@@ -1,0 +1,29 @@
+# Configuration for rPath repeater endpoints
+#
+# Note: When setting the following configuration parameters, be sure to
+# take the following into account:
+# 
+# o The endpoints should be generally be configured in a hub and spoke 
+#   method.  Where the hub includes the last mile repeater to the
+#   rBuilder.  The spokes are typically going to be the rPath Update
+#   servers
+#
+# o The way in which the rBuilder has been configured to handle the
+#   activation and polling of systems
+#
+# For more details, see the rBuilder Administration Guide.
+
+httpPort = (cfg.CfgInt, 8080)
+httpsPort = (cfg.CfgInt, 8443)
+#credentialPath = (cfg.CfgString, "/etc/conary/rMN")
+credentialPath = (cfg.CfgString, "tmp")
+xmppUsername = (cfg.CfgString, "rbuilder")
+xmppPassword = (cfg.CfgString, "password")
+xmppDomain = (cfg.CfgString, "jabber.eng.rpath.com")
+neighbors = (cfg.CfgList(cfg.CfgString), ["sput@jabber.eng.rpath.com/jabberlink"])
+repeaterHub = (cfg.CfgBool, 0)
+repeaterTypes = (cfg.CfgList(cfg.CfgString), ["HTTP",])
+repeaterDestinations = (cfg.CfgList(cfg.CfgString), ["localhost",])
+logFile = (cfg.CfgString, '/var/log/repeater')
+debugMode = (cfg.CfgBool, False)
+    
