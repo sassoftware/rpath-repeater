@@ -13,9 +13,7 @@
 
 from jabberlink.client import LinkClient
 from jabberlink.cred import XmppClientCredentials
-from jabberlink import logger
 from jabberlink import message
-from jabberlink.handlers.link import Message
 
 from rpath_repeater.endpoint import interfaces
 
@@ -44,7 +42,7 @@ class RepeaterMessageHandler(message.MessageHandler):
         
             neighbor.send(message.Message(self.namespace, reply, in_reply_to=msg))
         else:
-            raise Fault
+            raise
 
 class EndPointXMPPService(service.Service):
     implements(interfaces.IRepeaterPublishService)

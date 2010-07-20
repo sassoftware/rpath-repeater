@@ -22,7 +22,7 @@ from rpath_repeater import command
 from rpath_repeater import config
 from rpath_repeater import constants
 from rpath_repeater import errors
-from rpath_repeater import logger
+from rpath_repeater import logger as repeaterLogger
 
 class repeaterMain(mainhandler.MainHandler):
 
@@ -38,18 +38,7 @@ class repeaterMain(mainhandler.MainHandler):
 
     def configureLogging(self, logFile, debug):
         global logger
-        logger = logging.getLogger('repeater')
-        logger.setLevel(logging.INFO)
-        handler = logging.FileHandler(logFile)
-        formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-
-        if debug:
-            logger.setLevel(logging.DEBUG)
-            streamHandler = logging.StreamHandler(sys.stdout)
-            streamHandler.setFormatter(formatter)
-            logger.addHandler(streamHandler)
+        logger = repeaterLogger.getLogger()
 
         logger.info("Starting run of repeater endpoint...")
     
