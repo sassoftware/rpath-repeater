@@ -13,7 +13,6 @@
 #
 
 import errno
-import logging
 import sys
 
 from conary.lib import mainhandler
@@ -78,7 +77,7 @@ def _main(argv, MainClass):
             return 0
         return rc
     except debuggerException, err:
-        logger.error(err)
+        repeaterLogger.error(err)
         raise
     except IOError, e:
         # allow broken pipe to exit
