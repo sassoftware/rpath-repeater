@@ -106,4 +106,3 @@ class EndPointXMPPService(service.Service):
                 request.finish()
         
         return d
-    

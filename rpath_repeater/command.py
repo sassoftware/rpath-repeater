@@ -11,15 +11,10 @@
 # full details.
 #
 
-import os
-import sys
-import time
-import StringIO
-
 from conary.lib import command
-from conary.lib import options
+#from conary.lib import options
 
-from rpath_repeater import logger
+#from rpath_repeater import logger
 from rpath_repeater.endpoint import xmpp
 from rpath_repeater.repeaters import httprepeater
 

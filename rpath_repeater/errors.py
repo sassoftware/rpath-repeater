@@ -18,7 +18,7 @@ import traceback
 
 from conary.lib import util
 
-from rpath_repeater import logger
+#from rpath_repeater import logger
 
 class repeaterError(Exception):
     pass

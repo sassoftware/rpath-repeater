@@ -52,5 +52,4 @@ class HttpRepeater(object):
         
         d.callback(self)
         
-        return self.response
-        
+        return self.response   

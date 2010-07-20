@@ -49,5 +49,3 @@ class repeaterConfiguration(cfg.ConfigFile):
             self.read(root + os.environ["HOME"] + "/" + ".repeaterrc",
                       exception=False)
         self.read('repeaterrc', exception=False)
-        
-        
