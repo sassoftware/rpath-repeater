@@ -31,18 +31,33 @@ class RepeaterMessageHandler(message.MessageHandler):
 
     def onMessage(self, neighbor, msg):
         rows = msg.payload.split('\n')
-        
+
         header = eval(rows[0])
         body = "".join(rows[1:])
         
         if self.repeater:
-            response = self.repeater.dispatch(header['method'], header['url'], body, {})
+            response = self.repeater.dispatch(header['method'],
+                         header['url'], body, 
+                         {'X-rpathManagementNetworkNode': header['endpoint']})
             headers = {'status':response.status, 'headers':response.getheaders()}
             reply = "%s\n%s" % (headers, response.read())
         
             neighbor.send(message.Message(self.namespace, reply, in_reply_to=msg))
         else:
             raise
+
+class RepeaterLinkClient(LinkClient):
+    
+    def __init__(self, domain, creds, handlers=None, resource = "rPathManagementNetwork"):
+        self.resource = resource
+        super(RepeaterLinkClient,self).__init__(domain, creds, handlers)
+        
+           
+    def onNeighborDown(self, jid):
+        print "we lost %s" % jid
+        
+    def onNeighborUp(self, jid):
+        print "%s is back in business" % jid    
 
 class EndPointXMPPService(service.Service):
     implements(interfaces.IRepeaterPublishService)
@@ -51,11 +66,11 @@ class EndPointXMPPService(service.Service):
         self.cfg = cfg
        
         creds = XmppClientCredentials(cfg.credentialPath)
+        import epdb;epdb.st()
+        if self.cfg.xmppUser:
+            creds.set(self.cfg.xmppUser, self.cfg.xmppDomain, self.cfg.xmppUser)
         
-        if self.cfg.xmppUsername and self.cfg.xmppPassword:
-            creds.set(self.cfg.xmppUsername, self.cfg.xmppDomain, self.cfg.xmppPassword)
-        
-        self.client = LinkClient(cfg.xmppDomain, creds)
+        self.client = RepeaterLinkClient(cfg.xmppDomain, creds)
         self.client.logTraffic = True
  
         self.addNeighbors(self.cfg.neighbors)
@@ -80,8 +95,10 @@ class EndPointXMPPService(service.Service):
         request.content.seek(0, 0)
         msg = request.content.read()
         
-        headers = {'url':request.uri, 'sender':self.sender,
-                   'method':method.upper(), 'endpoint': request.getHost().host}
+        headers = {'url':request.uri,
+                   'sender':self.sender,
+                   'method':method.upper(), 
+                   'endpoint':self.cfg.xmppUsername}
         
         msg = "%s\n%s" % (headers, msg)
         msg = message.Message(NS, msg)

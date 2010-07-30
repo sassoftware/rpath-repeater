@@ -17,18 +17,23 @@ import os
 from conary.lib import cfg
 
 class repeaterConfiguration(cfg.ConfigFile):
+    topDir = (cfg.CfgString, "/etc/conary/rMN")
+    rActivateTopDir = (cfg.CfgString, "/etc/conary/ractivate")
+    
     httpPort = (cfg.CfgInt, 8080)
     httpsPort = (cfg.CfgInt, 8443)
-    #credentialPath = (cfg.CfgString, "/etc/conary/rMN/endpoint.cred")
-    credentialPath = (cfg.CfgString, "/tmp/endpoint.cred")
-    xmppUsername = (cfg.CfgString, "sput")
+    
+    xmppCredentialFile = (cfg.CfgString, "endpoint.cred")
+
+    uuidFile = (cfg.CfgString, "generated-uuid")
+    
+    xmppUsername = (cfg.CfgString, "rbuilder")
     xmppPassword = (cfg.CfgString, "password")
     xmppDomain = (cfg.CfgString, "jabber.eng.rpath.com")
-    neighbors = (cfg.CfgList(cfg.CfgString), ["rbuilder@jabber.eng.rpath.com/jabberlink",])
-    repeaterHub = (cfg.CfgBool, 0)
-    repeaterSpoke = (cfg.CfgBool, 1)
+    neighbors = (cfg.CfgList(cfg.CfgString), ["sput@jabber.eng.rpath.com/rPathManagementNetwork",])
+    repeaterHub = (cfg.CfgBool, 1)
     repeaterTypes = (cfg.CfgList(cfg.CfgString), ["HTTP",])
-    repeaterDestinations = (cfg.CfgList(cfg.CfgString), ["www.cnn.com",])
+    repeaterDestinations = (cfg.CfgList(cfg.CfgString), ["localhost",])
     logFile = (cfg.CfgString, '/var/log/repeater')
     debugMode = (cfg.CfgBool, False)
     
@@ -49,3 +54,11 @@ class repeaterConfiguration(cfg.ConfigFile):
             self.read(root + os.environ["HOME"] + "/" + ".repeaterrc",
                       exception=False)
         self.read('repeaterrc', exception=False)
+        
+    @property
+    def credentialPath(self):
+        return os.path.join(self.topDir, self.xmppCredentialFile)
+    
+    @property
+    def xmppUser(self):
+        return os.path.join(self.rActivateTopDir, self.uuidFile)

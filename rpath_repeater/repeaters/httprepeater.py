@@ -23,11 +23,11 @@ class HttpRepeater(object):
         self.host = host
         
    
-    def dispatch(self, method, endpoint, msg, headers):
+    def dispatch(self, method, url, msg, headers):
         d = defer.Deferred()
         
         self.method = method.upper()
-        self.endpoint = endpoint
+        self.url = url
         self.msg = msg
         self.headers = headers
         self.response = None
@@ -40,7 +40,7 @@ class HttpRepeater(object):
         def send(result):
             #fixme - handle the case when connections can't be made          
             if self.conn:
-                self.conn.request(self.method, self.endpoint, self.msg, self.headers)
+                self.conn.request(self.method, self.url, self.msg, self.headers)
 
                 self.response = self.conn.getresponse()
                 
