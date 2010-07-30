@@ -43,10 +43,16 @@ class RestForwardingPlugin(plug_dispatcher.DispatcherPlugin, plug_worker.Launche
     
     def dispatcher_post_setup(self, dispatcher):
         """ The rBuilder end of the rMake topology """
-
-        repeater = HttpRepeater('localhost')
         
-        dispatcher.bus.link.addMessageHandler(RepeaterMessageHandler(repeater))
+        # get configuration options
+        if self.__class__.__name__ in dispatcher.cfg.pluginOption:
+            options = dispatcher.cfg.pluginOption[self.__class__.__name__]
+            for option in options:
+                key, value = option.split()
+                
+                if key == 'repeaterTarget':
+                    repeater = HttpRepeater(value)
+                    dispatcher.bus.link.addMessageHandler(RepeaterMessageHandler(repeater))
     
 
 class RepeaterMessageHandler(message.MessageHandler):
@@ -150,11 +156,12 @@ class HttpRepeater(object):
         
         @d.addCallback
         def connect(result):
+            
             self.conn = httplib.HTTPConnection(self.host)
             
         @d.addCallback
         def send(result):
-            #fixme - handle the case when connections can't be made          
+                   
             if self.conn:
                 self.conn.request(self.method, self.url, self.msg, self.headers)
 
@@ -164,6 +171,7 @@ class HttpRepeater(object):
  
         @d.addErrback
         def errorHandler(failure):
+            print failure
             logger.logFailure(failure)
         
         d.callback(self)

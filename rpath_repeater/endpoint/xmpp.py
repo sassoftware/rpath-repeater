@@ -66,7 +66,7 @@ class EndPointXMPPService(service.Service):
         self.cfg = cfg
        
         creds = XmppClientCredentials(cfg.credentialPath)
-        import epdb;epdb.st()
+        
         if self.cfg.xmppUser:
             creds.set(self.cfg.xmppUser, self.cfg.xmppDomain, self.cfg.xmppUser)
         
