@@ -88,7 +88,7 @@ def _main(argv, MainClass):
         if rc is None:
             return 0
         return rc
-    except debuggerException, err:
+    except debuggerException:
 #        repeaterLogger.error(err)
         raise
     except IOError, e:
