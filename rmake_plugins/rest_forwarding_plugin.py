@@ -169,6 +169,3 @@ class HttpRepeater(object):
         d.callback(self)
         
         return self.response              
-        
-    
-        
