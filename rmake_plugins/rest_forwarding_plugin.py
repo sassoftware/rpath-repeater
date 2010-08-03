@@ -15,7 +15,7 @@
 import httplib
 import logging
 
-from jabberlink import message
+from rmake.lib.jabberlink import message
 
 from rmake.core import plug_dispatcher
 from rmake.worker import plug_worker
