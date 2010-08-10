@@ -59,7 +59,8 @@ class CimHandler(handler.JobHandler):
     
     def polling(self):
         self.setStatus(102, "Starting the polling {1/2}")
-        params = CimParams(self.cert, self.key)
+        params = CimParams(self.timeout)
+        data = eval(self.getData())
         task = self.newTask('Polling', CIM_TASK_POLLING,
                 PollingData(params, data['host'], self.port))
         def cb_gather(results):
