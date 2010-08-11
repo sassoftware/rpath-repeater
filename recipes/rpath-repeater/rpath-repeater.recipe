@@ -8,7 +8,8 @@ class rPathRepeater(PackageRecipe):
 
     buildRequires = [
         'make:runtime',
-        'rmake3',
+        'python:devel',
+        'rmake3:python',
     ]
 
     def setup(r):
