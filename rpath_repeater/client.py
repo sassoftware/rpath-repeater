@@ -12,7 +12,7 @@
 #
 
 from rmake.client import RmakeClient
-from rmake.lib import uuid
+from rmake.lib import uuid as RmakeUuid
 from rmake.core.types import RmakeJob
 
 from rpath_repeater.utils.immutabledict import FrozenImmutableDict
@@ -30,11 +30,14 @@ class RepeaterClient(object):
         data.update(method = 'rActivate')
         data=FrozenImmutableDict(data)
 
-        job = RmakeJob(uuid.uuid4(), 'com.rpath.sputnik.cimplugin', owner='nobody',
+        job = RmakeJob(RmakeUuid.uuid4(), 'com.rpath.sputnik.cimplugin', owner='nobody',
                        data=data, 
                        ).freeze()
 
-        juuid = job.job_uuid
+        uuid = job.job_uuid
         job = self.client.createJob(job)
 
-        return (juuid, job)
+        return (uuid, job.thaw())
+    
+    def getJob(self, uuid):
+        return self.client.getJob(uuid)
