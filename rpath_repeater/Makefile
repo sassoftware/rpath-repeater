@@ -14,7 +14,7 @@
 
 python_files =  $(wildcard *.py)
 
-SUBDIRS = endpoint repeaters
+SUBDIRS = utils
 
 all: default-subdirs default-all constants.py
 
