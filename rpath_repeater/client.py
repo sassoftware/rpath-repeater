@@ -38,4 +38,3 @@ class RepeaterClient(object):
         job = self.client.createJob(job)
 
         return (juuid, job)
-        
