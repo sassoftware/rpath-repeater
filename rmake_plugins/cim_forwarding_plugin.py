@@ -37,16 +37,32 @@ class CimForwardingPlugin(plug_dispatcher.DispatcherPlugin, plug_worker.WorkerPl
         
 class CimHandler(handler.JobHandler):
     
-    timeout = 3600
-    port = 5989
+    timeout = 7200
+    port = 5999
         
     jobType = CIM_JOB
     firstState = 'ractivate'
-       
+    
+    def setup (self):
+        cfg = self.dispatcher.cfg
+        
+        # get configuration options
+        if self.__class__.__name__ in cfg.pluginOption:
+            options = cfg.pluginOption[self.__class__.__name__]
+            for option in options:
+                key, value = option.split()
+                
+                if key == 'timeout':
+                    self.timeout = int(value)
+                elif key == 'port':
+                    self.port = int(value)
+
     def ractivate(self):
         self.setStatus(102, "Starting the rActivation {1/2}")
-        params = CimParams(self.timeout)
-        data = eval(self.getData())
+        params = CimParams(self.timeout, self.port)
+        
+        data = self.getData().thaw().getDict()
+        
         task = self.newTask('rActivate', CIM_TASK_RACTIVATE,
                 RactivateData(params, data['host'], self.port))
         def cb_gather(results):
@@ -59,7 +75,7 @@ class CimHandler(handler.JobHandler):
     
     def polling(self):
         self.setStatus(102, "Starting the polling {1/2}")
-        params = CimParams(self.timeout)
+        params = CimParams(self.timeout, self.port)
         data = eval(self.getData())
         task = self.newTask('Polling', CIM_TASK_POLLING,
                 PollingData(params, data['host'], self.port))
@@ -71,7 +87,7 @@ class CimHandler(handler.JobHandler):
             return 'done'
         return self.gatherTasks([task], cb_gather)    
     
-CimParams = types.slottype('CimParams', 'timeout')
+CimParams = types.slottype('CimParams', 'timeout port')
 # These are just the starting point attributes
 RactivateData = types.slottype('RactivateData', 'p host port response')
 PollingData = types.slottype('PollingData', 'p host port response')
