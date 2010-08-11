@@ -1,0 +1,17 @@
+#
+# Copyright (c) 2010 rPath, Inc.
+#
+
+class rPathRepeater(PackageRecipe):
+    name = 'rpath-repeater'
+    version = '0.1'
+
+    buildRequires = [
+        'make:runtime',
+        'rmake3:python',
+    ]
+
+    def setup(r):
+        r.addMercurialSnapshot()
+        r.MakeInstall()
+
