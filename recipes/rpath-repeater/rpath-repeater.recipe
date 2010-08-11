@@ -15,4 +15,4 @@ class rPathRepeater(PackageRecipe):
     def setup(r):
         r.addMercurialSnapshot()
         r.MakeInstall()
-
+        r.CompilePython('%(libdir)s')
