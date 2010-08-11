@@ -24,7 +24,7 @@ export libexecdir = $(prefix)/libexec
 export datadir = $(prefix)/share
 export mandir = $(datadir)/man
 export sitedir = $(libdir)/python$(PYVERSION)/site-packages
-export repeaterdir = $(sitedir)/rpath-repeater
+export repeaterdir = $(sitedir)/rpath_repeater
 export initdir = /etc/init.d
 export sysconfdir = /etc/sysconfig
 

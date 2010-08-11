@@ -15,7 +15,8 @@
 import httplib
 import logging
 
-from jabberlink import message
+from rmake.lib import chutney
+from rmake.lib.jabberlink import message
 
 from rmake.core import plug_dispatcher
 from rmake.worker import plug_worker
@@ -63,19 +64,17 @@ class RepeaterMessageHandler(message.MessageHandler):
 
     def onMessage(self, neighbor, msg):
         
-        rows = msg.payload.split('\n')
+        dict = chutney.loads(msg.payload)
 
-        header = eval(rows[0])
-        body = "".join(rows[1:])
-        
         if self.repeater:
-            response = self.repeater.dispatch(header['method'],
-                         header['url'], body, 
+            response = self.repeater.dispatch(dict['method'],
+                         dict['url'], dict['body'], 
                          {'X-rpathManagementNetworkNode': neighbor.jid})
-            headers = {'status':response.status, 'headers':response.getheaders()}
-            reply = "%s\n%s" % (headers, response.read())
+            reply = {'status':response.status, 'headers':response.getheaders(), 
+                     'response': response.read()}
         
-            neighbor.send(message.Message(self.namespace, reply, in_reply_to=msg))
+            neighbor.send(message.Message(self.namespace, chutney.dumps(reply),
+                                           in_reply_to=msg))
         else:
             raise
 
@@ -115,26 +114,25 @@ class EndPoint(resource.Resource):
     def sendMsg(self, request, method):
         
         request.content.seek(0, 0)
-        msg = request.content.read()
+        body = request.content.read()
         
-        headers = {'url':request.uri,
-                   'method':method.upper()}
+        content = {'url':request.uri,
+                   'method':method.upper(),
+                   'body': body}
         
-        msg = "%s\n%s" % (headers, msg)
-        msg = message.Message(NS, msg)
+        content = chutney.dumps(content)
+        msg = message.Message(NS, content)
                 
         d = self.bus.link.sendWithDeferred(self.bus.targetJID, msg)
         
         @d.addCallback
         def on_reply(replies):
             for reply in replies:
-                rows = reply.payload.split('\n')     
-                header = eval(rows[0])
-                body = "".join(rows[1:])
+                dict = chutney.loads(reply.payload)
 
-                request.setResponseCode(header['status'])
+                request.setResponseCode(dict['status'])
                 if body:
-                    request.write(body)
+                    request.write(dict['response'])
                 request.finish()
         
         return d

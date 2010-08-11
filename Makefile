@@ -21,8 +21,8 @@ export TOPDIR = $(shell pwd)
 export TIMESTAMP = $(shell python -c "import time; print time.time(); exit;")
 export CFGDEVEL=repeaterrc
 
-SUBDIRS=rpath_repeater distro commands
-MAKEALLSUBDIRS=rpath_repeater distro commands
+SUBDIRS=rpath_repeater rmake_plugins
+MAKEALLSUBDIRS=rpath_repeater rmake_plugins
 
 extra_files = \
 	Make.rules              \
