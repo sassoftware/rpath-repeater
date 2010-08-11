@@ -15,11 +15,11 @@
 import httplib
 import logging
 
-from rmake.lib import chutney
-from rmake.lib.jabberlink import message
+from rmake3.lib import chutney
+from rmake3.lib.jabberlink import message
 
-from rmake.core import plug_dispatcher
-from rmake.worker import plug_worker
+from rmake3.core import plug_dispatcher
+from rmake3.worker import plug_worker
 
 from twisted.internet import defer, reactor
 from twisted.web import resource, server
