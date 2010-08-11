@@ -12,7 +12,7 @@
 # full details.
 #
 
-from rmake.core.types import freezify, SlotCompare
+from rmake3.core.types import freezify, SlotCompare
 
 class ImmutableDict(SlotCompare):   
     """

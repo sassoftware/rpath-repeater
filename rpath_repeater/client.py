@@ -11,9 +11,9 @@
 # full details.
 #
 
-from rmake.client import RmakeClient
-from rmake.lib import uuid as RmakeUuid
-from rmake.core.types import RmakeJob
+from rmake3.client import RmakeClient
+from rmake3.lib import uuid as RmakeUuid
+from rmake3.core.types import RmakeJob
 
 from rpath_repeater.utils.immutabledict import FrozenImmutableDict
 

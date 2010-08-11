@@ -12,10 +12,10 @@
 # full details.
 #
 
-from rmake.core import handler
-from rmake.core import plug_dispatcher
-from rmake.core import types
-from rmake.worker import plug_worker
+from rmake3.core import handler
+from rmake3.core import plug_dispatcher
+from rmake3.core import types
+from rmake3.worker import plug_worker
 
 
 PREFIX = 'com.rpath.sputnik.cimplugin'
