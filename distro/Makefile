@@ -9,8 +9,8 @@
 all: default-all
 
 install: default-install
-	install -D -m0644 repeaterrc $(DESTDIR)/etc/conary/rMN/repeaterrc
-	install -D -m0755 repeater.init $(DESTDIR)/etc/init.d/repeater
+	install -D -m0644 disp.cfg $(DESTDIR)/etc/rmake3/server.d/25_repeater.conf
+	install -D -m0644 worker.cfg $(DESTDIR)/etc/rmake3/node.d/25_repeater.conf
 
 include ../Make.rules
 include ../Make.defs
