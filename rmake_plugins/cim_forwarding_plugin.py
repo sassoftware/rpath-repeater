@@ -13,13 +13,13 @@
 #
 
 import pywbem
-import rpath_repeater.utils import nodeinfo, wbemlib
 
 from rmake3.core import handler
 from rmake3.core import plug_dispatcher
 from rmake3.core import types
 from rmake3.worker import plug_worker
 
+from rpath_repeater.utils import nodeinfo, wbemlib
 
 PREFIX = 'com.rpath.sputnik.cimplugin'
 CIM_JOB = PREFIX
