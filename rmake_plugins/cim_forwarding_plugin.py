@@ -12,6 +12,9 @@
 # full details.
 #
 
+import pywbem
+import rpath_repeater.utils import nodeinfo, wbemlib
+
 from rmake3.core import handler
 from rmake3.core import plug_dispatcher
 from rmake3.core import types
@@ -64,7 +67,7 @@ class CimHandler(handler.JobHandler):
         data = self.getData().thaw().getDict()
         
         task = self.newTask('rActivate', CIM_TASK_RACTIVATE,
-                RactivateData(params, data['host'], self.port))
+                RactivateData(params, data['host'], self.port, nodeinfo.get_ip_address('eth0') +':8443'))
         def cb_gather(results):
             task, = results
             result = task.task_data.getObject().response
@@ -89,7 +92,7 @@ class CimHandler(handler.JobHandler):
     
 CimParams = types.slottype('CimParams', 'timeout port')
 # These are just the starting point attributes
-RactivateData = types.slottype('RactivateData', 'p host port response')
+RactivateData = types.slottype('RactivateData', 'p host port node response')
 PollingData = types.slottype('PollingData', 'p host port response')
     
 class RactivateTask(plug_worker.TaskHandler):
@@ -102,7 +105,10 @@ class RactivateTask(plug_worker.TaskHandler):
             data.host, data.port))
 
         #send CIM rActivate request
-        data.response = "<system/>"
+        server = wbemlib.WBEMServer("https://" + data.host)
+        cimInstances = server.RPATH_ComputerSystem.EnumerateInstanceNames()
+        server.conn.callMethod(cimInstances[0], 'RemoteActivation', ManagementNodeAddresses = [data.node])
+        data.response = ""
 
         self.setData(data)
         self.sendStatus(200, "Host %s will try to rActivate itself" % data.host)
