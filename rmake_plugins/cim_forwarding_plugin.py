@@ -12,8 +12,6 @@
 # full details.
 #
 
-import pywbem
-
 from rmake3.core import handler
 from rmake3.core import plug_dispatcher
 from rmake3.core import types
