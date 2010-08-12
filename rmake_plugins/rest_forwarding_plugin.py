@@ -38,13 +38,18 @@ class RestForwardingPlugin(plug_dispatcher.DispatcherPlugin, plug_worker.Launche
             options = launcher.cfg.pluginOption[self.__class__.__name__]
             for option in options:
                 key, value = option.split()
+                if key == 'key':
+                    self.sslkey = value
+                    
+                elif key == 'cert':
+                    self.sslcert = value
                 
-                if key == 'httpPort':
+                elif key == 'httpPort':
                     reactor.listenTCP(int(value), server.Site(resource.IResource(endpoint)))
                     
                 elif key == 'httpsPort':
                     reactor.listenSSL(int(value), server.Site(resource.IResource(endpoint)),
-                                      ssl.DefaultOpenSSLContextFactory('/root/certs/hg/site.pem','/root/certs/hg/site.pem'))
+                                      ssl.DefaultOpenSSLContextFactory(self.sslkey, self.sslcert))
     
     def dispatcher_post_setup(self, dispatcher):
         """ The rBuilder end of the rMake topology """

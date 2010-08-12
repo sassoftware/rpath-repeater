@@ -10,19 +10,5 @@
 # without any warranty; without even the implied warranty of merchantability
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
-
-from OpenSSL import SSL
-
-class RepeaterContextFactory:
-    
-    def __init__(self, certLocation):
-        self.pem = certLocation
-    
-    def getContext(self):
-        ctx = SSL.Context(SSL.SSLv23_METHOD)
-    
-        ctx.use_certificate_file(self.pem)
-        ctx.use_privatekey_file(self.pem)
-        return ctx 
     
         
