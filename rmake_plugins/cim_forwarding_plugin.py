@@ -65,7 +65,7 @@ class CimHandler(handler.JobHandler):
         data = self.getData().thaw().getDict()
         
         task = self.newTask('rActivate', CIM_TASK_RACTIVATE,
-                RactivateData(params, data['host'], self.port, nodeinfo.get_ip_address('eth0') +':8443'))
+                RactivateData(params, data['host'], self.port, nodeinfo.get_hostname() +':8443'))
         def cb_gather(results):
             task, = results
             result = task.task_data.getObject().response
