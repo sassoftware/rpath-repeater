@@ -95,8 +95,6 @@ PollingData = types.slottype('PollingData', 'p host port response')
     
 class RactivateTask(plug_worker.TaskHandler):
     
-    
-
     def run(self):
         data = self.getData()
         self.sendStatus(101, "Contacting host %s on port %d to rActivate itself" % (

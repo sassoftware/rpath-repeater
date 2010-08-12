@@ -21,7 +21,7 @@ class RepeaterClient(object):
     
     def __init__(self, address = None):
         if not address:
-            address = 'http://localhost:9999/'
+            address = 'http://localhost:9998/'
             
         self.client = RmakeClient(address)
         
@@ -41,3 +41,10 @@ class RepeaterClient(object):
     
     def getJob(self, uuid):
         return self.client.getJob(uuid)
+    
+def main():
+    cli = RepeaterClient()
+    cli.activate('dhcp236.eng.rpath.com')
+ 
+if __name__ == "__main__":
+    main()
