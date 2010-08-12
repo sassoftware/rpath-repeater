@@ -21,7 +21,7 @@ from rmake3.lib.jabberlink import message
 from rmake3.core import plug_dispatcher
 from rmake3.worker import plug_worker
 
-from twisted.internet import defer, reactor
+from twisted.internet import defer, reactor, ssl
 from twisted.web import resource, server
 
 NS = 'http://rpath.com/permanent/xmpp/repeater-1.0'
@@ -41,6 +41,10 @@ class RestForwardingPlugin(plug_dispatcher.DispatcherPlugin, plug_worker.Launche
                 
                 if key == 'httpPort':
                     reactor.listenTCP(int(value), server.Site(resource.IResource(endpoint)))
+                    
+                elif key == 'httpsPort':
+                    reactor.listenSSL(int(value), server.Site(resource.IResource(endpoint)),
+                                      ssl.DefaultOpenSSLContextFactory('/root/certs/hg/site.pem','/root/certs/hg/site.pem'))
     
     def dispatcher_post_setup(self, dispatcher):
         """ The rBuilder end of the rMake topology """
