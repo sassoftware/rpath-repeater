@@ -39,7 +39,7 @@ class CimForwardingPlugin(plug_dispatcher.DispatcherPlugin, plug_worker.WorkerPl
 class CimHandler(handler.JobHandler):
     
     timeout = 7200
-    port = 5999
+    port = 5989
         
     jobType = CIM_JOB
     firstState = 'ractivate'
@@ -64,8 +64,16 @@ class CimHandler(handler.JobHandler):
         
         data = self.getData().thaw().getDict()
         
+        self.setStatus(103, "Starting to probe the host: %s" % (data['host']))
+        try:
+            nodeinfo.probe_host(data['host'], self.port)
+        except self.ProbeHostError:
+            self.setStatus(404, "CIM not found on host: %s port: %d" ())
+            raise 
+        
         task = self.newTask('rActivate', CIM_TASK_RACTIVATE,
                 RactivateData(params, data['host'], self.port, nodeinfo.get_hostname() +':8443'))
+        
         def cb_gather(results):
             task, = results
             result = task.task_data.getObject().response
