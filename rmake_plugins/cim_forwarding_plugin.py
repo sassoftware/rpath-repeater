@@ -68,8 +68,8 @@ class CimHandler(handler.JobHandler):
         try:
             nodeinfo.probe_host(data['host'], self.port)
         except self.ProbeHostError:
-            self.setStatus(404, "CIM not found on host: %s port: %d" ())
-            raise 
+            self.setStatus(404, "CIM not found on host: %s port: %d" (data['host'], self.port))
+            return 
         
         task = self.newTask('rActivate', CIM_TASK_RACTIVATE,
                 RactivateData(params, data['host'], self.port, nodeinfo.get_hostname() +':8443'))
