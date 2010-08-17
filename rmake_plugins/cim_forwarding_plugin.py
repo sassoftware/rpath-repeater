@@ -62,29 +62,31 @@ class CimHandler(handler.JobHandler):
 
     def cimCall(self):
         self.setStatus(101, "Starting the CIM call {0/2}")
+        
         data = self.getData().thaw().getDict()
-        method = data['method']
-        host = data['host']
+        self.method = data['method']
+        self.host = data['host']
         
-        params = CimParams(host, self.port)
+        self.params = CimParams(self.host, self.port)
         
-        self.setStatus(102, "Starting to probe the host: %s" % (host))
+        self.setStatus(102, "Starting to probe the host: %s" % (self.host))
         try:
-            nodeinfo.probe_host(host, self.port)
+            nodeinfo.probe_host(self.host, self.port)
         except self.ProbeHostError:
-            self.setStatus(404, "CIM not found on host: %s port: %d" % (host, self.port))
+            self.setStatus(404, "CIM not found on host: %s port: %d" % (self.host, self.port))
             return 
         
-        if hasattr(self, method, None):
-            getattr(self, method)(params, data)
-        else:
-            self.setStatus(405, "Method does not exist: %s" % (method))
+        if hasattr(self, self.method):
+            return self.method
+        
+        self.setStatus(405, "Method does not exist: %s" % (self.method))
+        return   
 
-    def ractivate(self, params, data):
+    def ractivate(self):
         self.setStatus(103, "Starting the rActivation {1/2}")
         
         task = self.newTask('rActivate', CIM_TASK_RACTIVATE,
-                RactivateData(params, nodeinfo.get_hostname() +':8443'))
+                RactivateData(self.params, nodeinfo.get_hostname() +':8443'))
         
         def cb_gather(results):
             task, = results
@@ -94,11 +96,11 @@ class CimHandler(handler.JobHandler):
             return 'done'
         return self.gatherTasks([task], cb_gather)
     
-    def shutdown(self, params, data):
+    def shutdown(self):
         self.setStatus(103, "Shutting down the managed server")
         
         task = self.newTask('shutdown', CIM_TASK_SHUTDOWN,
-                CimData(params))
+                CimData(self.params))
         def cb_gather(results):
             task, = results
             result = task.task_data.getObject().response
@@ -107,11 +109,11 @@ class CimHandler(handler.JobHandler):
             return 'done'
         return self.gatherTasks([task], cb_gather) 
     
-    def polling(self, params, data):
+    def polling(self):
         self.setStatus(103, "Starting the polling {1/2}")
 
         task = self.newTask('Polling', CIM_TASK_POLLING,
-                CimData(params))
+                CimData(self.params))
         def cb_gather(results):
             task, = results
             result = task.task_data.getObject().response
@@ -130,7 +132,7 @@ class RactivateTask(plug_worker.TaskHandler):
     def run(self):
         data = self.getData()
         self.sendStatus(104, "Contacting host %s on port %d to rActivate itself" % (
-            data.host, data.port))
+            data.p.host, data.p.port))
 
         #send CIM rActivate request
         server = wbemlib.WBEMServer("https://" + data.host)
@@ -146,30 +148,30 @@ class ShutdownTask(plug_worker.TaskHandler):
     def run(self):
         data = self.getData()
         self.sendStatus(101, "Contacting host %s to shut itself down" % (
-            data.host))
+            data.p.host))
 
         #send CIM Shutdown request
-        server = wbemlib.WBEMServer("https://" + data.host)
-        cimInstances = server.RPATH_ComputerSystem.EnumerateInstanceNames()
+        server = wbemlib.WBEMServer("https://" + data.p.host)
+        cimInstances = server.Linux_OperatingSystem.EnumerateInstanceNames()
         value, args = server.conn.callMethod(cimInstances[0], 'Shutdown')
         data.response = str(value)
 
-        self.setData()
+        self.setData(data)
         if not value:
-            self.sendStatus(200, "Host %s will now shutdown" % data.host)
+            self.sendStatus(200, "Host %s will now shutdown" % data.p.host)
         else:
-            self.sendStatus(401, "Could not shutdown host %s" % data.host)
+            self.sendStatus(401, "Could not shutdown host %s" % data.p.host)
 
 class PollingTask(plug_worker.TaskHandler):
 
     def run(self):
         data = self.getData()
         self.sendStatus(101, "Contacting host %s on port %d to Poll it for info" % (
-            data.host, data.port))
+            data.p.host, data.p.port))
 
         #send CIM poll request
         data.response = ""
 
         self.setData(data)
-        self.sendStatus(200, "Host %s has been polled" % data.host)
+        self.sendStatus(200, "Host %s has been polled" % data.p.host)
     
