@@ -102,7 +102,7 @@ class EndPoint(resource.Resource):
         return server.NOT_DONE_YET
         
     def render_POST(self, request):
-        print request
+ 
         self.sendMsg(request, 'POST')
         return server.NOT_DONE_YET
     

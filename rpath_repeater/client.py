@@ -39,14 +39,14 @@ class RepeaterClient(object):
 
         return (uuid, job.thaw())
         
-    def activate(self, host, port = None):
-        data = dict(host=host, port = port)
+    def activate(self, host, node, port = None):
+        data = dict(host=host, port = port, node = node)
         data.update(method = 'ractivate')
 
         return self.__callDispatcher(data)
     
-    def shutdown(self, host, port = None):
-        data = dict(host=host, port = port)
+    def shutdown(self, host, node, port = None):
+        data = dict(host=host, port = port, node = node)
         data.update(method = 'shutdown')
         
         return self.__callDispatcher(data)
@@ -56,7 +56,7 @@ class RepeaterClient(object):
     
 def main():
     cli = RepeaterClient()
-    cli.activate('dhcp236.eng.rpath.com')
+    cli.activate('dhcp236.eng.rpath.com', 'sputnik1')
  
 if __name__ == "__main__":
     main()
