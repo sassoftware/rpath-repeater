@@ -73,7 +73,7 @@ class CimHandler(handler.JobHandler):
         self.setStatus(102, "Starting to probe the host: %s" % (self.host))
         try:
             nodeinfo.probe_host(self.host, self.port)
-        except self.ProbeHostError:
+        except nodeinfo.ProbeHostError:
             self.setStatus(404, "CIM not found on host: %s port: %d" % (self.host, self.port))
             return 
         
