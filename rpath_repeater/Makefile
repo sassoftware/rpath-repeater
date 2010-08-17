@@ -16,22 +16,11 @@ python_files =  $(wildcard *.py)
 
 SUBDIRS = utils
 
-all: default-subdirs default-all constants.py
-
-constants.py: constants.py.in ../Makefile ../Make.defs Makefile
-	sed -e s,@version@,$(VERSION),g \
-	$< > $@
-
-install: all install-subdirs pyfiles-install default-install
-	install constants.py $(DESTDIR)$(repeaterdir)/constants.py
-	$(PYTHON) -c "import compileall; compileall.compile_dir('$(DESTDIR)$(repeaterdir)', ddir='$(repeaterdir)', quiet=1)"
-	$(PYTHON) -OO -c "import compileall; compileall.compile_dir('$(DESTDIR)$(repeaterdir)', ddir='$(repeaterdir)', quiet=1)"
-
+all: default-subdirs default-all 
 
 dist: default-dist
 
 clean: clean-subdirs default-clean
-	rm -f constants.py
 
 include ../Make.rules
 include ../Make.defs
