@@ -22,6 +22,7 @@ from rpath_repeater.utils import nodeinfo, wbemlib
 PREFIX = 'com.rpath.sputnik.cimplugin'
 CIM_JOB = PREFIX
 CIM_TASK_RACTIVATE = PREFIX + '.ractivate'
+CIM_TASK_SHUTDOWN = PREFIX + '.shutdown'
 CIM_TASK_POLLING = PREFIX + '.poll'
 
 
@@ -33,6 +34,7 @@ class CimForwardingPlugin(plug_dispatcher.DispatcherPlugin, plug_worker.WorkerPl
     def worker_get_task_types(self):
         return {
                 CIM_TASK_RACTIVATE: RactivateTask,
+                CIM_TASK_SHUTDOWN: ShutdownTask,
                 CIM_TASK_POLLING: PollingTask,
                 }
         
@@ -42,7 +44,7 @@ class CimHandler(handler.JobHandler):
     port = 5989
         
     jobType = CIM_JOB
-    firstState = 'ractivate'
+    firstState = 'cimCall'
     
     def setup (self):
         cfg = self.dispatcher.cfg
@@ -58,21 +60,31 @@ class CimHandler(handler.JobHandler):
                 elif key == 'port':
                     self.port = int(value)
 
-    def ractivate(self):
-        self.setStatus(102, "Starting the rActivation {1/2}")
-        params = CimParams(self.timeout, self.port)
-        
+    def cimCall(self):
+        self.setStatus(101, "Starting the CIM call {0/2}")
         data = self.getData().thaw().getDict()
+        method = data['method']
+        host = data['host']
         
-        self.setStatus(103, "Starting to probe the host: %s" % (data['host']))
+        params = CimParams(host, self.port)
+        
+        self.setStatus(102, "Starting to probe the host: %s" % (host))
         try:
-            nodeinfo.probe_host(data['host'], self.port)
+            nodeinfo.probe_host(host, self.port)
         except self.ProbeHostError:
-            self.setStatus(404, "CIM not found on host: %s port: %d" (data['host'], self.port))
+            self.setStatus(404, "CIM not found on host: %s port: %d" % (host, self.port))
             return 
         
+        if hasattr(self, method, None):
+            getattr(self, method)(params, data)
+        else:
+            self.setStatus(405, "Method does not exist: %s" % (method))
+
+    def ractivate(self, params, data):
+        self.setStatus(103, "Starting the rActivation {1/2}")
+        
         task = self.newTask('rActivate', CIM_TASK_RACTIVATE,
-                RactivateData(params, data['host'], self.port, nodeinfo.get_hostname() +':8443'))
+                RactivateData(params, nodeinfo.get_hostname() +':8443'))
         
         def cb_gather(results):
             task, = results
@@ -82,12 +94,24 @@ class CimHandler(handler.JobHandler):
             return 'done'
         return self.gatherTasks([task], cb_gather)
     
-    def polling(self):
-        self.setStatus(102, "Starting the polling {1/2}")
-        params = CimParams(self.timeout, self.port)
-        data = eval(self.getData())
+    def shutdown(self, params, data):
+        self.setStatus(103, "Shutting down the managed server")
+        
+        task = self.newTask('shutdown', CIM_TASK_SHUTDOWN,
+                CimData(params))
+        def cb_gather(results):
+            task, = results
+            result = task.task_data.getObject().response
+            self.job.data = types.FrozenObject.fromObject(result)
+            self.setStatus(200, "Done! cim shutdown of %s" % (result))
+            return 'done'
+        return self.gatherTasks([task], cb_gather) 
+    
+    def polling(self, params, data):
+        self.setStatus(103, "Starting the polling {1/2}")
+
         task = self.newTask('Polling', CIM_TASK_POLLING,
-                PollingData(params, data['host'], self.port))
+                CimData(params))
         def cb_gather(results):
             task, = results
             result = task.task_data.getObject().response
@@ -96,16 +120,16 @@ class CimHandler(handler.JobHandler):
             return 'done'
         return self.gatherTasks([task], cb_gather)    
     
-CimParams = types.slottype('CimParams', 'timeout port')
+CimParams = types.slottype('CimParams', 'host port')
 # These are just the starting point attributes
-RactivateData = types.slottype('RactivateData', 'p host port node response')
-PollingData = types.slottype('PollingData', 'p host port response')
+CimData = types.slottype('CimData', 'p response')
+RactivateData = types.slottype('RactivateData', 'p node response')
     
 class RactivateTask(plug_worker.TaskHandler):
     
     def run(self):
         data = self.getData()
-        self.sendStatus(101, "Contacting host %s on port %d to rActivate itself" % (
+        self.sendStatus(104, "Contacting host %s on port %d to rActivate itself" % (
             data.host, data.port))
 
         #send CIM rActivate request
@@ -116,7 +140,25 @@ class RactivateTask(plug_worker.TaskHandler):
 
         self.setData(data)
         self.sendStatus(200, "Host %s will try to rActivate itself" % data.host)
+        
+class ShutdownTask(plug_worker.TaskHandler):
+    
+    def run(self):
+        data = self.getData()
+        self.sendStatus(101, "Contacting host %s to shut itself down" % (
+            data.host))
 
+        #send CIM Shutdown request
+        server = wbemlib.WBEMServer("https://" + data.host)
+        cimInstances = server.RPATH_ComputerSystem.EnumerateInstanceNames()
+        value, args = server.conn.callMethod(cimInstances[0], 'Shutdown')
+        data.response = str(value)
+
+        self.setData()
+        if not value:
+            self.sendStatus(200, "Host %s will now shutdown" % data.host)
+        else:
+            self.sendStatus(401, "Could not shutdown host %s" % data.host)
 
 class PollingTask(plug_worker.TaskHandler):
 

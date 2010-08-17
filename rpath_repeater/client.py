@@ -19,18 +19,18 @@ from rpath_repeater.utils.immutabledict import FrozenImmutableDict
 
 class RepeaterClient(object):
     
+    __PLUGIN_NS = 'com.rpath.sputnik.cimplugin'
+    
     def __init__(self, address = None):
         if not address:
             address = 'http://localhost:9998/'
             
         self.client = RmakeClient(address)
         
-    def activate(self, host, port = None):
-        data = dict(host=host, port = port)
-        data.update(method = 'rActivate')
+    def __callDispatcher(self, data):
         data=FrozenImmutableDict(data)
 
-        job = RmakeJob(RmakeUuid.uuid4(), 'com.rpath.sputnik.cimplugin', owner='nobody',
+        job = RmakeJob(RmakeUuid.uuid4(), self.__PLUGIN_NS, owner='nobody',
                        data=data, 
                        ).freeze()
 
@@ -38,6 +38,18 @@ class RepeaterClient(object):
         job = self.client.createJob(job)
 
         return (uuid, job.thaw())
+        
+    def activate(self, host, port = None):
+        data = dict(host=host, port = port)
+        data.update(method = 'ractivate')
+
+        return self.__callDispatcher(data)
+    
+    def shutdown(self, host, port = None):
+        data = dict(host=host, port = port)
+        data.update(method = 'shutdown')
+        
+        return self.__callDispatcher(data)
     
     def getJob(self, uuid):
         return self.client.getJob(uuid)
