@@ -24,7 +24,7 @@ CIM_JOB = PREFIX
 CIM_TASK_RACTIVATE = PREFIX + '.ractivate'
 CIM_TASK_SHUTDOWN = PREFIX + '.shutdown'
 CIM_TASK_POLLING = PREFIX + '.poll'
-
+CIM_TASK_UPDATE = PREFIX + '.update'
 
 class CimForwardingPlugin(plug_dispatcher.DispatcherPlugin, plug_worker.WorkerPlugin):
     
@@ -36,6 +36,7 @@ class CimForwardingPlugin(plug_dispatcher.DispatcherPlugin, plug_worker.WorkerPl
                 CIM_TASK_RACTIVATE: RactivateTask,
                 CIM_TASK_SHUTDOWN: ShutdownTask,
                 CIM_TASK_POLLING: PollingTask,
+                CIM_TASK_UPDATE: UpdateTask,
                 }
         
 class CimHandler(handler.JobHandler):
@@ -63,9 +64,9 @@ class CimHandler(handler.JobHandler):
     def cimCall(self):
         self.setStatus(101, "Starting the CIM call {0/2}")
         
-        data = self.getData().thaw().getDict()
-        self.method = data['method']
-        self.host = data['host']
+        self.data = self.getData().thaw().getDict()
+        self.method = self.data['method']
+        self.host = self.data['host']
         
         self.params = CimParams(self.host, self.port)
         
@@ -122,10 +123,26 @@ class CimHandler(handler.JobHandler):
             return 'done'
         return self.gatherTasks([task], cb_gather)    
     
+    def update(self):
+        self.setStatus(103, "Starting the updating {1/2}")
+
+        sources = self.data['sources']
+
+        task = self.newTask('Update', CIM_TASK_UPDATE,
+                UpdateData(self.params, sources))
+        def cb_gather(results):
+            task, = results
+            result = task.task_data.getObject().response
+            self.job.data = types.FrozenObject.fromObject(result)
+            self.setStatus(200, "Done! cim update got a result of: %s" % (result))
+            return 'done'
+        return self.gatherTasks([task], cb_gather)   
+    
 CimParams = types.slottype('CimParams', 'host port')
 # These are just the starting point attributes
 CimData = types.slottype('CimData', 'p response')
 RactivateData = types.slottype('RactivateData', 'p node response')
+UpdateData = types.slottype('UpdateData', 'p sources response')
     
 class RactivateTask(plug_worker.TaskHandler):
     
@@ -175,3 +192,15 @@ class PollingTask(plug_worker.TaskHandler):
         self.setData(data)
         self.sendStatus(200, "Host %s has been polled" % data.p.host)
     
+class UpdateTask(plug_worker.TaskHandler):
+
+    def run(self):
+        data = self.getData()
+        self.sendStatus(101, "Contacting host %s on port %d to Update it for info" % (
+            data.p.host, data.p.port))
+
+        #send CIM poll request
+        data.response = "*handwave*"
+
+        self.setData(data)
+        self.sendStatus(200, "Host %s has been updated" % data.p.host)

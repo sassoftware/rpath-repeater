@@ -51,6 +51,13 @@ class RepeaterClient(object):
         
         return self.__callDispatcher(data)
     
+    def update(self, host, node, sources, port = None):
+        data = dict(host=host, port = port, node = node,
+                    sources = sources)
+        data.update(method = 'update')
+        
+        return self.__callDispatcher(data)        
+    
     def getJob(self, uuid):
         return self.client.getJob(uuid)
     
