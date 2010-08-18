@@ -76,7 +76,7 @@ class RepeaterClient(object):
         return self.__callDispatcher(data)
 
     def getJob(self, uuid):
-        return self.client.getJob(uuid)
+        return self.client.getJob(uuid).thaw()
 
 def main():
     if len(sys.argv) < 2:
