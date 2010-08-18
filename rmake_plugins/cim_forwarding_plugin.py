@@ -18,6 +18,7 @@ from rmake3.core import types
 from rmake3.worker import plug_worker
 
 from rpath_repeater.utils import nodeinfo, wbemlib
+from rpath_repeater.utils.immutabledict import FrozenImmutableDict
 
 PREFIX = 'com.rpath.sputnik'
 PRESENCE_JOB = PREFIX + '.presence'
@@ -47,7 +48,13 @@ class PresenceHandler(handler.JobHandler):
     firstState = 'neighbors'
     
     def neighbors(self):
-        self.job.data = "Test"
+        self.setStatus(100, "Fetching neighbors")
+        neighbors = {}
+
+        for key, value in self.dispatcher.bus.link.neighbors.items():
+            neighbors.update(key=value.isAvailable)
+        
+        self.job.data = FrozenImmutableDict(neighbors)
         self.setStatus(200, "Got neighbors")
         return 'done'
         
