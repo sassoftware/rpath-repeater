@@ -61,13 +61,23 @@ class RepeaterClient(object):
         return self.__callDispatcher(data)      
     
     def getNodes(self):
-        job = RmakeJob(RmakeUuid.uuid4(), self.__PRESENCE_PLUGIN_NS, owner='nobody',
-                       data="n/a", 
+        job = RmakeJob(RmakeUuid.uuid4(), 
+                       self.__PRESENCE_PLUGIN_NS, owner='nobody',
+                       data=None, 
                        ).freeze()
 
         uuid = job.job_uuid
         job = self.client.createJob(job)
-        return job.thaw().data  
+        
+        while True:
+            job = self.getJob(uuid)
+            if not job.times.finished:
+                from time import sleep
+                sleep(5)
+            else:
+                break
+        
+        return job.thaw().data.getObject()
     
     def poll(self, host, node):
         data = dict(host=host)

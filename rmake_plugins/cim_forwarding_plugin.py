@@ -52,11 +52,11 @@ class PresenceHandler(handler.JobHandler):
         neighbors = {}
 
         for key, value in self.dispatcher.bus.link.neighbors.items():
-            neighbors.update(key=value.isAvailable)
+            neighbors[key] =value.isAvailable
         
-        self.job.data = FrozenImmutableDict(neighbors)
+        self.job.data = types.FrozenObject.fromObject(neighbors)
         self.setStatus(200, "Got neighbors")
-        return 'done'
+        return
         
 class CimHandler(handler.JobHandler):
     
