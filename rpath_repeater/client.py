@@ -11,7 +11,7 @@
 # full details.
 #
 
-import sys
+import sys, time
 from rmake3.client import RmakeClient
 from rmake3.lib import uuid as RmakeUuid
 from rmake3.core.types import RmakeJob
@@ -71,11 +71,10 @@ class RepeaterClient(object):
         
         while True:
             job = self.getJob(uuid)
-            if not job.times.finished:
-                from time import sleep
-                sleep(5)
-            else:
+            if job.status.completed:
                 break
+            else:
+                time.sleep(5)
         
         return job.thaw().data.getObject()
     
