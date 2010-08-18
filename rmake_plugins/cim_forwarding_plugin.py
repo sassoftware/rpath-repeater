@@ -20,7 +20,7 @@ from rmake3.worker import plug_worker
 from rpath_repeater.utils import nodeinfo, wbemlib
 
 PREFIX = 'com.rpath.sputnik'
-PRESENCE_JOB = PREFIX + ',presense'
+PRESENCE_JOB = PREFIX + '.presence'
 CIM_JOB = PREFIX + '.cimplugin'
 CIM_TASK_RACTIVATE = PREFIX + '.ractivate'
 CIM_TASK_SHUTDOWN = PREFIX + '.shutdown'
@@ -31,7 +31,7 @@ class CimForwardingPlugin(plug_dispatcher.DispatcherPlugin, plug_worker.WorkerPl
     
     def dispatcher_pre_setup(self, dispatcher):
         handler.registerHandler(CimHandler)
-#        handler.registerHandler(PresenceHandler)
+        handler.registerHandler(PresenceHandler)
 
     def worker_get_task_types(self):
         return {
