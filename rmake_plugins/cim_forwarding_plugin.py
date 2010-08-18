@@ -152,13 +152,13 @@ class RactivateTask(plug_worker.TaskHandler):
             data.p.host, data.p.port))
 
         #send CIM rActivate request
-        server = wbemlib.WBEMServer("https://" + data.host)
+        server = wbemlib.WBEMServer("https://" + data.p.host)
         cimInstances = server.RPATH_ComputerSystem.EnumerateInstanceNames()
         server.conn.callMethod(cimInstances[0], 'RemoteActivation', ManagementNodeAddresses = [data.node])
         data.response = ""
 
         self.setData(data)
-        self.sendStatus(200, "Host %s will try to rActivate itself" % data.host)
+        self.sendStatus(200, "Host %s will try to rActivate itself" % data.p.host)
         
 class ShutdownTask(plug_worker.TaskHandler):
     
