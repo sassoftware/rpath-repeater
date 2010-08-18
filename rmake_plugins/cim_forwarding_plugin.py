@@ -144,7 +144,12 @@ CimData = types.slottype('CimData', 'p response')
 RactivateData = types.slottype('RactivateData', 'p node response')
 UpdateData = types.slottype('UpdateData', 'p sources response')
     
-class RactivateTask(plug_worker.TaskHandler):
+class CIMTaskHandler(plug_worker.TaskHandler):
+    def getWbemConnection(self, data):
+        server = wbemlib.WBEMServer("https://" + data.p.host)
+        return server
+
+class RactivateTask(CIMTaskHandler):
     
     def run(self):
         data = self.getData()
@@ -152,7 +157,7 @@ class RactivateTask(plug_worker.TaskHandler):
             data.p.host, data.p.port))
 
         #send CIM rActivate request
-        server = wbemlib.WBEMServer("https://" + data.p.host)
+        server = self.getWbemConnection(data)
         cimInstances = server.RPATH_ComputerSystem.EnumerateInstanceNames()
         server.conn.callMethod(cimInstances[0], 'RemoteActivation', ManagementNodeAddresses = [data.node])
         data.response = ""
@@ -160,7 +165,7 @@ class RactivateTask(plug_worker.TaskHandler):
         self.setData(data)
         self.sendStatus(200, "Host %s will try to rActivate itself" % data.p.host)
         
-class ShutdownTask(plug_worker.TaskHandler):
+class ShutdownTask(CIMTaskHandler):
     
     def run(self):
         data = self.getData()
@@ -168,7 +173,7 @@ class ShutdownTask(plug_worker.TaskHandler):
             data.p.host))
 
         #send CIM Shutdown request
-        server = wbemlib.WBEMServer("https://" + data.p.host)
+        server = self.getWbemConnection(data)
         cimInstances = server.Linux_OperatingSystem.EnumerateInstanceNames()
         value, args = server.conn.callMethod(cimInstances[0], 'Shutdown')
         data.response = str(value)
@@ -179,20 +184,50 @@ class ShutdownTask(plug_worker.TaskHandler):
         else:
             self.sendStatus(401, "Could not shutdown host %s" % data.p.host)
 
-class PollingTask(plug_worker.TaskHandler):
+class PollingTask(CIMTaskHandler):
 
     def run(self):
         data = self.getData()
         self.sendStatus(101, "Contacting host %s on port %d to Poll it for info" % (
             data.p.host, data.p.port))
 
+        server = self.getWbemConnection(data)
+        swVersions = self._getSoftwareVersions(server)
+        uuids = self._getUuids(server)
+
         #send CIM poll request
-        data.response = ""
+        data.response = dict(ComputerSystem = uuids,
+            SoftwareVersions = swVersions)
 
         self.setData(data)
         self.sendStatus(200, "Host %s has been polled" % data.p.host)
+
+    def _getUuids(self, server):
+        cs = server.RPATH_ComputerSystem.EnumerateInstances()
+        if not cs:
+            return {}
+        cs = cs[0]
+        return dict(LocalUUID=cs['LocalUUID'], GeneratedUUID=cs['GeneratedUUID'])
+
+    def _getSoftwareVersions(self, server):
+        # Fetch instances of the ElementSoftwareIdentity association.
+        # We need to figure out which SoftwareIdentity instances are installed
+        # We do this by filtering the state
+        states = set([2, 6])
+        esi = server.RPATH_ElementSoftwareIdentity.EnumerateInstances()
+        installedSofwareIdentityNames = set(g['Antecedent']['InstanceID']
+            for g in esi
+                if states.issubset(g.properties['ElementSoftwareStatus'].value))
+        # Now fetch all SoftwareIdentity elements and filter out the ones not
+        # installed (i.e. InstanceID not in installedSofwareIdentityNames)
+        siList = server.RPATH_SoftwareIdentity.EnumerateInstances()
+        siList = [ si for si in siList
+            if si['InstanceID'] in installedSofwareIdentityNames ]
+        ret = [ "%s=%s" % (si['name'], si['VersionString'])
+            for si in siList ]
+        return ret
     
-class UpdateTask(plug_worker.TaskHandler):
+class UpdateTask(CIMTaskHandler):
 
     def run(self):
         data = self.getData()

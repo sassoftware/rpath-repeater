@@ -57,13 +57,20 @@ class RepeaterClient(object):
         data.update(method = 'update')
         
         return self.__callDispatcher(data)        
-    
+
+    def poll(self, host, node):
+        data = dict(host=host)
+        data.update(method='polling')
+
+        return self.__callDispatcher(data)
+
     def getJob(self, uuid):
         return self.client.getJob(uuid)
     
 def main():
     cli = RepeaterClient()
-    cli.activate('dhcp236.eng.rpath.com', 'sputnik1')
+    #cli.activate('dhcp236.eng.rpath.com', 'sputnik1')
+    cli.poll('dhcp236.eng.rpath.com', 'sputnik1')
  
 if __name__ == "__main__":
     main()
