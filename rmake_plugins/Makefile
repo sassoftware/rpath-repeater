@@ -9,9 +9,9 @@
 all: default-all
 
 install: default-install
-	mkdir -p $(DESTDIR)/usr/lib64/rmake3
-#	chmod 755 $(DESTDIR)/usr/lib64/rmake3
-	install -D -m0644 *.py $(DESTDIR)/usr/lib64/rmake3
+	install -d -m0755 $(DESTDIR)/usr/lib64/rmake3
+	install -m0644 *.py $(DESTDIR)/usr/lib64/rmake3
+	$(MAKE) _pyfiles-compile DDIR=/usr/lib64/rmake3
 
 include ../Make.rules
 include ../Make.defs

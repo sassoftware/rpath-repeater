@@ -22,6 +22,13 @@ pyfiles-install:
 	        cp -a $$f $(DESTDIR)/$(sitedir)/$(DIR)/$$f; \
 	done
 
+pyfiles-compile:
+	$(MAKE) _pyfiles-compile DDIR=$(sitedir)$(DIR)
+
+_pyfiles-compile:
+	$(PYTHON) -c "import compileall; compileall.compile_dir('$(DESTDIR)$(DDIR)', ddir='$(DDIR)', quiet=1)"
+	$(PYTHON) -OO -c "import compileall; compileall.compile_dir('$(DESTDIR)$(DDIR)', ddir='$(DDIR)', quiet=1)"
+
 default-dist:
 
 default-install:
