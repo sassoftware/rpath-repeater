@@ -11,6 +11,7 @@
 # full details.
 #
 
+import sys
 from rmake3.client import RmakeClient
 from rmake3.lib import uuid as RmakeUuid
 from rmake3.core.types import RmakeJob
@@ -76,11 +77,16 @@ class RepeaterClient(object):
 
     def getJob(self, uuid):
         return self.client.getJob(uuid)
-    
+
 def main():
+    if len(sys.argv) < 2:
+        print "Usage: %s system" % sys.argv[0]
+        return 1
+    system = sys.argv[1]
+    sputnik = 'sputnik1'
     cli = RepeaterClient()
-    #cli.activate('dhcp236.eng.rpath.com', 'sputnik1')
-    cli.poll('dhcp236.eng.rpath.com', 'sputnik1')
+    #cli.activate(system, sputnik)
+    cli.poll(system, sputnik)
  
 if __name__ == "__main__":
     main()
