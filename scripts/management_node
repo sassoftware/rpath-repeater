@@ -26,25 +26,60 @@ def nonPrivate(s):
            
     return True
 
-def getCommands():
+            
+def getArgs(func, availArgs):
     idx = RepeaterClient.__dict__.items()
+    fargs = None
+    rargs = []
     
     for name, attr in idx:
-        if inspect.isfunction(attr) and nonPrivate(name):
-            print name
+        if inspect.isfunction(attr) and attr.func_name == func:
+            fargs = inspect.getargspec(attr)[0][1:]
+    
+    for a in fargs:
+        rargs.append(availArgs[a])
+        
+    return tuple(rargs)
+    
+class ManagementNodeControl(object):
+
+    def __init__(self, options, args):
+        self.options = options
+        self.args = args
+        
+    def getCommands(self):
+        idx = RepeaterClient.__dict__.items()
+        
+        for name, attr in idx:
+            if inspect.isfunction(attr) and nonPrivate(name):
+                print "\t" + name
+    
+    def prettyprint(self, results):
+        if isinstance(results, tuple):
+            uuid, job = results
+            print uuid
+        else:
+            print results
+    
+    def runCommand(self):
+        cli = RepeaterClient()
+        
+        command = self.options.command
+        host = self.options.host
+        node = self.options.node
+        port = self.options.port
+        
+        response = None
+        
+        args = dict(host=host, node=node, port=port)
+        
+        if hasattr(cli, command):
+            response = getattr(cli, command)(*getArgs(command, args))
+        else:
+            print >> sys.stderr, "Command: %s does not exist" % command
+            sys.exit(1)
             
-def runCommand(options):
-    cli = RepeaterClient()
-    
-    command = options.command
-    host = options.host
-    port = options.port
-    node = options.node
-    
-    args = (host, node, port)
-    
-    if hasattr(cli, command):
-        print getattr(cli, command)(*args)
+        self.prettyprint(response)
 
 if __name__ == '__main__':
     parser = optparse.OptionParser(version = '%prog 0.1')
@@ -66,11 +101,13 @@ if __name__ == '__main__':
    #     print >> sys.stderr, "management_node: a management node command was expected"
    #     sys.exit(1)
         
+    mgmtNodeControl = ManagementNodeControl(options, args)
+    
     if options.listCommands:
-        getCommands()
+        mgmtNodeControl.getCommands()
         sys.exit(0)
         
     if options.command:
-        runCommand(options)
+        mgmtNodeControl.runCommand()
         
      

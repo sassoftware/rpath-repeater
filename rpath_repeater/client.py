@@ -41,7 +41,7 @@ class RepeaterClient(object):
 
         return (uuid, job.thaw())
         
-    def activate(self, host, node, port = None):
+    def register(self, host, node, port = None):
         data = dict(host=host, port = port, node = node)
         data.update(method = 'ractivate')
 
