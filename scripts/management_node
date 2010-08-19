@@ -17,6 +17,9 @@
 
 import inspect, optparse, sys, time
 
+from rmake3.core.types import RmakeJob
+from rmake3.lib import uuid as RmakeUuid
+
 from rpath_repeater.client import RepeaterClient
 
 def nonPrivate(s):
@@ -37,7 +40,10 @@ def getArgs(func, availArgs):
             fargs = inspect.getargspec(attr)[0][1:]
     
     for a in fargs:
-        rargs.append(availArgs[a])
+	if a in availArgs:
+            rargs.append(availArgs[a])
+	else:
+	    print >> sys.stderr, "Missing argument %s" % a
         
     return tuple(rargs)
     
@@ -46,10 +52,10 @@ class ManagementNodeControl(object):
     def __init__(self, options, args):
         self.options = options
         self.args = args
-        self.client = RepeaterClient()
+	self.client = RepeaterClient()
         
     def getCommands(self):
-        idx = self.client.__dict__.items()
+        idx = RepeaterClient.__dict__.items()
         
         for name, attr in idx:
             if inspect.isfunction(attr) and nonPrivate(name):
@@ -60,29 +66,42 @@ class ManagementNodeControl(object):
             uuid, job = results
             if not self.options.noWait:
                 while True:
-                    job = self.getJob(uuid)
-                    if job.status.completed:
-                        break
-                    else:
-                        time.sleep(5)
+                   job = self.client.getJob(uuid)
+
+                   if job.status.completed or job.status.failed:
+                       break
+                   else:
+                       time.sleep(5)
     
-                print job.status.text
-            print uuid
+	    	print job.status.code
+            	print job.status.text
+		return
+
+	    print uuid
+	if isinstance(results, RmakeJob):
+	    print results.status.code
+	    print results.status.text
         else:
             print results
     
     def runCommand(self):
+        cli = RepeaterClient()
+        
         command = self.options.command
         host = self.options.host
         node = self.options.node
         port = self.options.port
+	uuid = None
+
+	if self.options.UUID:
+		uuid = RmakeUuid.UUID(self.options.UUID)
         
         response = None
         
-        args = dict(host=host, node=node, port=port)
+        args = dict(host=host, node=node, port=port, uuid=uuid)
         
         if hasattr(cli, command):
-            response = getattr(self.client, command)(*getArgs(command, args))
+            response = getattr(cli, command)(*getArgs(command, args))
         else:
             print >> sys.stderr, "Command: %s does not exist" % command
             sys.exit(1)
@@ -97,6 +116,8 @@ if __name__ == '__main__':
                       action = "store", help = "specify the node")
     parser.add_option("--host","-m", dest = "host", 
                       action = "store", help = "specify the host to manage")
+    parser.add_option("--job","-j", dest = "UUID", default = None,
+                      action = "store", help = "specify the job that you want inspect")
     parser.add_option("--port","-p", dest = "port", default = None,
                       action = "store", help = "specify the port that the managed system is listening")
     parser.add_option("--no-wait","-w", dest = "noWait", default = False,
