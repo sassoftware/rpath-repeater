@@ -15,7 +15,7 @@
 # This script will issue commands to the specified management node to
 # simulate the same functionality that the GUI can provide
 
-import inspect, optparse, sys
+import inspect, optparse, sys, time
 
 from rpath_repeater.client import RepeaterClient
 
@@ -46,9 +46,10 @@ class ManagementNodeControl(object):
     def __init__(self, options, args):
         self.options = options
         self.args = args
+        self.client = RepeaterClient()
         
     def getCommands(self):
-        idx = RepeaterClient.__dict__.items()
+        idx = self.client.__dict__.items()
         
         for name, attr in idx:
             if inspect.isfunction(attr) and nonPrivate(name):
@@ -57,13 +58,20 @@ class ManagementNodeControl(object):
     def prettyprint(self, results):
         if isinstance(results, tuple):
             uuid, job = results
+            if not self.options.noWait:
+                while True:
+                    job = self.getJob(uuid)
+                    if job.status.completed:
+                        break
+                    else:
+                        time.sleep(5)
+    
+                print job.status.text
             print uuid
         else:
             print results
     
     def runCommand(self):
-        cli = RepeaterClient()
-        
         command = self.options.command
         host = self.options.host
         node = self.options.node
@@ -74,7 +82,7 @@ class ManagementNodeControl(object):
         args = dict(host=host, node=node, port=port)
         
         if hasattr(cli, command):
-            response = getattr(cli, command)(*getArgs(command, args))
+            response = getattr(self.client, command)(*getArgs(command, args))
         else:
             print >> sys.stderr, "Command: %s does not exist" % command
             sys.exit(1)

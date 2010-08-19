@@ -116,7 +116,7 @@ class CimHandler(handler.JobHandler):
             task, = results
             result = task.task_data.getObject().response
             self.job.data = types.FrozenObject.fromObject(result)
-            self.setStatus(200, "Done! cim ractivation response: %s" % (result))
+            self.setStatus(200, "Done! CIM Registration has been kicked off. {2/2}")
             return 'done'
         return self.gatherTasks([task], cb_gather)
     

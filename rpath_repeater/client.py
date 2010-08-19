@@ -69,7 +69,7 @@ class RepeaterClient(object):
         uuid = job.job_uuid
         job = self.client.createJob(job)
         while True:
-            job = self.getJob(uuid)
+            job = self.client.getJob(uuid)
             if job.status.completed:
                 break
             else:
