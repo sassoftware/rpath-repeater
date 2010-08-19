@@ -12,6 +12,10 @@
 # full details.
 #
 
+from xml.dom import minidom
+from conary import conaryclient
+from conary import versions
+
 from twisted.web import client
 from twisted.internet import reactor
 
@@ -140,17 +144,19 @@ class CimHandler(handler.JobHandler):
                 CimData(self.params))
         def cb_gather(results):
             task, = results
-            result = task.task_data.getObject().response
-            self.job.data = types.FrozenObject.fromObject(result)
+            result = task.task_data.getObject()
+            self.job.data = result
             self.setStatus(200, "Done! cim polling of %s" % (result))
             host = 'localhost'
             port = self.resultsLocation.get('port', 80)
             path = self.resultsLocation.get('path')
             if path:
-                data = str(self.job.data.thaw().getObject())
-                headers = { 'Content-Type' : 'application/xml; charset="utf-8"' }
+                data = self.job.data.encode("utf-8")
+                headers = {
+                    'Content-Type' : 'application/xml; charset="utf-8"',
+                    'Host' : host, }
                 agent = "rmake-plugin/1.0"
-                fact = HTTPClientFactory(path, method='POST', postdata=data,
+                fact = HTTPClientFactory(path, method='PUT', postdata=data,
                     headers = headers, agent = agent)
                 @fact.deferred.addCallback
                 def processResult(result):
@@ -161,11 +167,10 @@ class CimHandler(handler.JobHandler):
                 def processError(error):
                     print "Error!", error.getErrorMessage()
 
-                print "Connecting to http://%s:%s%s" % (host, port, path)
                 reactor.connectTCP(host, port, fact)
             return 'done'
-        return self.gatherTasks([task], cb_gather)    
-    
+        return self.gatherTasks([task], cb_gather)
+
     def update(self):
         self.setStatus(103, "Starting the updating {1/2}")
 
@@ -235,14 +240,12 @@ class PollingTask(CIMTaskHandler):
             data.p.host, data.p.port))
 
         server = self.getWbemConnection(data)
-        swVersions = self._getSoftwareVersions(server)
-        uuids = self._getUuids(server)
+        children = self._getUuids(server)
+        children.append(self._getSoftwareVersions(server))
 
-        #send CIM poll request
-        data.response = dict(ComputerSystem = uuids,
-            SoftwareVersions = swVersions)
+        el = XML.Element("server", *children)
 
-        self.setData(data)
+        self.setData(el.toxml())
         self.sendStatus(200, "Host %s has been polled" % data.p.host)
 
     def _getUuids(self, server):
@@ -250,7 +253,9 @@ class PollingTask(CIMTaskHandler):
         if not cs:
             return {}
         cs = cs[0]
-        return dict(LocalUUID=cs['LocalUUID'], GeneratedUUID=cs['GeneratedUUID'])
+        T = XML.Text
+        return [ T("localUuid", cs['LocalUUID']),
+            T("generatedUuid", cs['GeneratedUUID']) ]
 
     def _getSoftwareVersions(self, server):
         # Fetch instances of the ElementSoftwareIdentity association.
@@ -266,10 +271,55 @@ class PollingTask(CIMTaskHandler):
         siList = server.RPATH_SoftwareIdentity.EnumerateInstances()
         siList = [ si for si in siList
             if si['InstanceID'] in installedSofwareIdentityNames ]
-        ret = [ "%s=%s" % (si['name'], si['VersionString'])
-            for si in siList ]
-        return ret
-    
+
+        # Start creating the XML document
+        troves = [ self._trove(si) for si in siList ]
+        return XML.Element("installedSoftware", *troves)
+
+    @classmethod
+    def _trove(cls, si):
+        Text = XML.Text
+        nvf = "%s=%s" % (si['name'], si['VersionString'])
+        n, v, f = conaryclient.cmdline.parseTroveSpec(nvf)
+
+        name = Text("name", n)
+        version = cls._version(v, f)
+        flavor = Text("flavor", str(f))
+
+        return XML.Element("trove", name, version, flavor)
+
+    @classmethod
+    def _version(cls, v, f):
+        thawed_v = versions.ThawVersion(v)
+        Text = XML.Text
+        full = Text("full", str(thawed_v))
+        ordering = Text("ordering", thawed_v.trailingRevision())
+        revision = Text("revision", str(thawed_v.trailingRevision()))
+        label = Text("label", str(thawed_v.trailingLabel()))
+        flavor = Text("flavor", str(f))
+        return XML.Element("version", full, label, revision, ordering, flavor)
+
+class XML(object):
+    @classmethod
+    def Text(cls, tagName, text):
+        txt = minidom.Text()
+        txt.data = text
+        return cls.Element(tagName, txt)
+
+    @classmethod
+    def Element(cls, tagName, *children, **attributes):
+        node = cls._Node(tagName, minidom.Element)
+        for child in children:
+            node.appendChild(child)
+        for k, v in attributes.items():
+            node.setAttribute(k, unicode(v).encode("utf-8"))
+        return node
+
+    @classmethod
+    def _Node(cls, tagName, factory):
+        node = factory(tagName)
+        return node
+
 class UpdateTask(CIMTaskHandler):
 
     def run(self):
