@@ -68,18 +68,17 @@ class RepeaterClient(object):
 
         uuid = job.job_uuid
         job = self.client.createJob(job)
-        
         while True:
             job = self.getJob(uuid)
             if job.status.completed:
                 break
             else:
                 time.sleep(5)
-        
+
         return job.thaw().data.getObject()
-    
-    def poll(self, host, node):
-        data = dict(host=host)
+
+    def poll(self, host, node, resultsLocation):
+        data = dict(host=host, resultsLocation = resultsLocation)
         data.update(method='polling')
 
         return self.__callDispatcher(data)
@@ -95,7 +94,14 @@ def main():
     sputnik = 'sputnik1'
     cli = RepeaterClient()
     #cli.activate(system, sputnik)
-    cli.poll(system, sputnik)
+    uuid, job = cli.poll(system, sputnik, dict(path='/adfadf', port=1234))
+    import time
+    while 1:
+        job = cli.getJob(uuid)
+        if job.status.completed:
+            break
+        time.sleep(1)
+    #import epdb; epdb.st()
  
 if __name__ == "__main__":
     main()

@@ -12,6 +12,9 @@
 # full details.
 #
 
+from twisted.web import client
+from twisted.internet import reactor
+
 from rmake3.core import handler
 from rmake3.core import plug_dispatcher
 from rmake3.core import types
@@ -86,6 +89,7 @@ class CimHandler(handler.JobHandler):
         self.data = self.getData().thaw().getDict()
         self.method = self.data['method']
         self.host = self.data['host']
+        self.resultsLocation = self.data.pop('resultsLocation', {})
         
         self.params = CimParams(self.host, self.port)
         
@@ -139,6 +143,26 @@ class CimHandler(handler.JobHandler):
             result = task.task_data.getObject().response
             self.job.data = types.FrozenObject.fromObject(result)
             self.setStatus(200, "Done! cim polling of %s" % (result))
+            host = 'localhost'
+            port = self.resultsLocation.get('port', 80)
+            path = self.resultsLocation.get('path')
+            if path:
+                data = str(self.job.data.thaw().getObject())
+                headers = { 'Content-Type' : 'application/xml; charset="utf-8"' }
+                agent = "rmake-plugin/1.0"
+                fact = HTTPClientFactory(path, method='POST', postdata=data,
+                    headers = headers, agent = agent)
+                @fact.deferred.addCallback
+                def processResult(result):
+                    print "Received result for", host, result
+                    return result
+
+                @fact.deferred.addErrback
+                def processError(error):
+                    print "Error!", error.getErrorMessage()
+
+                print "Connecting to http://%s:%s%s" % (host, port, path)
+                reactor.connectTCP(host, port, fact)
             return 'done'
         return self.gatherTasks([task], cb_gather)    
     
@@ -258,3 +282,10 @@ class UpdateTask(CIMTaskHandler):
 
         self.setData(data)
         self.sendStatus(200, "Host %s has been updated" % data.p.host)
+
+class HTTPClientFactory(client.HTTPClientFactory):
+    def __init__(self, url, *args, **kwargs):
+        client.HTTPClientFactory.__init__(self, url, *args, **kwargs)
+        self.status = None
+        self.deferred.addCallback(
+            lambda data: (data, self.status, self.response_headers))
