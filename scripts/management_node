@@ -1,0 +1,76 @@
+#!/usr/bin/python
+# Copyright (c) 2010 rPath, Inc.
+#
+# This program is distributed under the terms of the Common Public License,
+# version 1.0. A copy of this license should have been distributed with this
+# source file in a file called LICENSE. If it is not present, the license
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
+#
+# This program is distributed in the hope that it will be useful, but
+# without any warranty; without even the implied warranty of merchantability
+# or fitness for a particular purpose. See the Common Public License for
+# full details.
+#
+#
+# This script will issue commands to the specified management node to
+# simulate the same functionality that the GUI can provide
+
+import inspect, optparse, sys
+
+from rpath_repeater.client import RepeaterClient
+
+def nonPrivate(s):
+    if '_' in s:
+        if s.index('_') == 0:
+            return False
+           
+    return True
+
+def getCommands():
+    idx = RepeaterClient.__dict__.items()
+    
+    for name, attr in idx:
+        if inspect.isfunction(attr) and nonPrivate(name):
+            print name
+            
+def runCommand(options):
+    cli = RepeaterClient()
+    
+    command = options.command
+    host = options.host
+    port = options.port
+    node = options.node
+    
+    args = (host, node, port)
+    
+    if hasattr(cli, command):
+        print getattr(cli, command)(*args)
+
+if __name__ == '__main__':
+    parser = optparse.OptionParser(version = '%prog 0.1')
+    parser.add_option("--command","-c", dest = "command", 
+                      action = "store", help = "specify the command to run on the management node")
+    parser.add_option("--node","-n", dest = "node", default = 'localhost',
+                      action = "store", help = "specify the node")
+    parser.add_option("--host","-m", dest = "host", 
+                      action = "store", help = "specify the host to manage")
+    parser.add_option("--port","-p", dest = "port", default = None,
+                      action = "store", help = "specify the port that the managed system is listening")
+    parser.add_option("--no-wait","-w", dest = "noWait", default = False,
+                      action = "store_true", help = "return immediately with the job id")
+    parser.add_option("--list","-l", dest = "listCommands", default = False,
+                      action = "store_true", help = "list the commands available")
+    (options, args) = parser.parse_args()
+    
+   # if len(args) < 1 and not options.listCommands:
+   #     print >> sys.stderr, "management_node: a management node command was expected"
+   #     sys.exit(1)
+        
+    if options.listCommands:
+        getCommands()
+        sys.exit(0)
+        
+    if options.command:
+        runCommand(options)
+        
+     
