@@ -113,7 +113,7 @@ class CimHandler(handler.JobHandler):
     def register(self):
         self.setStatus(103, "Starting the registration {1/2}")
         
-        task = self.newTask('rActivate', CIM_TASK_REGISTER,
+        task = self.newTask('register', CIM_TASK_REGISTER,
                 RactivateData(self.params, nodeinfo.get_hostname() +':8443'))
         
         def cb_gather(results):
@@ -197,7 +197,7 @@ class CIMTaskHandler(plug_worker.TaskHandler):
         server = wbemlib.WBEMServer("https://" + data.p.host)
         return server
 
-class RactivateTask(CIMTaskHandler):
+class RegisterTask(CIMTaskHandler):
     
     def run(self):
         data = self.getData()
