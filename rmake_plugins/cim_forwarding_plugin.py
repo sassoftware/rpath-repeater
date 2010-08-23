@@ -30,7 +30,7 @@ from rpath_repeater.utils.immutabledict import FrozenImmutableDict
 PREFIX = 'com.rpath.sputnik'
 PRESENCE_JOB = PREFIX + '.presence'
 CIM_JOB = PREFIX + '.cimplugin'
-CIM_TASK_RACTIVATE = PREFIX + '.ractivate'
+CIM_TASK_REGISTER = PREFIX + '.register'
 CIM_TASK_SHUTDOWN = PREFIX + '.shutdown'
 CIM_TASK_POLLING = PREFIX + '.poll'
 CIM_TASK_UPDATE = PREFIX + '.update'
@@ -43,7 +43,7 @@ class CimForwardingPlugin(plug_dispatcher.DispatcherPlugin, plug_worker.WorkerPl
 
     def worker_get_task_types(self):
         return {
-                CIM_TASK_RACTIVATE: RactivateTask,
+                CIM_TASK_REGISTER: RegisterTask,
                 CIM_TASK_SHUTDOWN: ShutdownTask,
                 CIM_TASK_POLLING: PollingTask,
                 CIM_TASK_UPDATE: UpdateTask,
@@ -110,10 +110,10 @@ class CimHandler(handler.JobHandler):
         self.setStatus(405, "Method does not exist: %s" % (self.method))
         return   
 
-    def ractivate(self):
-        self.setStatus(103, "Starting the rActivation {1/2}")
+    def register(self):
+        self.setStatus(103, "Starting the registration {1/2}")
         
-        task = self.newTask('rActivate', CIM_TASK_RACTIVATE,
+        task = self.newTask('rActivate', CIM_TASK_REGISTER,
                 RactivateData(self.params, nodeinfo.get_hostname() +':8443'))
         
         def cb_gather(results):

@@ -89,7 +89,7 @@ class ManagementNodeControl(object):
         
         command = self.options.command
         host = self.options.host
-        node = self.options.node
+        zone = self.options.zone
         port = self.options.port
 	uuid = None
 
@@ -98,7 +98,7 @@ class ManagementNodeControl(object):
         
         response = None
         
-        args = dict(host=host, node=node, port=port, uuid=uuid)
+        args = dict(host=host, zone=zone, port=port, uuid=uuid)
         
         if hasattr(cli, command):
             response = getattr(cli, command)(*getArgs(command, args))
@@ -112,15 +112,15 @@ if __name__ == '__main__':
     parser = optparse.OptionParser(version = '%prog 0.1')
     parser.add_option("--command","-c", dest = "command", 
                       action = "store", help = "specify the command to run on the management node")
-    parser.add_option("--node","-n", dest = "node", default = 'localhost',
-                      action = "store", help = "specify the node")
+    parser.add_option("--zone","-z", dest = "zone", default = 'localhost',
+                      action = "store", help = "specify the zone")
     parser.add_option("--host","-m", dest = "host", 
                       action = "store", help = "specify the host to manage")
     parser.add_option("--job","-j", dest = "UUID", default = None,
                       action = "store", help = "specify the job that you want inspect")
     parser.add_option("--port","-p", dest = "port", default = None,
                       action = "store", help = "specify the port that the managed system is listening")
-    parser.add_option("--no-wait","-w", dest = "noWait", default = False,
+    parser.add_option("--no-wait", dest = "noWait", default = False,
                       action = "store_true", help = "return immediately with the job id")
     parser.add_option("--list","-l", dest = "listCommands", default = False,
                       action = "store_true", help = "list the commands available")

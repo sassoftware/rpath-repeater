@@ -41,20 +41,20 @@ class RepeaterClient(object):
 
         return (uuid, job.thaw())
         
-    def register(self, host, node, port = None):
-        data = dict(host=host, port = port, node = node)
-        data.update(method = 'ractivate')
+    def register(self, host, zone, port = None):
+        data = dict(host=host, port = port, zone = zone)
+        data.update(method = 'register')
 
         return self.__callDispatcher(data)
     
-    def shutdown(self, host, node, port = None):
-        data = dict(host=host, port = port, node = node)
+    def shutdown(self, host, zone, port = None):
+        data = dict(host=host, port = port, zone = zone)
         data.update(method = 'shutdown')
         
         return self.__callDispatcher(data)
     
-    def update(self, host, node, sources, port = None):
-        data = dict(host=host, port = port, node = node,
+    def update(self, host, zone, sources, port = None):
+        data = dict(host=host, port = port, zone = zone,
                     sources = sources)
         data.update(method = 'update')
         
@@ -77,7 +77,7 @@ class RepeaterClient(object):
 
         return job.thaw().data.getObject()
 
-    def poll(self, host, node, resultsLocation):
+    def poll(self, host, zone, resultsLocation):
         data = dict(host=host, resultsLocation = resultsLocation)
         data.update(method='polling')
 
