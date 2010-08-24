@@ -60,6 +60,12 @@ class RepeaterClient(object):
         
         return self.__callDispatcher(data)      
     
+    def retireNode(self, node, zone, port = None):
+        """ This is a temporary large hammer for handling the retirement
+            of a management node.
+        """
+        return self.shutdown(node, zone, port)
+    
     def getNodes(self):
         job = RmakeJob(RmakeUuid.uuid4(), 
                        self.__PRESENCE_PLUGIN_NS, owner='nobody',
