@@ -299,7 +299,7 @@ class PollingTask(CIMTaskHandler):
         thawed_v = versions.ThawVersion(v)
         Text = XML.Text
         full = Text("full", str(thawed_v))
-        ordering = Text("ordering", thawed_v.trailingRevision())
+        ordering = Text("ordering", thawed_v.timeStamps()[0])
         revision = Text("revision", str(thawed_v.trailingRevision()))
         label = Text("label", str(thawed_v.trailingLabel()))
         flavor = Text("flavor", str(f))
