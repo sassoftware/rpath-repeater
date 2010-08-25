@@ -28,7 +28,6 @@ from rpath_repeater.utils import nodeinfo, wbemlib
 from rpath_repeater.utils.immutabledict import FrozenImmutableDict
 
 PREFIX = 'com.rpath.sputnik'
-PRESENCE_JOB = PREFIX + '.presence'
 CIM_JOB = PREFIX + '.cimplugin'
 CIM_TASK_REGISTER = PREFIX + '.register'
 CIM_TASK_SHUTDOWN = PREFIX + '.shutdown'
@@ -39,7 +38,6 @@ class CimForwardingPlugin(plug_dispatcher.DispatcherPlugin, plug_worker.WorkerPl
     
     def dispatcher_pre_setup(self, dispatcher):
         handler.registerHandler(CimHandler)
-        handler.registerHandler(PresenceHandler)
 
     def worker_get_task_types(self):
         return {
@@ -47,23 +45,7 @@ class CimForwardingPlugin(plug_dispatcher.DispatcherPlugin, plug_worker.WorkerPl
                 CIM_TASK_SHUTDOWN: ShutdownTask,
                 CIM_TASK_POLLING: PollingTask,
                 CIM_TASK_UPDATE: UpdateTask,
-                }
-        
-class PresenceHandler(handler.JobHandler):
-    
-    jobType = PRESENCE_JOB
-    firstState = 'neighbors'
-    
-    def neighbors(self):
-        self.setStatus(100, "Fetching neighbors")
-        neighbors = {}
-
-        for key, value in self.dispatcher.bus.link.neighbors.items():
-            neighbors[key] =value.isAvailable
-        
-        self.job.data = types.FrozenObject.fromObject(neighbors)
-        self.setStatus(200, "Got neighbors")
-        return
+                }     
         
 class CimHandler(handler.JobHandler):
     
@@ -94,8 +76,9 @@ class CimHandler(handler.JobHandler):
         self.method = self.data['method']
         self.host = self.data['host']
         self.resultsLocation = self.data.pop('resultsLocation', {})
+        self.eventId = self.data.pop('eventId', None)
         
-        self.params = CimParams(self.host, self.port)
+        self.params = CimParams(self.host, self.port, self.eventId)
         
         self.setStatus(102, "Starting to probe the host: %s" % (self.host))
         try:
@@ -187,7 +170,7 @@ class CimHandler(handler.JobHandler):
             return 'done'
         return self.gatherTasks([task], cb_gather)   
     
-CimParams = types.slottype('CimParams', 'host port')
+CimParams = types.slottype('CimParams', 'host port eventId')
 # These are just the starting point attributes
 CimData = types.slottype('CimData', 'p response')
 RactivateData = types.slottype('RactivateData', 'p node requiredNetwork response')
