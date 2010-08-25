@@ -212,7 +212,7 @@ class RegisterTask(CIMTaskHandler):
             ManagementNodeAddresses = [data.node])
         if data.requiredNetwork:
             arguments.update(RequiredNetwork = data.requiredNetwork)
-        server.conn.callMethod(cimInstances[0], 'RemoteActivation',
+        server.conn.callMethod(cimInstances[0], 'RemoteRegistration',
             **arguments)
         data.response = ""
 
