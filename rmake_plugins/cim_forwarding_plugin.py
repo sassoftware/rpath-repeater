@@ -249,7 +249,7 @@ class PollingTask(CIMTaskHandler):
         children = self._getUuids(server)
         children.append(self._getSoftwareVersions(server))
 
-        el = XML.Element("server", *children)
+        el = XML.Element("system", *children)
 
         self.setData(el.toxml())
         self.sendStatus(200, "Host %s has been polled" % data.p.host)
