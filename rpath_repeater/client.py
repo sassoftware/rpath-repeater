@@ -91,7 +91,6 @@ def main():
     else:
         uuid, job = cli.poll(system, sputnik,
             resultsLocation=dict(path='/adfadf', port=1234))
-    import time
     while 1:
         job = cli.getJob(uuid)
         if job.status.completed:
