@@ -68,21 +68,7 @@ class RepeaterClient(object):
         return self.shutdown(node, zone, port)
     
     def getNodes(self):
-        job = RmakeJob(RmakeUuid.uuid4(), 
-                       self.__PRESENCE_PLUGIN_NS, owner='nobody',
-                       data=None, 
-                       ).freeze()
-
-        uuid = job.job_uuid
-        job = self.client.createJob(job)
-        while True:
-            job = self.client.getJob(uuid)
-            if job.status.completed:
-                break
-            else:
-                time.sleep(5)
-
-        return job.thaw().data.getObject()
+        return self.client.getWorkerList()
 
     def poll(self, host, zone, resultsLocation=None):
         data = dict(host=host, resultsLocation = resultsLocation)
