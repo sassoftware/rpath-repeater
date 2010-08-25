@@ -90,8 +90,7 @@ def main():
         uuid, job = cli.register(system, sputnik,)# requiredNetwork="1.1.1.1")
     else:
         uuid, job = cli.poll(system, sputnik,
-            resultsLocation=dict(path='/adfadf', port=1234),
-            requiredNetwork='1.2.3.4')
+            resultsLocation=dict(path='/adfadf', port=1234))
     import time
     while 1:
         job = cli.getJob(uuid)
