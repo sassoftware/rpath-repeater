@@ -114,7 +114,8 @@ class CimHandler(handler.JobHandler):
         self.setStatus(103, "Starting the registration {1/2}")
         
         task = self.newTask('register', CIM_TASK_REGISTER,
-                RactivateData(self.params, nodeinfo.get_hostname() +':8443'))
+                RactivateData(self.params, nodeinfo.get_hostname() +':8443',
+                self.data.get('requiredNetwork')))
         
         def cb_gather(results):
             task, = results
@@ -189,9 +190,9 @@ class CimHandler(handler.JobHandler):
 CimParams = types.slottype('CimParams', 'host port')
 # These are just the starting point attributes
 CimData = types.slottype('CimData', 'p response')
-RactivateData = types.slottype('RactivateData', 'p node response')
+RactivateData = types.slottype('RactivateData', 'p node requiredNetwork response')
 UpdateData = types.slottype('UpdateData', 'p sources response')
-    
+
 class CIMTaskHandler(plug_worker.TaskHandler):
     def getWbemConnection(self, data):
         server = wbemlib.WBEMServer("https://" + data.p.host)
@@ -207,7 +208,12 @@ class RegisterTask(CIMTaskHandler):
         #send CIM rActivate request
         server = self.getWbemConnection(data)
         cimInstances = server.RPATH_ComputerSystem.EnumerateInstanceNames()
-        server.conn.callMethod(cimInstances[0], 'RemoteActivation', ManagementNodeAddresses = [data.node])
+        arguments = dict(
+            ManagementNodeAddresses = [data.node])
+        if data.requiredNetwork:
+            arguments.update(RequiredNetwork = data.requiredNetwork)
+        server.conn.callMethod(cimInstances[0], 'RemoteActivation',
+            **arguments)
         data.response = ""
 
         self.setData(data)

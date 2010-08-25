@@ -41,8 +41,9 @@ class RepeaterClient(object):
 
         return (uuid, job.thaw())
         
-    def register(self, host, zone, port = None):
-        data = dict(host=host, port = port, zone = zone)
+    def register(self, host, zone, port = None, requiredNetwork=None):
+        data = dict(host=host, port = port, zone = zone,
+            requiredNetwork=requiredNetwork)
         data.update(method = 'register')
 
         return self.__callDispatcher(data)
@@ -83,7 +84,7 @@ class RepeaterClient(object):
 
         return job.thaw().data.getObject()
 
-    def poll(self, host, zone, resultsLocation):
+    def poll(self, host, zone, resultsLocation=None):
         data = dict(host=host, resultsLocation = resultsLocation)
         data.update(method='polling')
 
@@ -99,8 +100,12 @@ def main():
     system = sys.argv[1]
     sputnik = 'sputnik1'
     cli = RepeaterClient()
-    #cli.activate(system, sputnik)
-    uuid, job = cli.poll(system, sputnik, dict(path='/adfadf', port=1234))
+    if 1:
+        uuid, job = cli.register(system, sputnik,)# requiredNetwork="1.1.1.1")
+    else:
+        uuid, job = cli.poll(system, sputnik,
+            resultsLocation=dict(path='/adfadf', port=1234),
+            requiredNetwork='1.2.3.4')
     import time
     while 1:
         job = cli.getJob(uuid)
