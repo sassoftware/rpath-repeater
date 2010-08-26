@@ -193,6 +193,8 @@ class RegisterTask(CIMTaskHandler):
         cimInstances = server.RPATH_ComputerSystem.EnumerateInstanceNames()
         arguments = dict(
             ManagementNodeAddresses = [data.node])
+        if data.p.eventId:
+            arguments.update(EventUUID = data.p.eventId)
         if data.requiredNetwork:
             arguments.update(RequiredNetwork = data.requiredNetwork)
         server.conn.callMethod(cimInstances[0], 'RemoteRegistration',
