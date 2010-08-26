@@ -78,7 +78,7 @@ class RepeaterMessageHandler(message.MessageHandler):
         if self.repeater:
             response = self.repeater.dispatch(dict['method'],
                          dict['url'], dict['body'], 
-                         {'X-rpathManagementNetworkNode': neighbor.jid})
+                         {'X-rpathManagementNetworkNode': neighbor.jid.full()})
             reply = {'status':response.status, 'headers':response.getheaders(), 
                      'response': response.read()}
         
@@ -140,9 +140,12 @@ class EndPoint(resource.Resource):
                 dict = chutney.loads(reply.payload)
 
                 request.setResponseCode(dict['status'])
+                
                 if body:
                     request.write(dict['response'])
-                request.finish()
+                
+                if not request._disconnected: 
+                    request.finish()
         
         return d
     
