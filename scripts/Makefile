@@ -12,8 +12,8 @@ override STATICDEST = /usr/share/rbuilder/scripts
 all: default-all
 
 install: default-install
-	install -d -m0755 $(STATICDEST)
-	install -m0755 $(static_files)  $(STATICDEST)
+	install -d -m0755 $(DESTDIR)/$(STATICDEST)
+	install -m0755 $(static_files)  $(DESTDIR)/$(STATICDEST)
 
 clean: default-clean
 
