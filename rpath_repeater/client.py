@@ -72,7 +72,7 @@ class RepeaterClient(object):
 
     def poll(self, host, zone, eventId = None, port = None, resultsLocation=None):
         data = dict(host=host, resultsLocation = resultsLocation,
-                    port = port, eventId = eventId)
+                    port = port, eventId = eventId, zone = zone)
         data.update(method='polling')
 
         return self.__callDispatcher(data)

@@ -77,6 +77,7 @@ class CimHandler(handler.JobHandler):
         self.host = self.data['host']
         self.resultsLocation = self.data.pop('resultsLocation', {})
         self.eventId = self.data.pop('eventId', None)
+        self.zone = self.data.pop('zone', None)
         
         self.params = CimParams(self.host, self.port, self.eventId)
         
@@ -98,7 +99,7 @@ class CimHandler(handler.JobHandler):
         
         task = self.newTask('register', CIM_TASK_REGISTER,
                 RactivateData(self.params, nodeinfo.get_hostname() +':8443',
-                self.data.get('requiredNetwork')))
+                self.data.get('requiredNetwork')), zone=self.zone)
         
         def cb_gather(results):
             task, = results
@@ -112,7 +113,7 @@ class CimHandler(handler.JobHandler):
         self.setStatus(103, "Shutting down the managed server")
         
         task = self.newTask('shutdown', CIM_TASK_SHUTDOWN,
-                CimData(self.params))
+                CimData(self.params), zone=self.zone)
         def cb_gather(results):
             task, = results
             result = task.task_data.getObject().response
@@ -125,7 +126,7 @@ class CimHandler(handler.JobHandler):
         self.setStatus(103, "Starting the polling {1/2}")
 
         task = self.newTask('Polling', CIM_TASK_POLLING,
-                CimData(self.params))
+                CimData(self.params), zone=self.zone)
         def cb_gather(results):
             task, = results
             result = task.task_data.getObject()
@@ -161,7 +162,7 @@ class CimHandler(handler.JobHandler):
         sources = self.data['sources']
 
         task = self.newTask('Update', CIM_TASK_UPDATE,
-                UpdateData(self.params, sources))
+                UpdateData(self.params, sources), zone=self.zone)
         def cb_gather(results):
             task, = results
             result = task.task_data.getObject().response
