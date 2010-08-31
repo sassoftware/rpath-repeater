@@ -76,10 +76,10 @@ class CimHandler(handler.JobHandler):
         self.method = self.data['method']
         self.host = self.data['host']
         self.resultsLocation = self.data.pop('resultsLocation', {})
-        self.eventId = self.data.pop('eventId', None)
+        self.eventUuid = self.data.pop('eventUuid', None)
         self.zone = self.data.pop('zone', None)
         
-        self.params = CimParams(self.host, self.port, self.eventId)
+        self.params = CimParams(self.host, self.port, self.eventUuid)
         
         self.setStatus(102, "Starting to probe the host: %s" % (self.host))
         try:
@@ -171,7 +171,7 @@ class CimHandler(handler.JobHandler):
             return 'done'
         return self.gatherTasks([task], cb_gather)   
     
-CimParams = types.slottype('CimParams', 'host port eventId')
+CimParams = types.slottype('CimParams', 'host port eventUuid')
 # These are just the starting point attributes
 CimData = types.slottype('CimData', 'p response')
 RactivateData = types.slottype('RactivateData', 'p node requiredNetwork response')
@@ -194,8 +194,8 @@ class RegisterTask(CIMTaskHandler):
         cimInstances = server.RPATH_ComputerSystem.EnumerateInstanceNames()
         arguments = dict(
             ManagementNodeAddresses = [data.node])
-        if data.p.eventId:
-            arguments.update(EventUUID = data.p.eventId)
+        if data.p.eventUuid:
+            arguments.update(EventUUID = data.p.eventUuid)
         if data.requiredNetwork:
             arguments.update(RequiredNetwork = data.requiredNetwork)
         server.conn.callMethod(cimInstances[0], 'RemoteRegistration',

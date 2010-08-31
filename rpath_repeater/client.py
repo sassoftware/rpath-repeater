@@ -41,9 +41,9 @@ class RepeaterClient(object):
 
         return (uuid, job.thaw())
         
-    def register(self, host, zone, eventId = None, port = None, requiredNetwork=None):
+    def register(self, host, zone, eventUuid = None, port = None, requiredNetwork=None):
         data = dict(host=host, port = port, zone = zone,
-            requiredNetwork=requiredNetwork, eventId = eventId)
+            requiredNetwork=requiredNetwork, eventUuid = eventUuid)
         data.update(method = 'register')
 
         return self.__callDispatcher(data)
@@ -54,9 +54,9 @@ class RepeaterClient(object):
         
         return self.__callDispatcher(data)
     
-    def update(self, host, zone, sources, eventId = None, port = None):
+    def update(self, host, zone, sources, eventUuid = None, port = None):
         data = dict(host=host, port = port, zone = zone,
-                    sources = sources, eventId = eventId)
+                    sources = sources, eventUuid = eventUuid)
         data.update(method = 'update')
         
         return self.__callDispatcher(data)      
@@ -70,9 +70,9 @@ class RepeaterClient(object):
     def getNodes(self):
         return self.client.getWorkerList()
 
-    def poll(self, host, zone, eventId = None, port = None, resultsLocation=None):
+    def poll(self, host, zone, eventUuid = None, port = None, resultsLocation=None):
         data = dict(host=host, resultsLocation = resultsLocation,
-                    port = port, eventId = eventId, zone = zone)
+                    port = port, eventUuid = eventUuid, zone = zone)
         data.update(method='polling')
 
         return self.__callDispatcher(data)
