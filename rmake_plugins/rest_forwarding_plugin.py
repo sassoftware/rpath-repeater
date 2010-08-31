@@ -19,13 +19,14 @@ from rmake3.lib import chutney
 from rmake3.lib.jabberlink import message
 
 from rmake3.core import plug_dispatcher
+from rmake3.lib import logger
 from rmake3.worker import plug_worker
 
 from twisted.internet import defer, reactor, ssl
 from twisted.web import resource, server
 
 NS = 'http://rpath.com/permanent/xmpp/repeater-1.0'
-logger = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 class RestForwardingPlugin(plug_dispatcher.DispatcherPlugin, plug_worker.LauncherPlugin):
 
