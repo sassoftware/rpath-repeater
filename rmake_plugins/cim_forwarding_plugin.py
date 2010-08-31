@@ -88,12 +88,14 @@ class CimHandler(handler.JobHandler):
         except nodeinfo.ProbeHostError:
             self.setStatus(404, "CIM not found on host: %s port: %d" % (
                 cp.host, cp.port))
+            self.postFailure()
             return
 
         if hasattr(self, self.method):
             return self.method
 
         self.setStatus(405, "Method does not exist: %s" % (self.method))
+        self.postFailure()
         return
 
     def register(self):
@@ -138,16 +140,23 @@ class CimHandler(handler.JobHandler):
             return 'done'
         return self.gatherTasks([task], cb_gather)
 
-    def postResults(self, dom=None):
+    def postFailure(self):
+        T = XML.Text
+        el = XML.Element("system",
+            T("event_uuid", self.cimParams.eventUuid))
+        self.postResults(el)
+
+    def postResults(self, elt=None):
         host = self.resultsLocation.get('host', 'localhost')
         port = self.resultsLocation.get('port', 80)
         path = self.resultsLocation.get('path')
         if not path:
             return
-        if dom is None:
+        if elt is None:
             dom = minidom.parseString(self.job.data)
-        self.addJobUuid(dom)
-        data = self.domToXml(dom)
+            elt = dom.firstChild
+        self.addJobInfo(elt)
+        data = self.toXml(elt)
         headers = {
             'Content-Type' : 'application/xml; charset="utf-8"',
             'Host' : host, }
@@ -165,7 +174,7 @@ class CimHandler(handler.JobHandler):
 
         reactor.connectTCP(host, port, fact)
 
-    def addJobUuid(self, dom):
+    def addJobInfo(self, elt):
         # Parse the data, we need to insert the job uuid
         T = XML.Text
         jobStateMap = { False : 'Failed', True : 'Completed' }
@@ -174,10 +183,10 @@ class CimHandler(handler.JobHandler):
             T("job_uuid", self.job.job_uuid),
             T("job_state", jobStateString),
         )
-        dom.firstChild.appendChild(XML.Element("system_jobs", job))
+        elt.appendChild(XML.Element("system_jobs", job))
 
-    def domToXml(self, dom):
-        return dom.toxml(encoding="UTF-8").encode("utf-8")
+    def toXml(self, elt):
+        return elt.toxml(encoding="UTF-8").encode("utf-8")
 
     def update(self):
         self.setStatus(103, "Starting the updating {1/2}")
