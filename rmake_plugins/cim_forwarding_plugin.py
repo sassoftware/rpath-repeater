@@ -24,7 +24,7 @@ from rmake3.core import plug_dispatcher
 from rmake3.core import types
 from rmake3.worker import plug_worker
 
-from rpath_repeater.utils import nodeinfo, wbemlib
+from rpath_repeater.utils import nodeinfo, wbemlib, cimupdater
 from rpath_repeater.utils.immutabledict import FrozenImmutableDict
 
 PREFIX = 'com.rpath.sputnik'
@@ -165,11 +165,10 @@ class CimHandler(handler.JobHandler):
                 UpdateData(self.params, sources), zone=self.zone)
         def cb_gather(results):
             task, = results
-            result = task.task_data.getObject().response
-            self.job.data = types.FrozenObject.fromObject(result)
-            self.setStatus(200, "Done! cim update got a result of: %s" % (result))
+            result = task.task_data.getObject()
+            self.setStatus(200, "Done! cim updating of %s" % (result))
             return 'done'
-        return self.gatherTasks([task], cb_gather)   
+        return self.gatherTasks([task], cb_gather)
     
 CimParams = types.slottype('CimParams', 'host port eventId')
 # These are just the starting point attributes
@@ -316,14 +315,11 @@ class UpdateTask(CIMTaskHandler):
 
     def run(self):
         data = self.getData()
-        self.sendStatus(101, "Contacting host %s on port %d to Poll it for info" % (
+        self.sendStatus(101, "Contacting host %s on port %d to update it" % (
             data.p.host, data.p.port))
 
-        server = self.getWbemConnection(data)
-
-        children = self._getUuids(server)
-        children.append(self._applySoftwareUpdate(data.p.host, data.p.sources))
-
+        self._applySoftwareUpdate(data.p.host, data.sources)
+        children = []
         el = XML.Element("system", *children)
 
         self.setData(el.toxml())
