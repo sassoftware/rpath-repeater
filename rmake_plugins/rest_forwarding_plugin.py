@@ -80,8 +80,14 @@ class RepeaterMessageHandler(message.MessageHandler):
             response = self.repeater.dispatch(dict['method'],
                          dict['url'], dict['body'], 
                          {'X-rpathManagementNetworkNode': neighbor.jid.full()})
-            reply = {'status':response.status, 'headers':response.getheaders(), 
-                     'response': response.read()}
+            if response is None:
+                # There was an error talking upstream. Return a 502 Bad Gateway
+                # XXX Ideally we want to explain what the original error was
+                reply = { 'status' : 502, 'response' : '' }
+            else:
+                reply = {'status':response.status,
+                         'headers':response.getheaders(),
+                         'response': response.read()}
         
             neighbor.send(message.Message(self.namespace, chutney.dumps(reply),
                                            in_reply_to=msg))
