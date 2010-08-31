@@ -316,14 +316,23 @@ class UpdateTask(CIMTaskHandler):
 
     def run(self):
         data = self.getData()
-        self.sendStatus(101, "Contacting host %s on port %d to Update it for info" % (
+        self.sendStatus(101, "Contacting host %s on port %d to Poll it for info" % (
             data.p.host, data.p.port))
 
-        #send CIM poll request
-        data.response = "*handwave*"
+        server = self.getWbemConnection(data)
 
-        self.setData(data)
+        children = self._getUuids(server)
+        children.append(self._applySoftwareUpdate(data.p.host, data.p.sources))
+
+        el = XML.Element("system", *children)
+
+        self.setData(el.toxml())
         self.sendStatus(200, "Host %s has been updated" % data.p.host)
+
+    def _applySoftwareUpdate(self, host, sources):
+        cimUpdater = cimupdater.CIMUpdater("https://" + host)
+        cimUpdater.applyUpdate(sources)
+        return None
 
 class HTTPClientFactory(client.HTTPClientFactory):
     def __init__(self, url, *args, **kwargs):
