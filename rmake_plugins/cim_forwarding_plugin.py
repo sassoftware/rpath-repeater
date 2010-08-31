@@ -147,7 +147,7 @@ class CimHandler(handler.JobHandler):
         if dom is None:
             dom = minidom.parseString(self.job.data)
         self.addJobUuid(dom)
-        data = eslf.domToXml(dom)
+        data = self.domToXml(dom)
         headers = {
             'Content-Type' : 'application/xml; charset="utf-8"',
             'Host' : host, }
