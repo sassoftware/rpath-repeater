@@ -132,29 +132,45 @@ class CimHandler(handler.JobHandler):
             result = task.task_data.getObject()
             self.job.data = result
             self.setStatus(200, "Done! cim polling of %s" % (result))
-            host = 'localhost'
-            port = self.resultsLocation.get('port', 80)
-            path = self.resultsLocation.get('path')
-            if path:
-                data = self.job.data.encode("utf-8")
-                headers = {
-                    'Content-Type' : 'application/xml; charset="utf-8"',
-                    'Host' : host, }
-                agent = "rmake-plugin/1.0"
-                fact = HTTPClientFactory(path, method='PUT', postdata=data,
-                    headers = headers, agent = agent)
-                @fact.deferred.addCallback
-                def processResult(result):
-                    print "Received result for", host, result
-                    return result
-
-                @fact.deferred.addErrback
-                def processError(error):
-                    print "Error!", error.getErrorMessage()
-
-                reactor.connectTCP(host, port, fact)
+            self.postResults()
             return 'done'
         return self.gatherTasks([task], cb_gather)
+
+    def postResults(self):
+        host = 'localhost'
+        port = self.resultsLocation.get('port', 80)
+        path = self.resultsLocation.get('path')
+        if not path:
+            return
+        data = self.addJobUuid()
+        headers = {
+            'Content-Type' : 'application/xml; charset="utf-8"',
+            'Host' : host, }
+        agent = "rmake-plugin/1.0"
+        fact = HTTPClientFactory(path, method='PUT', postdata=data,
+            headers = headers, agent = agent)
+        @fact.deferred.addCallback
+        def processResult(result):
+            print "Received result for", host, result
+            return result
+
+        @fact.deferred.addErrback
+        def processError(error):
+            print "Error!", error.getErrorMessage()
+
+        reactor.connectTCP(host, port, fact)
+
+    def addJobUuid(self):
+        # Parse the data, we need to insert the job uuid
+        dom = minidom.parseString(self.job.data)
+        T = XML.Text
+        # XXX Assume the job completed - we need to deal with errors too
+        job = XML.Element("job",
+            T("job_uuid", self.job.job_uuid),
+            T("job_state", "Completed"),
+        )
+        dom.firstChild.appendChild(XML.Element("system_jobs", job))
+        return dom.toxml(encoding="UTF-8").encode("utf-8")
 
     def update(self):
         self.setStatus(103, "Starting the updating {1/2}")
@@ -238,7 +254,7 @@ class PollingTask(CIMTaskHandler):
 
         el = XML.Element("system", *children)
 
-        self.setData(el.toxml())
+        self.setData(el.toxml(encoding="UTF-8"))
         self.sendStatus(200, "Host %s has been polled" % data.p.host)
 
     def _getUuids(self, server):
