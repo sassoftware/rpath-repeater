@@ -234,6 +234,7 @@ class PollingTask(CIMTaskHandler):
         server = self.getWbemConnection(data)
         children = self._getUuids(server)
         children.append(self._getSoftwareVersions(server))
+        children.extend(self._getEventUuid(data))
 
         el = XML.Element("system", *children)
 
@@ -267,6 +268,11 @@ class PollingTask(CIMTaskHandler):
         # Start creating the XML document
         troves = [ self._trove(si) for si in siList ]
         return XML.Element("installedSoftware", *troves)
+
+    def _getEventUuid(self, data):
+        if not data.p.eventUuid:
+            return []
+        return [ XML.Text("eventUuid", data.p.eventUuid) ]
 
     @classmethod
     def _trove(cls, si):

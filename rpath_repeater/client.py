@@ -85,12 +85,12 @@ def main():
         print "Usage: %s system" % sys.argv[0]
         return 1
     system = sys.argv[1]
-    sputnik = 'sputnik1'
+    zone = None
     cli = RepeaterClient()
     if 1:
-        uuid, job = cli.register(system, sputnik,)# requiredNetwork="1.1.1.1")
+        uuid, job = cli.register(system, zone,)# requiredNetwork="1.1.1.1")
     else:
-        uuid, job = cli.poll(system, sputnik,
+        uuid, job = cli.poll(system, zone, eventUuid="unique uuid",
             resultsLocation=dict(path='/adfadf', port=1234))
     while 1:
         job = cli.getJob(uuid)
