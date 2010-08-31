@@ -73,34 +73,36 @@ class CimHandler(handler.JobHandler):
         self.setStatus(101, "Starting the CIM call {0/2}")
         
         self.data = self.getData().thaw().getDict()
+        self.zone = self.data.pop('zone', None)
+        self.cimParams = CimParams(**self.data.pop('cimParams', {}))
         self.method = self.data['method']
-        self.host = self.data['host']
+        self.methodArguments = self.data.pop('methodArguments', {})
         self.resultsLocation = self.data.pop('resultsLocation', {})
         self.eventUuid = self.data.pop('eventUuid', None)
-        self.zone = self.data.pop('zone', None)
-        
-        self.params = CimParams(self.host, self.port, self.eventUuid)
-        
-        self.setStatus(102, "Starting to probe the host: %s" % (self.host))
+
+        # XXX FIXME this should not happen here, but on the endpoint
+        cp = self.cimParams
+        self.setStatus(102, "Starting to probe the host: %s" % (cp.host))
         try:
-            nodeinfo.probe_host(self.host, self.port)
+            nodeinfo.probe_host(cp.host, cp.port)
         except nodeinfo.ProbeHostError:
-            self.setStatus(404, "CIM not found on host: %s port: %d" % (self.host, self.port))
-            return 
-        
+            self.setStatus(404, "CIM not found on host: %s port: %d" % (
+                cp.host, cp.port))
+            return
+
         if hasattr(self, self.method):
             return self.method
-        
+
         self.setStatus(405, "Method does not exist: %s" % (self.method))
-        return   
+        return
 
     def register(self):
         self.setStatus(103, "Starting the registration {1/2}")
         
-        task = self.newTask('register', CIM_TASK_REGISTER,
-                RactivateData(self.params, nodeinfo.get_hostname() +':8443',
-                self.data.get('requiredNetwork')), zone=self.zone)
-        
+        args = RactivateData(self.cimParams, nodeinfo.get_hostname() +':8443',
+            self.methodArguments.get('requiredNetwork'))
+        task = self.newTask('register', CIM_TASK_REGISTER, args, zone=self.zone)
+
         def cb_gather(results):
             task, = results
             result = task.task_data.getObject().response
@@ -111,9 +113,9 @@ class CimHandler(handler.JobHandler):
     
     def shutdown(self):
         self.setStatus(103, "Shutting down the managed server")
-        
-        task = self.newTask('shutdown', CIM_TASK_SHUTDOWN,
-                CimData(self.params), zone=self.zone)
+
+        args = CimData(self.cimParams)
+        task = self.newTask('shutdown', CIM_TASK_SHUTDOWN, args, zone=self.zone)
         def cb_gather(results):
             task, = results
             result = task.task_data.getObject().response
@@ -125,8 +127,8 @@ class CimHandler(handler.JobHandler):
     def polling(self):
         self.setStatus(103, "Starting the polling {1/2}")
 
-        task = self.newTask('Polling', CIM_TASK_POLLING,
-                CimData(self.params), zone=self.zone)
+        args = CimData(self.cimParams)
+        task = self.newTask('Polling', CIM_TASK_POLLING, args, zone=self.zone)
         def cb_gather(results):
             task, = results
             result = task.task_data.getObject()
@@ -136,13 +138,16 @@ class CimHandler(handler.JobHandler):
             return 'done'
         return self.gatherTasks([task], cb_gather)
 
-    def postResults(self):
-        host = 'localhost'
+    def postResults(self, dom=None):
+        host = self.resultsLocation.get('host', 'localhost')
         port = self.resultsLocation.get('port', 80)
         path = self.resultsLocation.get('path')
         if not path:
             return
-        data = self.addJobUuid()
+        if dom is None:
+            dom = minidom.parseString(self.job.data)
+        self.addJobUuid(dom)
+        data = eslf.domToXml(dom)
         headers = {
             'Content-Type' : 'application/xml; charset="utf-8"',
             'Host' : host, }
@@ -160,25 +165,28 @@ class CimHandler(handler.JobHandler):
 
         reactor.connectTCP(host, port, fact)
 
-    def addJobUuid(self):
+    def addJobUuid(self, dom):
         # Parse the data, we need to insert the job uuid
-        dom = minidom.parseString(self.job.data)
         T = XML.Text
-        # XXX Assume the job completed - we need to deal with errors too
+        jobStateMap = { False : 'Failed', True : 'Completed' }
+        jobStateString = jobStateMap[self.job.status.completed]
         job = XML.Element("job",
             T("job_uuid", self.job.job_uuid),
-            T("job_state", "Completed"),
+            T("job_state", jobStateString),
         )
         dom.firstChild.appendChild(XML.Element("system_jobs", job))
+
+    def domToXml(self, dom):
         return dom.toxml(encoding="UTF-8").encode("utf-8")
 
     def update(self):
         self.setStatus(103, "Starting the updating {1/2}")
 
-        sources = self.data['sources']
+        sources = self.methodArguments['sources']
 
-        task = self.newTask('Update', CIM_TASK_UPDATE,
-                UpdateData(self.params, sources), zone=self.zone)
+        args = UpdateData(self.cimParams, sources)
+        task = self.newTask('Update', CIM_TASK_UPDATE,args, zone=self.zone)
+
         def cb_gather(results):
             task, = results
             result = task.task_data.getObject().response
@@ -187,7 +195,8 @@ class CimHandler(handler.JobHandler):
             return 'done'
         return self.gatherTasks([task], cb_gather)   
     
-CimParams = types.slottype('CimParams', 'host port eventUuid')
+CimParams = types.slottype('CimParams',
+    'host port clientCert clientKey eventUuid')
 # These are just the starting point attributes
 CimData = types.slottype('CimData', 'p response')
 RactivateData = types.slottype('RactivateData', 'p node requiredNetwork response')
