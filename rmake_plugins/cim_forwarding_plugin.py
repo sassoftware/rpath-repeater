@@ -221,6 +221,57 @@ class CIMTaskHandler(plug_worker.TaskHandler):
         server = wbemlib.WBEMServer("https://" + data.p.host)
         return server
 
+    def _getUuids(self, server):
+        cs = server.RPATH_ComputerSystem.EnumerateInstances()
+        if not cs:
+            return {}
+        cs = cs[0]
+        T = XML.Text
+        return [ T("localUuid", cs['LocalUUID']),
+            T("generatedUuid", cs['GeneratedUUID']) ]
+
+    def _getSoftwareVersions(self, server):
+        # Fetch instances of the ElementSoftwareIdentity association.
+        # We need to figure out which SoftwareIdentity instances are installed
+        # We do this by filtering the state
+        states = set([2, 6])
+        esi = server.RPATH_ElementSoftwareIdentity.EnumerateInstances()
+        installedSofwareIdentityNames = set(g['Antecedent']['InstanceID']
+            for g in esi
+                if states.issubset(g.properties['ElementSoftwareStatus'].value))
+        # Now fetch all SoftwareIdentity elements and filter out the ones not
+        # installed (i.e. InstanceID not in installedSofwareIdentityNames)
+        siList = server.RPATH_SoftwareIdentity.EnumerateInstances()
+        siList = [ si for si in siList
+            if si['InstanceID'] in installedSofwareIdentityNames ]
+
+        # Start creating the XML document
+        troves = [ self._trove(si) for si in siList ]
+        return XML.Element("installedSoftware", *troves)
+
+    @classmethod
+    def _trove(cls, si):
+        Text = XML.Text
+        nvf = "%s=%s" % (si['name'], si['VersionString'])
+        n, v, f = conaryclient.cmdline.parseTroveSpec(nvf)
+
+        name = Text("name", n)
+        version = cls._version(v, f)
+        flavor = Text("flavor", str(f))
+
+        return XML.Element("trove", name, version, flavor)
+
+    @classmethod
+    def _version(cls, v, f):
+        thawed_v = versions.ThawVersion(v)
+        Text = XML.Text
+        full = Text("full", str(thawed_v))
+        ordering = Text("ordering", thawed_v.timeStamps()[0])
+        revision = Text("revision", str(thawed_v.trailingRevision()))
+        label = Text("label", str(thawed_v.trailingLabel()))
+        flavor = Text("flavor", str(f))
+        return XML.Element("version", full, label, revision, ordering, flavor)
+
 class RegisterTask(CIMTaskHandler):
     
     def run(self):
@@ -279,56 +330,27 @@ class PollingTask(CIMTaskHandler):
         self.setData(el.toxml(encoding="UTF-8"))
         self.sendStatus(200, "Host %s has been polled" % data.p.host)
 
-    def _getUuids(self, server):
-        cs = server.RPATH_ComputerSystem.EnumerateInstances()
-        if not cs:
-            return {}
-        cs = cs[0]
-        T = XML.Text
-        return [ T("localUuid", cs['LocalUUID']),
-            T("generatedUuid", cs['GeneratedUUID']) ]
+class UpdateTask(CIMTaskHandler):
 
-    def _getSoftwareVersions(self, server):
-        # Fetch instances of the ElementSoftwareIdentity association.
-        # We need to figure out which SoftwareIdentity instances are installed
-        # We do this by filtering the state
-        states = set([2, 6])
-        esi = server.RPATH_ElementSoftwareIdentity.EnumerateInstances()
-        installedSofwareIdentityNames = set(g['Antecedent']['InstanceID']
-            for g in esi
-                if states.issubset(g.properties['ElementSoftwareStatus'].value))
-        # Now fetch all SoftwareIdentity elements and filter out the ones not
-        # installed (i.e. InstanceID not in installedSofwareIdentityNames)
-        siList = server.RPATH_SoftwareIdentity.EnumerateInstances()
-        siList = [ si for si in siList
-            if si['InstanceID'] in installedSofwareIdentityNames ]
+    def run(self):
+        data = self.getData()
+        self.sendStatus(101, "Contacting host %s on port %d to update it" % (
+            data.p.host, data.p.port))
 
-        # Start creating the XML document
-        troves = [ self._trove(si) for si in siList ]
-        return XML.Element("installedSoftware", *troves)
+        server = self.getWbemConnection(data)
+        self._applySoftwareUpdate(data.p.host, data.sources)
+        children = self._getUuids(server)
+        children.append(self._getSoftwareVersions(server))
 
-    @classmethod
-    def _trove(cls, si):
-        Text = XML.Text
-        nvf = "%s=%s" % (si['name'], si['VersionString'])
-        n, v, f = conaryclient.cmdline.parseTroveSpec(nvf)
+        el = XML.Element("system", *children)
 
-        name = Text("name", n)
-        version = cls._version(v, f)
-        flavor = Text("flavor", str(f))
+        self.setData(el.toxml(encoding="UTF-8"))
+        self.sendStatus(200, "Host %s has been updated" % data.p.host)
 
-        return XML.Element("trove", name, version, flavor)
-
-    @classmethod
-    def _version(cls, v, f):
-        thawed_v = versions.ThawVersion(v)
-        Text = XML.Text
-        full = Text("full", str(thawed_v))
-        ordering = Text("ordering", thawed_v.timeStamps()[0])
-        revision = Text("revision", str(thawed_v.trailingRevision()))
-        label = Text("label", str(thawed_v.trailingLabel()))
-        flavor = Text("flavor", str(f))
-        return XML.Element("version", full, label, revision, ordering, flavor)
+    def _applySoftwareUpdate(self, host, sources):
+        cimUpdater = cimupdater.CIMUpdater("https://" + host)
+        cimUpdater.applyUpdate(sources)
+        return None
 
 class XML(object):
     @classmethod
@@ -350,25 +372,6 @@ class XML(object):
     def _Node(cls, tagName, factory):
         node = factory(tagName)
         return node
-
-class UpdateTask(CIMTaskHandler):
-
-    def run(self):
-        data = self.getData()
-        self.sendStatus(101, "Contacting host %s on port %d to update it" % (
-            data.p.host, data.p.port))
-
-        self._applySoftwareUpdate(data.p.host, data.sources)
-        children = []
-        el = XML.Element("system", *children)
-
-        self.setData(el.toxml())
-        self.sendStatus(200, "Host %s has been updated" % data.p.host)
-
-    def _applySoftwareUpdate(self, host, sources):
-        cimUpdater = cimupdater.CIMUpdater("https://" + host)
-        cimUpdater.applyUpdate(sources)
-        return None
 
 class HTTPClientFactory(client.HTTPClientFactory):
     def __init__(self, url, *args, **kwargs):
