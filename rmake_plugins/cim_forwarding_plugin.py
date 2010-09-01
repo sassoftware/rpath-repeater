@@ -25,7 +25,6 @@ from rmake3.core import types
 from rmake3.worker import plug_worker
 
 from rpath_repeater.utils import nodeinfo, wbemlib, cimupdater
-from rpath_repeater.utils.immutabledict import FrozenImmutableDict
 
 PREFIX = 'com.rpath.sputnik'
 CIM_JOB = PREFIX + '.cimplugin'
