@@ -174,6 +174,8 @@ class CimHandler(handler.JobHandler):
         reactor.connectTCP(host, port, fact)
 
     def addEventInfo(self, elt):
+        if not self.cimParams.eventUuid:
+            return
         elt.appendChild(XML.Text("event_uuid", self.cimParams.eventUuid))
         return elt
 
