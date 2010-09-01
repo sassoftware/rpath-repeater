@@ -140,7 +140,6 @@ class CimHandler(handler.JobHandler):
         return self.gatherTasks([task], cb_gather)
 
     def postFailure(self):
-        T = XML.Text
         el = XML.Element("system")
         self.postResults(el)
 
