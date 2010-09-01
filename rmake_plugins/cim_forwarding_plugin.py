@@ -198,7 +198,9 @@ class CimHandler(handler.JobHandler):
         def cb_gather(results):
             task, = results
             result = task.task_data.getObject()
+            self.job.data = result
             self.setStatus(200, "Done! cim updating of %s" % (result))
+            self.postResults()
             return 'done'
         return self.gatherTasks([task], cb_gather)
     
