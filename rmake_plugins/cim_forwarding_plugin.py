@@ -141,8 +141,7 @@ class CimHandler(handler.JobHandler):
 
     def postFailure(self):
         T = XML.Text
-        el = XML.Element("system",
-            T("event_uuid", self.cimParams.eventUuid))
+        el = XML.Element("system")
         self.postResults(el)
 
     def postResults(self, elt=None):
@@ -154,6 +153,7 @@ class CimHandler(handler.JobHandler):
         if elt is None:
             dom = minidom.parseString(self.job.data)
             elt = dom.firstChild
+        self.addEventInfo(elt)
         self.addJobInfo(elt)
         data = self.toXml(elt)
         headers = {
@@ -172,6 +172,10 @@ class CimHandler(handler.JobHandler):
             print "Error!", error.getErrorMessage()
 
         reactor.connectTCP(host, port, fact)
+
+    def addEventInfo(self, elt):
+        elt.appendChild(XML.Text("event_uuid", self.cimParams.eventUuid))
+        return elt
 
     def addJobInfo(self, elt):
         # Parse the data, we need to insert the job uuid
@@ -268,7 +272,6 @@ class PollingTask(CIMTaskHandler):
         server = self.getWbemConnection(data)
         children = self._getUuids(server)
         children.append(self._getSoftwareVersions(server))
-        children.extend(self._getEventUuid(data))
 
         el = XML.Element("system", *children)
 
@@ -302,11 +305,6 @@ class PollingTask(CIMTaskHandler):
         # Start creating the XML document
         troves = [ self._trove(si) for si in siList ]
         return XML.Element("installedSoftware", *troves)
-
-    def _getEventUuid(self, data):
-        if not data.p.eventUuid:
-            return []
-        return [ XML.Text("eventUuid", data.p.eventUuid) ]
 
     @classmethod
     def _trove(cls, si):
