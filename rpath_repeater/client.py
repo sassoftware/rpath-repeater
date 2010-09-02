@@ -119,7 +119,10 @@ def main():
             zone=zone)
     else:
         uuid, job = cli.poll(
-            cli.CimParams(host=system, eventUuid="unique uuid"),
+            cli.CimParams(host=system, eventUuid="unique uuid",
+#              clientCert=file("/tmp/reinhold.crt").read(),
+#              clientKey=file("/tmp/reinhold.key").read(),
+            ),
             cli.ResultsLocation(path="/adfadf", port=1234),
             zone=zone)
     while 1:

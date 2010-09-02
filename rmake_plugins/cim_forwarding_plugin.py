@@ -12,6 +12,8 @@
 # full details.
 #
 
+import tempfile
+
 from xml.dom import minidom
 from conary import conaryclient
 from conary import versions
@@ -217,9 +219,28 @@ RactivateData = types.slottype('RactivateData', 'p node requiredNetwork response
 UpdateData = types.slottype('UpdateData', 'p sources response')
 
 class CIMTaskHandler(plug_worker.TaskHandler):
+    TemporaryDir = "/dev/shm"
     def getWbemConnection(self, data):
-        server = wbemlib.WBEMServer("https://" + data.p.host)
+        x509Dict = {}
+        if None not in [ data.p.clientCert, data.p.clientKey ]:
+            self._clientCertFile = self._tempFile("client-cert-",
+                data.p.clientCert)
+            self._clientKeyFile = self._tempFile("client-key-",
+                data.p.clientKey)
+            x509Dict = dict(cert_file=self._clientCertFile.name,
+                            key_file=self._clientKeyFile.name)
+
+        server = wbemlib.WBEMServer("https://" + data.p.host, x509=x509Dict)
         return server
+
+    @classmethod
+    def _tempFile(cls, prefix, contents):
+        # NamedTemporaryFile will conveniently go *poof* when it gets closed
+        tmpf = tempfile.NamedTemporaryFile(dir=cls.TemporaryDir, prefix=prefix)
+        tmpf.write(contents)
+        # Flush the contents on the disk, so python's ssl lib can see them
+        tmpf.flush()
+        return tmpf
 
     def _getUuids(self, server):
         cs = server.RPATH_ComputerSystem.EnumerateInstances()
