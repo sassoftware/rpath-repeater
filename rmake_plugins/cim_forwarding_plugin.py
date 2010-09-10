@@ -46,6 +46,7 @@ class CimForwardingPlugin(plug_dispatcher.DispatcherPlugin, plug_worker.WorkerPl
                 CIM_TASK_SHUTDOWN: ShutdownTask,
                 CIM_TASK_POLLING: PollingTask,
                 CIM_TASK_UPDATE: UpdateTask,
+                CIM_TASK_SHUTDOWN: ShutdownTask,
                 }     
         
 class CimHandler(handler.JobHandler):
