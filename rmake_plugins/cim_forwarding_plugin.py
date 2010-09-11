@@ -12,6 +12,7 @@
 # full details.
 #
 
+import sys
 import tempfile
 
 from xml.dom import minidom
@@ -82,16 +83,9 @@ class CimHandler(handler.JobHandler):
         self.resultsLocation = self.data.pop('resultsLocation', {})
         self.eventUuid = self.data.pop('eventUuid', None)
 
-        # XXX FIXME this should not happen here, but on the endpoint
         cp = self.cimParams
-        self.setStatus(102, "Starting to probe the host: %s" % (cp.host))
-        try:
-            nodeinfo.probe_host(cp.host, cp.port)
-        except nodeinfo.ProbeHostError:
-            self.setStatus(404, "CIM not found on host: %s port: %d" % (
-                cp.host, cp.port))
-            self.postFailure()
-            return
+        self.setStatus(102, "CIM call for %s:%s" %
+            (cp.host, cp.port))
 
         if hasattr(self, self.method):
             return self.method
@@ -231,8 +225,28 @@ class CIMTaskHandler(plug_worker.TaskHandler):
             x509Dict = dict(cert_file=self._clientCertFile.name,
                             key_file=self._clientKeyFile.name)
 
+        # Do the probing early, since WBEMServer does not do proper timeouts
+        # May raise ProbeHostError, which we catch in run()
+        self._serverCert = nodeinfo.probe_host_ssl(data.p.host, data.p.port,
+            sslCert=self._clientCertFile,
+            sslKey= self._clientKeyFile)
         server = wbemlib.WBEMServer("https://" + data.p.host, x509=x509Dict)
         return server
+
+    def run(self):
+        """
+        Exception handing for the _run method doing the real work
+        """
+        data = self.getData()
+        try:
+            self._run(data)
+        except nodeinfo.ProbeHostError:
+            self.setStatus(404, "CIM not found on %s:%d" % (
+                data.p.host, data.p.port))
+        except:
+            ei = sys.exc_info()
+            self.setStatus(500, "Error: %s" % ei[1])
+
 
     @classmethod
     def _tempFile(cls, prefix, contents):
@@ -243,10 +257,13 @@ class CIMTaskHandler(plug_worker.TaskHandler):
         tmpf.flush()
         return tmpf
 
+    def _getServerCert(self):
+        return [ XML.Text("sslServerCertificate", self._serverCert) ]
+
     def _getUuids(self, server):
         cs = server.RPATH_ComputerSystem.EnumerateInstances()
         if not cs:
-            return {}
+            return []
         cs = cs[0]
         T = XML.Text
         return [ T("localUuid", cs['LocalUUID']),
@@ -296,8 +313,7 @@ class CIMTaskHandler(plug_worker.TaskHandler):
 
 class RegisterTask(CIMTaskHandler):
     
-    def run(self):
-        data = self.getData()
+    def _run(self, data):
         self.sendStatus(104, "Contacting host %s on port %d to rActivate itself" % (
             data.p.host, data.p.port))
 
@@ -316,11 +332,10 @@ class RegisterTask(CIMTaskHandler):
 
         self.setData(data)
         self.sendStatus(200, "Host %s will try to rActivate itself" % data.p.host)
-        
+
 class ShutdownTask(CIMTaskHandler):
-    
-    def run(self):
-        data = self.getData()
+
+    def _run(self, data):
         self.sendStatus(101, "Contacting host %s to shut itself down" % (
             data.p.host))
 
@@ -338,13 +353,13 @@ class ShutdownTask(CIMTaskHandler):
 
 class PollingTask(CIMTaskHandler):
 
-    def run(self):
-        data = self.getData()
+    def _run(self, data):
         self.sendStatus(101, "Contacting host %s on port %d to Poll it for info" % (
             data.p.host, data.p.port))
 
         server = self.getWbemConnection(data)
         children = self._getUuids(server)
+        children.extend(self._getServerCert)
         children.append(self._getSoftwareVersions(server))
 
         el = XML.Element("system", *children)
@@ -354,14 +369,14 @@ class PollingTask(CIMTaskHandler):
 
 class UpdateTask(CIMTaskHandler):
 
-    def run(self):
-        data = self.getData()
+    def _run(self, data):
         self.sendStatus(101, "Contacting host %s on port %d to update it" % (
             data.p.host, data.p.port))
 
         server = self.getWbemConnection(data)
         self._applySoftwareUpdate(data.p.host, data.sources)
         children = self._getUuids(server)
+        children.extend(self._getServerCert)
         children.append(self._getSoftwareVersions(server))
 
         el = XML.Element("system", *children)
