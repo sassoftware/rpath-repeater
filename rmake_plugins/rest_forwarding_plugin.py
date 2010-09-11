@@ -64,22 +64,26 @@ class RestForwardingPlugin(plug_dispatcher.DispatcherPlugin, plug_worker.Launche
                 if key == 'repeaterTarget':
                     repeater = HttpRepeater(value)
                     dispatcher.bus.link.addMessageHandler(RepeaterMessageHandler(repeater))
-    
+
 
 class RepeaterMessageHandler(message.MessageHandler):
     namespace = NS
-    
+
     def __init__(self, repeater):
         self.repeater = repeater
 
     def onMessage(self, neighbor, msg):
-        
-        dict = chutney.loads(msg.payload)
+        reqDict = chutney.loads(msg.payload)
+        method = reqDict['method']
+        url = reqDict['url']
+        body = reqDict['body']
+        headers = reqDict['headers']
+        # Technically, this is wrong, it gets rid of multi-valued headers
+        headers = dict((x, y[-1]) for (x, y) in headers)
 
         if self.repeater:
-            response = self.repeater.dispatch(dict['method'],
-                         dict['url'], dict['body'], 
-                         {'X-rpathManagementNetworkNode': neighbor.jid.full()})
+            headers['X-rpathManagementNetworkNode'] = neighbor.jid.full()
+            response = self.repeater.dispatch(method, url, body, headers)
             if response is None:
                 # There was an error talking upstream. Return a 502 Bad Gateway
                 # XXX Ideally we want to explain what the original error was
@@ -88,7 +92,6 @@ class RepeaterMessageHandler(message.MessageHandler):
                 reply = {'status':response.status,
                          'headers':response.getheaders(),
                          'response': response.read()}
-        
             neighbor.send(message.Message(self.namespace, chutney.dumps(reply),
                                            in_reply_to=msg))
         else:
@@ -132,9 +135,12 @@ class EndPoint(resource.Resource):
         request.content.seek(0, 0)
         body = request.content.read()
         
+	
         content = {'url':request.uri,
                    'method':method.upper(),
-                   'body': body}
+                   'body': body,
+                   'headers' : list(request.requestHeaders.getAllRawHeaders()),
+                   }
         
         content = chutney.dumps(content)
         msg = message.Message(NS, content)
@@ -148,8 +154,9 @@ class EndPoint(resource.Resource):
 
                 request.setResponseCode(dict['status'])
                 
-                if body:
-                    request.write(dict['response'])
+		responseBody = dict['response']
+                if responseBody:
+                    request.write(responseBody)
                 
                 if not request._disconnected: 
                     request.finish()
