@@ -33,10 +33,11 @@ def probe_host(host, port):
     s.close()
     return True
 
-def probe_host_ssl(host, port, certFile=None, keyFile=None, sslServerCert=None):
+def probe_host_ssl(host, port, cert_file=None, key_file=None,
+        ssl_server_cert=None):
     """
     Probe the given host for an SSL connection on the given port.
-    The optional certFile and keyFile arguments point to a client-side
+    The optional cert_file and key_file arguments point to a client-side
     certificate pair to be used.
     If sslServerCert is provided, the server's certificate will be verified
     against this one.
@@ -55,13 +56,13 @@ def probe_host_ssl(host, port, certFile=None, keyFile=None, sslServerCert=None):
 
     ctx = SSL.Context(SSL.SSLv23_METHOD)
     ctx.set_options(SSL.OP_NO_SSLv2)
-    if certFile:
-        ctx.use_certificate_file(certFile)
-    if keyFile:
-        ctx.use_privatekey_file(keyFile)
-    if 0 and sslServerCert:
+    if cert_file:
+        ctx.use_certificate_file(cert_file)
+    if key_file:
+        ctx.use_privatekey_file(key_file)
+    if 0 and ssl_server_cert:
         # for some unknown reason, this does not work
-        ctx.load_verify_locations(sslServerCert)
+        ctx.load_verify_locations(ssl_server_cert)
         ctx.set_verify_depth(5)
         ctx.set_verify(SSL.VERIFY_PEER, verifyCallback)
 

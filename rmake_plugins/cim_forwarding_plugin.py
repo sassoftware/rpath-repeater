@@ -14,10 +14,12 @@
 
 import sys
 import tempfile
+import StringIO
 
 from xml.dom import minidom
 from conary import conaryclient
 from conary import versions
+from conary.lib.formattrace import formatTrace
 
 from twisted.web import client
 from twisted.internet import reactor
@@ -228,8 +230,7 @@ class CIMTaskHandler(plug_worker.TaskHandler):
         # Do the probing early, since WBEMServer does not do proper timeouts
         # May raise ProbeHostError, which we catch in run()
         self._serverCert = nodeinfo.probe_host_ssl(data.p.host, data.p.port,
-            sslCert=self._clientCertFile,
-            sslKey= self._clientKeyFile)
+            **x509Dict)
         server = wbemlib.WBEMServer("https://" + data.p.host, x509=x509Dict)
         return server
 
@@ -241,11 +242,16 @@ class CIMTaskHandler(plug_worker.TaskHandler):
         try:
             self._run(data)
         except nodeinfo.ProbeHostError:
-            self.setStatus(404, "CIM not found on %s:%d" % (
+            self.sendStatus(404, "CIM not found on %s:%d" % (
                 data.p.host, data.p.port))
         except:
-            ei = sys.exc_info()
-            self.setStatus(500, "Error: %s" % ei[1])
+            typ, value, tb = sys.exc_info()
+            out = StringIO.StringIO()
+            formatTrace(typ, value, tb, stream = out, withLocals = False)
+            out.write("\nFull stack:\n")
+            formatTrace(typ, value, tb, stream = out, withLocals = True)
+
+            self.sendStatus(450, "Error: %s" % out.getvalue())
 
 
     @classmethod
@@ -359,7 +365,7 @@ class PollingTask(CIMTaskHandler):
 
         server = self.getWbemConnection(data)
         children = self._getUuids(server)
-        children.extend(self._getServerCert)
+        children.extend(self._getServerCert())
         children.append(self._getSoftwareVersions(server))
 
         el = XML.Element("system", *children)
@@ -376,7 +382,7 @@ class UpdateTask(CIMTaskHandler):
         server = self.getWbemConnection(data)
         self._applySoftwareUpdate(data.p.host, data.sources)
         children = self._getUuids(server)
-        children.extend(self._getServerCert)
+        children.extend(self._getServerCert())
         children.append(self._getSoftwareVersions(server))
 
         el = XML.Element("system", *children)
