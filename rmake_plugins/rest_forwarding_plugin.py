@@ -22,7 +22,7 @@ from rmake3.core import plug_dispatcher
 from rmake3.lib import logger
 from rmake3.worker import plug_worker
 
-from twisted.internet import defer, reactor, ssl
+from twisted.internet import reactor, ssl
 from twisted.web import resource, server, client
 
 NS = 'http://rpath.com/permanent/xmpp/repeater-1.0'
