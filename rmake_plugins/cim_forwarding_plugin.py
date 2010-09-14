@@ -241,9 +241,9 @@ class CIMTaskHandler(plug_worker.TaskHandler):
         data = self.getData()
         try:
             self._run(data)
-        except nodeinfo.ProbeHostError:
-            self.sendStatus(404, "CIM not found on %s:%d" % (
-                data.p.host, data.p.port))
+        except nodeinfo.ProbeHostError, e:
+            self.sendStatus(404, "CIM not found on %s:%d: %s" % (
+                data.p.host, data.p.port, str(e)))
         except:
             typ, value, tb = sys.exc_info()
             out = StringIO.StringIO()
