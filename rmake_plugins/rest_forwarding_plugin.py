@@ -22,8 +22,8 @@ from rmake3.core import plug_dispatcher
 from rmake3.lib import logger
 from rmake3.worker import plug_worker
 
-from twisted.internet import defer, reactor, ssl
-from twisted.web import resource, server
+from twisted.internet import reactor, ssl
+from twisted.web import resource, server, client
 
 NS = 'http://rpath.com/permanent/xmpp/repeater-1.0'
 log = logging.getLogger(__name__)
@@ -62,37 +62,53 @@ class RestForwardingPlugin(plug_dispatcher.DispatcherPlugin, plug_worker.Launche
                 key, value = option.split()
                 
                 if key == 'repeaterTarget':
-                    repeater = HttpRepeater(value)
-                    dispatcher.bus.link.addMessageHandler(RepeaterMessageHandler(repeater))
-    
+                    dispatcher.bus.link.addMessageHandler(RepeaterMessageHandler(value))
+
 
 class RepeaterMessageHandler(message.MessageHandler):
     namespace = NS
-    
-    def __init__(self, repeater):
-        self.repeater = repeater
+    XHeader = 'X-rpathManagementNetworkNode'
+
+    def __init__(self, host):
+        self.host = host
 
     def onMessage(self, neighbor, msg):
-        
-        dict = chutney.loads(msg.payload)
+        reqDict = chutney.loads(msg.payload)
+        method = reqDict['method']
+        url = reqDict['url']
+        body = reqDict['body']
+        rawHeaders = reqDict['headers']
+        headers = client.Headers(rawHeaders)
+        headers.removeHeader(self.XHeader)
+        headers.addRawHeader(self.XHeader, neighbor.jid.full().encode('ascii'))
+        # XXX this is where multi-valued headers go down the drain
+        headers = dict((k.lower(), v[-1])
+            for (k, v) in headers.getAllRawHeaders())
 
-        if self.repeater:
-            response = self.repeater.dispatch(dict['method'],
-                         dict['url'], dict['body'], 
-                         {'X-rpathManagementNetworkNode': neighbor.jid.full()})
-            if response is None:
-                # There was an error talking upstream. Return a 502 Bad Gateway
-                # XXX Ideally we want to explain what the original error was
-                reply = { 'status' : 502, 'response' : '' }
-            else:
-                reply = {'status':response.status,
-                         'headers':response.getheaders(),
-                         'response': response.read()}
-        
+        fact = HTTPClientFactory(url, method=method.upper(), postdata=body,
+            headers=headers)
+        @fact.deferred.addCallback
+        def processResult(args):
+            (status, statusMessage, headers, body) = args
+            reply = dict(
+                status = int(status),
+                message = statusMessage,
+                headers = headers,
+                body = body,
+            )
             neighbor.send(message.Message(self.namespace, chutney.dumps(reply),
                                            in_reply_to=msg))
-        else:
-            raise
+            return args
+
+        @fact.deferred.addErrback
+        def processError(error):
+            # There was an error talking upstream. Return a 502 Bad Gateway
+            # XXX Ideally we want to explain what the original error was
+            reply = { 'status' : 502, 'body' : '' }
+            neighbor.send(message.Message(self.namespace, chutney.dumps(reply),
+                                           in_reply_to=msg))
+
+        reactor.connectTCP(self.host, 80, fact)
 
 class EndPoint(resource.Resource):
     isLeaf=True
@@ -128,69 +144,41 @@ class EndPoint(resource.Resource):
         return self
              
     def sendMsg(self, request, method):
-        
+
         request.content.seek(0, 0)
         body = request.content.read()
-        
+
+
         content = {'url':request.uri,
                    'method':method.upper(),
-                   'body': body}
-        
+                   'body': body,
+                   'headers' : dict(request.requestHeaders.getAllRawHeaders()),
+                   }
+
         content = chutney.dumps(content)
         msg = message.Message(NS, content)
-                
+
         d = self.bus.link.sendWithDeferred(self.bus.targetJID, msg)
-        
+
         @d.addCallback
         def on_reply(replies):
             for reply in replies:
                 dict = chutney.loads(reply.payload)
 
                 request.setResponseCode(dict['status'])
-                
-                if body:
-                    request.write(dict['response'])
-                
-                if not request._disconnected: 
-                    request.finish()
-        
-        return d
-    
-class HttpRepeater(object):
-    
-    def __init__(self, host):
-        self.host = host
-        
-   
-    def dispatch(self, method, url, msg, headers):
-        d = defer.Deferred()
-        
-        self.method = method.upper()
-        self.url = url
-        self.msg = msg
-        self.headers = headers
-        self.response = None
-        
-        @d.addCallback
-        def connect(result):
-            
-            self.conn = httplib.HTTPConnection(self.host)
-            
-        @d.addCallback
-        def send(result):
-                   
-            if self.conn:
-                self.conn.request(self.method, self.url, self.msg, self.headers)
 
-                self.response = self.conn.getresponse()
-                
-                self.conn.close()
- 
-        @d.addErrback
-        def errorHandler(failure):
-            print failure
-            logger.logFailure(failure)
-        
-        d.callback(self)
-        
-        return self.response              
+                responseBody = dict['body']
+                if responseBody:
+                    request.write(responseBody)
+
+                if not request._disconnected:
+                    request.finish()
+
+        return d
+
+class HTTPClientFactory(client.HTTPClientFactory):
+    def __init__(self, url, *args, **kwargs):
+        client.HTTPClientFactory.__init__(self, url, *args, **kwargs)
+        self.status = None
+        self.deferred.addCallback(
+            lambda data: (self.status, self.message, self.response_headers, data))
