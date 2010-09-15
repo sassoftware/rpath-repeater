@@ -190,7 +190,7 @@ class CimHandler(handler.JobHandler):
             T("job_uuid", self.job.job_uuid),
             T("job_state", jobStateString),
         )
-        elt.appendChild(XML.Element("system_jobs", job))
+        elt.appendChild(XML.Element("jobs", job))
 
     def toXml(self, elt):
         return elt.toxml(encoding="UTF-8").encode("utf-8")
