@@ -59,7 +59,9 @@ class CimHandler(handler.JobHandler):
         
     jobType = CIM_JOB
     firstState = 'cimCall'
-    
+
+    X_Event_Uuid_Header = 'X-rBuilder-Event-UUID'
+
     def setup (self):
         cfg = self.dispatcher.cfg
         
@@ -157,6 +159,9 @@ class CimHandler(handler.JobHandler):
         headers = {
             'Content-Type' : 'application/xml; charset="utf-8"',
             'Host' : host, }
+        eventUuid = self.cimParams.eventUuid
+        if eventUuid:
+            headers[self.X_Event_Uuid_Header] = eventUuid.encode('ascii')
         agent = "rmake-plugin/1.0"
         fact = HTTPClientFactory(path, method='PUT', postdata=data,
             headers = headers, agent = agent)
