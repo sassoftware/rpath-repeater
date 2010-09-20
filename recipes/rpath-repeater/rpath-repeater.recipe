@@ -17,3 +17,5 @@ class rPathRepeater(PackageRecipe):
         r.addMercurialSnapshot()
         r.MakeInstall()
         r.CompilePython('%(libdir)s')
+
+        r.InitialContents('/etc/rmake3/node.d/50_zone.conf')
