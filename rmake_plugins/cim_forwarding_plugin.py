@@ -269,7 +269,7 @@ class CIMTaskHandler(plug_worker.TaskHandler):
         return tmpf
 
     def _getServerCert(self):
-        return [ XML.Text("sslServerCertificate", self._serverCert) ]
+        return [ XML.Text("ssl_server_certificate", self._serverCert) ]
 
     def _getUuids(self, server):
         cs = server.RPATH_ComputerSystem.EnumerateInstances()
@@ -277,8 +277,8 @@ class CIMTaskHandler(plug_worker.TaskHandler):
             return []
         cs = cs[0]
         T = XML.Text
-        return [ T("localUuid", cs['LocalUUID']),
-            T("generatedUuid", cs['GeneratedUUID']) ]
+        return [ T("local_uuid", cs['LocalUUID']),
+            T("generated_uuid", cs['GeneratedUUID']) ]
 
     def _getSoftwareVersions(self, server):
         # Fetch instances of the ElementSoftwareIdentity association.
@@ -297,7 +297,7 @@ class CIMTaskHandler(plug_worker.TaskHandler):
 
         # Start creating the XML document
         troves = [ self._trove(si) for si in siList ]
-        return XML.Element("installedSoftware", *troves)
+        return XML.Element("installed_software", *troves)
 
     @classmethod
     def _trove(cls, si):
