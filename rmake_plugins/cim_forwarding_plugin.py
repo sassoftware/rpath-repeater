@@ -87,6 +87,11 @@ class CimHandler(handler.JobHandler):
         self.resultsLocation = self.data.pop('resultsLocation', {})
         self.eventUuid = self.data.pop('eventUuid', None)
 
+        if not self.zone:
+            self.setStatus(400, "CIM call requires a zone")
+            self.postFailure()
+            return
+
         cp = self.cimParams
         self.setStatus(102, "CIM call for %s:%s" %
             (cp.host, cp.port))
@@ -98,11 +103,24 @@ class CimHandler(handler.JobHandler):
         self.postFailure()
         return
 
+    def _getZoneAddresses(self):
+        """Return set of IP addresses of all nodes in this zone."""
+        needed = set([
+            types.TaskCapability(CIM_TASK_REGISTER),
+            types.ZoneCapability(self.zone),
+            ])
+        addresses = set()
+        for worker in self.dispatcher.workers.values():
+            if worker.supports(needed):
+                addresses.update(worker.addresses)
+        return addresses
+
     def register(self):
         self.setStatus(103, "Starting the registration {1/2}")
-        
-        args = RactivateData(self.cimParams, nodeinfo.get_hostname() +':8443',
-            self.methodArguments.get('requiredNetwork'))
+
+        nodes = [x + ':8443' for x in self._getZoneAddresses()]
+        args = RactivateData(self.cimParams, nodes,
+                self.methodArguments.get('requiredNetwork'))
         task = self.newTask('register', CIM_TASK_REGISTER, args, zone=self.zone)
 
         def cb_gather(results):
@@ -217,7 +235,8 @@ CimParams = types.slottype('CimParams',
     'host port clientCert clientKey eventUuid')
 # These are just the starting point attributes
 CimData = types.slottype('CimData', 'p response')
-RactivateData = types.slottype('RactivateData', 'p node requiredNetwork response')
+RactivateData = types.slottype('RactivateData',
+        'p nodes requiredNetwork response')
 UpdateData = types.slottype('UpdateData', 'p sources response')
 
 class CIMTaskHandler(plug_worker.TaskHandler):
@@ -332,7 +351,7 @@ class RegisterTask(CIMTaskHandler):
         server = self.getWbemConnection(data)
         cimInstances = server.RPATH_ComputerSystem.EnumerateInstanceNames()
         arguments = dict(
-            ManagementNodeAddresses = [data.node])
+            ManagementNodeAddresses = sorted(data.nodes))
         if data.p.eventUuid:
             arguments.update(EventUUID = data.p.eventUuid)
         if data.requiredNetwork:
