@@ -256,8 +256,8 @@ class CIMTaskHandler(plug_worker.TaskHandler):
             out.write("\nFull stack:\n")
             formatTrace(typ, value, tb, stream = out, withLocals = True)
 
-            self.sendStatus(450, "Error: %s" % out.getvalue())
-
+            self.sendStatus(450, "Error in CIM call: %s" % str(value),
+                    out.getvalue())
 
     @classmethod
     def _tempFile(cls, prefix, contents):
