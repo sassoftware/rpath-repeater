@@ -51,12 +51,33 @@ class CimForwardingPlugin(plug_dispatcher.DispatcherPlugin, plug_worker.WorkerPl
                 CIM_TASK_UPDATE: UpdateTask,
                 CIM_TASK_SHUTDOWN: ShutdownTask,
                 }     
-        
+
+def exposed(func):
+    """Decorator that exposes a method as being externally callable"""
+    func.exposed = True
+    return func
+
+class Options(object):
+    __slots__ = [ 'exposed', ]
+    def __init__(self):
+        self.exposed = set()
+
+    def addExposed(self, name):
+        self.exposed.add(name)
+
 class CimHandler(handler.JobHandler):
-    
+    class __metaclass__(type):
+        def __new__(cls, name, bases, attrs):
+            ret = type.__new__(cls, name, bases, attrs)
+            ret.Meta = Options()
+            for attrName, attrVal in attrs.items():
+                if getattr(attrVal, 'exposed', None):
+                    ret.Meta.addExposed(attrName)
+            return ret
+
     timeout = 7200
     port = 5989
-        
+
     jobType = CIM_JOB
     firstState = 'cimCall'
 
@@ -77,8 +98,8 @@ class CimHandler(handler.JobHandler):
                     self.port = int(value)
 
     def cimCall(self):
-        self.setStatus(101, "Starting the CIM call {0/2}")
-        
+        self.setStatus(101, "Initiating CIM call")
+
         self.data = self.getData().thaw().getDict()
         self.zone = self.data.pop('zone', None)
         self.cimParams = CimParams(**self.data.pop('cimParams', {}))
@@ -93,15 +114,42 @@ class CimHandler(handler.JobHandler):
             return
 
         cp = self.cimParams
-        self.setStatus(102, "CIM call for %s:%s" %
-            (cp.host, cp.port))
-
-        if hasattr(self, self.method):
+        if self.method in self.Meta.exposed:
+            self.setStatus(102, "CIM call: %s %s:%s" %
+                (self.method, cp.host, cp.port))
             return self.method
 
-        self.setStatus(405, "Method does not exist: %s" % (self.method))
+        self.setStatus(405, "Method does not exist: %s" % (self.method, ))
         self.postFailure()
         return
+
+    def _handleTask(self, task):
+        """
+        Handle responses for a task execution
+        """
+        d = self.waitForTask(task)
+        d.addCallbacks(self._handleTaskCallback, self._handleTaskError)
+        return d
+
+    def _handleTaskCallback(self, task):
+        if task.status.failed:
+            self.setStatus(task.status.code, "Failed")
+            self.postFailure()
+        else:
+            response = task.task_data.getObject().response
+            self.job.data = response
+            self.setStatus(200, "Done")
+            self.postResults()
+        return 'done'
+
+    def _handleTaskError(self, reason):
+        """
+        Error callback that gets invoked if rmake failed to handle the job.
+        Clean errors from the repeater do not see this function.
+        """
+        d = self.failJob(reason)
+        self.postFailure()
+        return d
 
     def _getZoneAddresses(self):
         """Return set of IP addresses of all nodes in this zone."""
@@ -115,48 +163,31 @@ class CimHandler(handler.JobHandler):
                 addresses.update(worker.addresses)
         return addresses
 
+    @exposed
     def register(self):
-        self.setStatus(103, "Starting the registration {1/2}")
+        self.setStatus(103, "Creating task")
 
         nodes = [x + ':8443' for x in self._getZoneAddresses()]
         args = RactivateData(self.cimParams, nodes,
                 self.methodArguments.get('requiredNetwork'))
         task = self.newTask('register', CIM_TASK_REGISTER, args, zone=self.zone)
+        return self._handleTask(task)
 
-        def cb_gather(results):
-            task, = results
-            result = task.task_data.getObject().response
-            self.job.data = types.FrozenObject.fromObject(result)
-            self.setStatus(200, "Done! CIM Registration has been kicked off. {2/2}")
-            return 'done'
-        return self.gatherTasks([task], cb_gather)
-    
+    @exposed
     def shutdown(self):
-        self.setStatus(103, "Shutting down the managed server")
+        self.setStatus(103, "Creating task")
 
         args = CimData(self.cimParams)
         task = self.newTask('shutdown', CIM_TASK_SHUTDOWN, args, zone=self.zone)
-        def cb_gather(results):
-            task, = results
-            result = task.task_data.getObject().response
-            self.job.data = types.FrozenObject.fromObject(result)
-            self.setStatus(200, "Done! cim shutdown of %s" % (result))
-            return 'done'
-        return self.gatherTasks([task], cb_gather) 
-    
+        return self._handleTask(task)
+
+    @exposed
     def polling(self):
-        self.setStatus(103, "Starting the polling {1/2}")
+        self.setStatus(103, "Creating task")
 
         args = CimData(self.cimParams)
         task = self.newTask('Polling', CIM_TASK_POLLING, args, zone=self.zone)
-        def cb_gather(results):
-            task, = results
-            result = task.task_data.getObject()
-            self.job.data = result
-            self.setStatus(200, "Done! cim polling of %s" % (result))
-            self.postResults()
-            return 'done'
-        return self.gatherTasks([task], cb_gather)
+        return self._handleTask(task)
 
     def postFailure(self):
         el = XML.Element("system")
@@ -214,23 +245,16 @@ class CimHandler(handler.JobHandler):
     def toXml(self, elt):
         return elt.toxml(encoding="UTF-8").encode("utf-8")
 
+    @exposed
     def update(self):
-        self.setStatus(103, "Starting the updating {1/2}")
+        self.setStatus(103, "Creating task")
 
         sources = self.methodArguments['sources']
 
         args = UpdateData(self.cimParams, sources)
         task = self.newTask('Update', CIM_TASK_UPDATE,args, zone=self.zone)
+        return self._handleTask(task)
 
-        def cb_gather(results):
-            task, = results
-            result = task.task_data.getObject()
-            self.job.data = result
-            self.setStatus(200, "Done! cim updating of %s" % (result))
-            self.postResults()
-            return 'done'
-        return self.gatherTasks([task], cb_gather)
-    
 CimParams = types.slottype('CimParams',
     'host port clientCert clientKey eventUuid')
 # These are just the starting point attributes
@@ -356,12 +380,20 @@ class RegisterTask(CIMTaskHandler):
             arguments.update(EventUUID = data.p.eventUuid)
         if data.requiredNetwork:
             arguments.update(RequiredNetwork = data.requiredNetwork)
-        server.conn.callMethod(cimInstances[0], 'RemoteRegistration',
+        ret = server.conn.callMethod(cimInstances[0], 'RemoteRegistration',
             **arguments)
-        data.response = ""
-
+        data.response = "<system/>"
         self.setData(data)
-        self.sendStatus(200, "Host %s will try to rActivate itself" % data.p.host)
+
+        retVal, outParams = ret
+        if retVal == 0:
+            self.sendStatus(200, "Host %s registration initiated" % data.p.host)
+        else:
+            errorSummary = outParams.get('errorSummary', '')
+            errorDetails = outParams.get('errorDetails', '')
+            file("/tmp/tracing2", "w").write("%s\n" % (outParams, ))
+            self.sendStatus(451, "Host %s registration failed: %s" %
+                (data.p.host, errorSummary), errorDetails)
 
 class ShutdownTask(CIMTaskHandler):
 
@@ -373,7 +405,7 @@ class ShutdownTask(CIMTaskHandler):
         server = self.getWbemConnection(data)
         cimInstances = server.Linux_OperatingSystem.EnumerateInstanceNames()
         value, args = server.conn.callMethod(cimInstances[0], 'Shutdown')
-        data.response = str(value)
+        data.response = "<system/>"
 
         self.setData(data)
         if not value:
@@ -394,7 +426,8 @@ class PollingTask(CIMTaskHandler):
 
         el = XML.Element("system", *children)
 
-        self.setData(el.toxml(encoding="UTF-8"))
+        data.response = el.toxml(encoding="UTF-8")
+        self.setData(data)
         self.sendStatus(200, "Host %s has been polled" % data.p.host)
 
 class UpdateTask(CIMTaskHandler):
@@ -411,7 +444,8 @@ class UpdateTask(CIMTaskHandler):
 
         el = XML.Element("system", *children)
 
-        self.setData(el.toxml(encoding="UTF-8"))
+        data.response = el.toxml(encoding="UTF-8")
+        self.setData(data)
         self.sendStatus(200, "Host %s has been updated" % data.p.host)
 
     def _applySoftwareUpdate(self, host, sources):
