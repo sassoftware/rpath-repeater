@@ -391,7 +391,6 @@ class RegisterTask(CIMTaskHandler):
         else:
             errorSummary = outParams.get('errorSummary', '')
             errorDetails = outParams.get('errorDetails', '')
-            file("/tmp/tracing2", "w").write("%s\n" % (outParams, ))
             self.sendStatus(451, "Host %s registration failed: %s" %
                 (data.p.host, errorSummary), errorDetails)
 

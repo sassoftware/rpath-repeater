@@ -12,13 +12,16 @@
 # full details.
 #
 
+import base64
 import httplib
 import logging
 
 from rmake3.lib import chutney
 from rmake3.lib.jabberlink import message
+from rmake3.lib.jabberlink.handlers import link
 
 from rmake3.core import plug_dispatcher
+from rmake3.core import types
 from rmake3.lib import logger
 from rmake3.worker import plug_worker
 
@@ -62,15 +65,35 @@ class RestForwardingPlugin(plug_dispatcher.DispatcherPlugin, plug_worker.Launche
                 key, value = option.split()
                 
                 if key == 'repeaterTarget':
-                    dispatcher.bus.link.addMessageHandler(RepeaterMessageHandler(value))
+                    dispatcher.bus.link.addMessageHandler(
+                        RepeaterMessageHandler(value, dispatcher.workers))
 
 
 class RepeaterMessageHandler(message.MessageHandler):
     namespace = NS
-    XHeader = 'X-rpathManagementNetworkNode'
+    XHeader = 'X-rPath-Management-Zone'
 
-    def __init__(self, host):
+    def __init__(self, host, workers):
         self.host = host
+        self.workers = workers
+
+    def getManagementZone(self, neighbor):
+        jid = link.toJID(neighbor.jid.full())
+        worker = self.workers.get(jid)
+        if worker is None:
+            return None
+        zones = self.getWorkerZones(worker)
+        if not zones:
+            return None
+        # We only care about one zone for now
+        return base64.b64encode(zones[0])
+
+    @classmethod
+    def getWorkerZones(cls, worker):
+        # XXX it would be nice if this was a property of the worker
+        zoneNames = [ x.zoneName for x in worker.caps
+            if isinstance(x, types.ZoneCapability) ]
+        return zoneNames
 
     def onMessage(self, neighbor, msg):
         reqDict = chutney.loads(msg.payload)
@@ -80,7 +103,9 @@ class RepeaterMessageHandler(message.MessageHandler):
         rawHeaders = reqDict['headers']
         headers = client.Headers(rawHeaders)
         headers.removeHeader(self.XHeader)
-        headers.addRawHeader(self.XHeader, neighbor.jid.full().encode('ascii'))
+        managementZone = self.getManagementZone(neighbor)
+        if managementZone is not None:
+            headers.addRawHeader(self.XHeader, managementZone)
         # XXX this is where multi-valued headers go down the drain
         headers = dict((k.lower(), v[-1])
             for (k, v) in headers.getAllRawHeaders())
