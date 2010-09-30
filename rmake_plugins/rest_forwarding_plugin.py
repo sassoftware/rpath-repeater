@@ -13,7 +13,6 @@
 #
 
 import base64
-import httplib
 import logging
 
 from rmake3.lib import chutney
@@ -22,7 +21,6 @@ from rmake3.lib.jabberlink.handlers import link
 
 from rmake3.core import plug_dispatcher
 from rmake3.core import types
-from rmake3.lib import logger
 from rmake3.worker import plug_worker
 
 from twisted.internet import reactor, ssl
