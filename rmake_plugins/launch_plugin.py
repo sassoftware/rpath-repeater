@@ -70,6 +70,10 @@ class LaunchHandler(handler.JobHandler):
             response = task.task_data.getObject().response
             self.job.data = response
             self.setStatus(200, "Done. %s" % response)
+            jobState = models.JobState.objects.get(name=models.JobState.COMPLETED)
+            job = models.Job.objects.get(job_uuid=self.job.job_uuid)
+            job.job_state = jobState
+            job.save()
         return 'done'
 
     def _handleTaskError(self, reason):
@@ -200,10 +204,6 @@ class WaitForNetworkTask(plug_worker.TaskHandler):
             data.response = response
             self.setData(data)
             self.sendStatus(200, response)
-            jobState = models.JobState.objects.get(name=models.JobState.COMPLETED)
-            job = models.Job.objects.get(job_uuid=self.job.job_uuid)
-            job.job_state = jobState
-            job.save()
         else:
             response = "timed out waiting for dns name for instance %s" \
                 %  instanceId
