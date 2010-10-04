@@ -256,7 +256,7 @@ class CimHandler(handler.JobHandler):
         return self._handleTask(task)
 
 CimParams = types.slottype('CimParams',
-    'host port clientCert clientKey eventUuid')
+    'host port clientCert clientKey eventUuid instanceId targetName targetType')
 # These are just the starting point attributes
 CimData = types.slottype('CimData', 'p response')
 RactivateData = types.slottype('RactivateData',

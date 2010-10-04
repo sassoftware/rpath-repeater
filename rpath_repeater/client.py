@@ -21,6 +21,7 @@ from rpath_repeater.utils.immutabledict import FrozenImmutableDict
 class RepeaterClient(object):
     
     __CIM_PLUGIN_NS = 'com.rpath.sputnik.cimplugin'
+    __LAUNCH_PLUGIN_NS = 'com.rpath.sputnik.launchplugin'
     __PRESENCE_PLUGIN_NS = 'com.rpath.sputnik.presence'
 
     class _BaseSlotCompare(SlotCompare):
@@ -36,7 +37,8 @@ class RepeaterClient(object):
         """
         Information required in order to talk to a WBEM endpoint
         """
-        __slots__ = [ 'host', 'port', 'clientCert', 'clientKey', 'eventUuid', ]
+        __slots__ = [ 'host', 'port', 'clientCert', 'clientKey', 
+            'eventUuid', 'instanceId', 'targetName', 'targetType' ]
 
     class ResultsLocation(_BaseSlotCompare):
         """
@@ -101,6 +103,28 @@ class RepeaterClient(object):
     def poll(self, cimParams, resultsLocation=None, zone=None):
         method = 'polling'
         return self._cimCallDispatcher(method, cimParams, resultsLocation, zone)
+
+    def launchWaitForNetwork(self, cimParams, resultsLocation=None, zone=None,
+                             **kwargs):
+        params = dict(zone=zone or self.zone)
+        if kwargs:
+            params['methodArguments'] = kwargs
+        assert isinstance(cimParams, self.CimParams)
+        params['cimParams'] = cimParams.toDict()
+        if resultsLocation is not None:
+            assert isinstance(resultsLocation, self.ResultsLocation)
+            params['resultsLocation'] = resultsLocation.toDict()
+
+        data = FrozenImmutableDict(params)
+        job = RmakeJob(RmakeUuid.uuid4(), self.__LAUNCH_PLUGIN_NS, 
+                       owner='nobody',
+                       data=data,
+                       ).freeze()
+
+        uuid = job.job_uuid
+        job = self.client.createJob(job)
+
+        return (uuid, job.thaw())
 
     def getJob(self, uuid):
         return self.client.getJob(uuid).thaw()
