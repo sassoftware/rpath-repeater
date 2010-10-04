@@ -13,8 +13,8 @@
 #
 
 import sys
-import tempfile
 import time
+import StringIO
 
 from conary.lib.formattrace import formatTrace
 
@@ -29,6 +29,7 @@ from catalogService.rest.database import RestDatabase
 from mint import config
 from mint import users
 from mint.db import database
+from mint.django_rest.rbuilder.inventory import models
 from mint.rest.db import authmgr
 
 PREFIX = 'com.rpath.sputnik'
@@ -204,7 +205,7 @@ class WaitForNetworkTask(plug_worker.TaskHandler):
                 %  instanceId
             data.response = response
             self.setData(data)
-            self.sendStatus(451, resposne)
+            self.sendStatus(451, response)
 
 
     def run(self):
