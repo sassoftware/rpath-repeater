@@ -200,6 +200,10 @@ class WaitForNetworkTask(plug_worker.TaskHandler):
             data.response = response
             self.setData(data)
             self.sendStatus(200, response)
+            jobState = models.JobState.get(name=models.JobState.COMPLETED)
+            job = models.Job.get(job_uuid=self.job.job_uuid)
+            job.job_state = jobState
+            job.save()
         else:
             response = "timed out waiting for dns name for instance %s" \
                 %  instanceId
