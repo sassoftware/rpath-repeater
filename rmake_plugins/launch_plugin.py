@@ -12,36 +12,24 @@
 # full details.
 #
 
-import os
 import sys
-import logging
 import tempfile
 import time
-import StringIO
 
-from xml.dom import minidom
-
-from mint.db import database
-
-from mint import config
-from catalogService import storage
-from catalogService.rest.database import RestDatabase
-from mint.lib import scriptlibrary
 from conary.lib.formattrace import formatTrace
-
-
-from mint import users
-from mint.rest.db import authmgr
-
-from catalogService.rest import baseDriver
-
-from twisted.web import client
-from twisted.internet import reactor
 
 from rmake3.core import handler
 from rmake3.core import plug_dispatcher
 from rmake3.core import types
 from rmake3.worker import plug_worker
+
+from catalogService import storage
+from catalogService.rest.database import RestDatabase
+
+from mint import config
+from mint import users
+from mint.db import database
+from mint.rest.db import authmgr
 
 PREFIX = 'com.rpath.sputnik'
 LAUNCH_JOB = PREFIX + '.launchplugin'
@@ -64,7 +52,7 @@ class LaunchHandler(handler.JobHandler):
     jobType = LAUNCH_JOB
 
     def setup(self):
-        cfg = self.dispatcher.cfg
+        pass
 
     def _handleTask(self, task):
         """
@@ -143,7 +131,6 @@ class WaitForNetworkTask(plug_worker.TaskHandler):
 
     def _run(self, data):        
         instanceId = data.p.instanceId
-        targetName = data.p.targetName
         targetType = data.p.targetType
         cfg = config.MintConfig()
         cfg.read(config.RBUILDER_CONFIG)
