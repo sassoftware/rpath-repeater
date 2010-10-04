@@ -200,8 +200,8 @@ class WaitForNetworkTask(plug_worker.TaskHandler):
             data.response = response
             self.setData(data)
             self.sendStatus(200, response)
-            jobState = models.JobState.get(name=models.JobState.COMPLETED)
-            job = models.Job.get(job_uuid=self.job.job_uuid)
+            jobState = models.JobState.objects.get(name=models.JobState.COMPLETED)
+            job = models.Job.objects.get(job_uuid=self.job.job_uuid)
             job.job_state = jobState
             job.save()
         else:
