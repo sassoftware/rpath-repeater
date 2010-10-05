@@ -169,9 +169,18 @@ class WaitForNetworkTask(plug_worker.TaskHandler):
         td = targetDrivers[0]
 
         hasDnsName = False
+        setDnsName = False
         sleptTime = 0
 
         while sleptTime < self.totalRunTime:
+            system = mgr.getSystemByTargetSystemId(instanceId)
+            networks = system.networks.all()
+            if networks:
+                network = networks[0]
+                if network.dns_name:
+                    hasDnsName = True
+                    break
+
             instance = td.getInstance(instanceId)
             dnsName = instance.getPublicDnsName()
             if dnsName:
@@ -185,28 +194,23 @@ class WaitForNetworkTask(plug_worker.TaskHandler):
                     network = models.Network(dns_name=dnsName)
                     system.networks.add(network)
                 system.save()
-                hasDnsName = True
+                setDnsName = True
                 break
-
-            system = mgr.getSystemByTargetSystemId(instanceId)
-            networks = system.networks.all()
-            if networks:
-                network = networks[0]
-                if network.dns_name:
-                    hasDnsName = True
-                    break
 
             time.sleep(5)
             sleptTime += 5
 
-        if hasDnsName:
-            response = "dns name for %s updated to %s" % (instanceId, dnsName) 
+        if setDnsName:
+            mgr.scheduleSystemRegistrationEvent(system)
+            response = \
+                "dns name for %s updated to %s.  Scheduled registration event" % (instanceId, dnsName) 
             data.response = response
             self.setData(data)
             self.sendStatus(200, response)
+        elif hasDnsName:
+            resposne = "dns name for %s became avaiable. no longer checking target"  % instanceId
         else:
-            response = "timed out waiting for dns name for instance %s" \
-                %  instanceId
+            response = "timed out waiting for dns name for instance %s" % instanceId
             data.response = response
             self.setData(data)
             self.sendStatus(451, response)
