@@ -209,6 +209,9 @@ class WaitForNetworkTask(plug_worker.TaskHandler):
             self.sendStatus(200, response)
         elif hasDnsName:
             resposne = "dns name for %s became avaiable. no longer checking target"  % instanceId
+            data.response = response
+            self.setData(data)
+            self.sendStatus(200, response)
         else:
             response = "timed out waiting for dns name for instance %s" % instanceId
             data.response = response
