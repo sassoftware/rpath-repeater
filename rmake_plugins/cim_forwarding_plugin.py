@@ -436,7 +436,7 @@ class UpdateTask(CIMTaskHandler):
             data.p.host, data.p.port))
 
         server = self.getWbemConnection(data)
-        self._applySoftwareUpdate(data.p.host, data.sources)
+        self._applySoftwareUpdate(server, data.sources)
         children = self._getUuids(server)
         children.extend(self._getServerCert())
         children.append(self._getSoftwareVersions(server))
@@ -447,8 +447,8 @@ class UpdateTask(CIMTaskHandler):
         self.setData(data)
         self.sendStatus(200, "Host %s has been updated" % data.p.host)
 
-    def _applySoftwareUpdate(self, host, sources):
-        cimUpdater = cimupdater.CIMUpdater("https://" + host)
+    def _applySoftwareUpdate(self, server, sources):
+        cimUpdater = cimupdater.CIMUpdater(server)
         cimUpdater.applyUpdate(sources)
         return None
 
