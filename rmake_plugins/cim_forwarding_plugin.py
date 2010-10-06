@@ -51,15 +51,6 @@ class CimForwardingPlugin(BaseForwardingPlugin):
 
 
 class CimHandler(BaseHandler):
-    class __metaclass__(type):
-        def __new__(cls, name, bases, attrs):
-            ret = type.__new__(cls, name, bases, attrs)
-            ret.Meta = Options()
-            for attrName, attrVal in attrs.items():
-                if getattr(attrVal, 'exposed', None):
-                    ret.Meta.addExposed(attrName)
-            return ret
-
     timeout = 7200
     port = 5989
 
