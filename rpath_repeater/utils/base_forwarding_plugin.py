@@ -19,6 +19,7 @@ from conary import conaryclient
 from conary import versions
 
 from twisted.web import client
+from twisted.internet import reactor
 
 from rmake3.core import handler
 from rmake3.core import plug_dispatcher
@@ -53,6 +54,8 @@ class Options(object):
 
 
 class BaseHandler(handler.JobHandler):
+    X_Event_Uuid_Header = 'X-rBuilder-Event-UUID'
+
     class __metaclass__(type):
         def __new__(cls, name, bases, attrs):
             ret = type.__new__(cls, name, bases, attrs)
@@ -62,7 +65,7 @@ class BaseHandler(handler.JobHandler):
                     ret.Meta.addExposed(attrName)
             return ret
 
-    def setup (self):
+    def setup(self):
         pass
 
     def initCall(self):
@@ -72,6 +75,58 @@ class BaseHandler(handler.JobHandler):
         self.methodArguments = self.data.pop('methodArguments', {})
         self.resultsLocation = self.data.pop('resultsLocation', {})
         self.eventUuid = self.data.pop('eventUuid', None)
+
+    def postResults(self, elt=None):
+        host = self.resultsLocation.get('host', 'localhost')
+        port = self.resultsLocation.get('port', 80)
+        path = self.resultsLocation.get('path')
+        if not path:
+            return
+        if elt is None:
+            dom = minidom.parseString(self.job.data)
+            elt = dom.firstChild
+        self.addEventInfo(elt)
+        self.addJobInfo(elt)
+        data = self.toXml(elt)
+        headers = {
+            'Content-Type' : 'application/xml; charset="utf-8"',
+            'Host' : host, }
+        eventUuid = self.cimParams.eventUuid
+        if eventUuid:
+            headers[self.X_Event_Uuid_Header] = eventUuid.encode('ascii')
+        agent = "rmake-plugin/1.0"
+        fact = HTTPClientFactory(path, method='PUT', postdata=data,
+            headers = headers, agent = agent)
+        @fact.deferred.addCallback
+        def processResult(result):
+            print "Received result for", host, result
+            return result
+
+        @fact.deferred.addErrback
+        def processError(error):
+            print "Error!", error.getErrorMessage()
+
+        reactor.connectTCP(host, port, fact)
+
+    def addEventInfo(self, elt):
+        if not self.cimParams.eventUuid:
+            return
+        elt.appendChild(XML.Text("event_uuid", self.cimParams.eventUuid))
+        return elt
+
+    def addJobInfo(self, elt):
+        # Parse the data, we need to insert the job uuid
+        T = XML.Text
+        jobStateMap = { False : 'Failed', True : 'Completed' }
+        jobStateString = jobStateMap[self.job.status.completed]
+        job = XML.Element("job",
+            T("job_uuid", self.job.job_uuid),
+            T("job_state", jobStateString),
+        )
+        elt.appendChild(XML.Element("jobs", job))
+
+    def toXml(self, elt):
+        return elt.toxml(encoding="UTF-8").encode("utf-8")
 
     def _getZoneAddresses(self):
         """Return set of IP addresses of all nodes in this zone."""
@@ -84,6 +139,38 @@ class BaseHandler(handler.JobHandler):
             if worker.supports(needed):
                 addresses.update(worker.addresses)
         return addresses
+
+    def _handleTask(self, task):
+        """
+        Handle responses for a task execution
+        """
+        d = self.waitForTask(task)
+        d.addCallbacks(self._handleTaskCallback, self._handleTaskError)
+        return d
+
+    def _handleTaskCallback(self, task):
+        if task.status.failed:
+            self.setStatus(task.status.code, "Failed")
+            self.postFailure()
+        else:
+            self._handleTaskComplete(task)
+        return 'done'
+
+    def _handleTaskComplete(self, task):
+        response = task.task_data.getObject().response
+        self.job.data = response
+        self.setStatus(200, "Done")
+        self.postResults()
+
+    def _handleTaskError(self, reason):
+        """
+        Error callback that gets invoked if rmake failed to handle the job.
+        Clean errors from the repeater do not see this function.
+        """
+        d = self.failJob(reason)
+        self.postFailure()
+        return d
+
 
 class BaseTaskHandler(plug_worker.TaskHandler):
     TemporaryDir = "/dev/shm"

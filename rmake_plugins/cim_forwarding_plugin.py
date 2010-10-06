@@ -15,18 +15,14 @@
 import sys
 import StringIO
 
-from xml.dom import minidom
 from conary.lib.formattrace import formatTrace
-
-from twisted.internet import reactor
 
 from rmake3.core import handler
 from rmake3.core import types
 
 from rpath_repeater.utils import nodeinfo, wbemlib, cimupdater
 from rpath_repeater.utils.base_forwarding_plugin import BaseHandler, \
-    BaseTaskHandler, BaseForwardingPlugin, XML, HTTPClientFactory, Options, \
-    exposed
+    BaseTaskHandler, BaseForwardingPlugin, XML, exposed
 
 PREFIX = 'com.rpath.sputnik'
 CIM_JOB = PREFIX + '.cimplugin'
@@ -56,8 +52,6 @@ class CimHandler(BaseHandler):
 
     jobType = CIM_JOB
     firstState = 'cimCall'
-
-    X_Event_Uuid_Header = 'X-rBuilder-Event-UUID'
 
     def setup (self):
         BaseHandler.setup()
@@ -95,34 +89,6 @@ class CimHandler(BaseHandler):
         self.postFailure()
         return
 
-    def _handleTask(self, task):
-        """
-        Handle responses for a task execution
-        """
-        d = self.waitForTask(task)
-        d.addCallbacks(self._handleTaskCallback, self._handleTaskError)
-        return d
-
-    def _handleTaskCallback(self, task):
-        if task.status.failed:
-            self.setStatus(task.status.code, "Failed")
-            self.postFailure()
-        else:
-            response = task.task_data.getObject().response
-            self.job.data = response
-            self.setStatus(200, "Done")
-            self.postResults()
-        return 'done'
-
-    def _handleTaskError(self, reason):
-        """
-        Error callback that gets invoked if rmake failed to handle the job.
-        Clean errors from the repeater do not see this function.
-        """
-        d = self.failJob(reason)
-        self.postFailure()
-        return d
-
     @exposed
     def register(self):
         self.setStatus(103, "Creating task")
@@ -148,58 +114,6 @@ class CimHandler(BaseHandler):
         args = CimData(self.cimParams)
         task = self.newTask('Polling', CIM_TASK_POLLING, args, zone=self.zone)
         return self._handleTask(task)
-
-    def postResults(self, elt=None):
-        host = self.resultsLocation.get('host', 'localhost')
-        port = self.resultsLocation.get('port', 80)
-        path = self.resultsLocation.get('path')
-        if not path:
-            return
-        if elt is None:
-            dom = minidom.parseString(self.job.data)
-            elt = dom.firstChild
-        self.addEventInfo(elt)
-        self.addJobInfo(elt)
-        data = self.toXml(elt)
-        headers = {
-            'Content-Type' : 'application/xml; charset="utf-8"',
-            'Host' : host, }
-        eventUuid = self.cimParams.eventUuid
-        if eventUuid:
-            headers[self.X_Event_Uuid_Header] = eventUuid.encode('ascii')
-        agent = "rmake-plugin/1.0"
-        fact = HTTPClientFactory(path, method='PUT', postdata=data,
-            headers = headers, agent = agent)
-        @fact.deferred.addCallback
-        def processResult(result):
-            print "Received result for", host, result
-            return result
-
-        @fact.deferred.addErrback
-        def processError(error):
-            print "Error!", error.getErrorMessage()
-
-        reactor.connectTCP(host, port, fact)
-
-    def addEventInfo(self, elt):
-        if not self.cimParams.eventUuid:
-            return
-        elt.appendChild(XML.Text("event_uuid", self.cimParams.eventUuid))
-        return elt
-
-    def addJobInfo(self, elt):
-        # Parse the data, we need to insert the job uuid
-        T = XML.Text
-        jobStateMap = { False : 'Failed', True : 'Completed' }
-        jobStateString = jobStateMap[self.job.status.completed]
-        job = XML.Element("job",
-            T("job_uuid", self.job.job_uuid),
-            T("job_state", jobStateString),
-        )
-        elt.appendChild(XML.Element("jobs", job))
-
-    def toXml(self, elt):
-        return elt.toxml(encoding="UTF-8").encode("utf-8")
 
     @exposed
     def update(self):
