@@ -23,38 +23,38 @@ from twisted.internet import reactor
 from rmake3.core import handler
 from rmake3.core import types
 
-from rpath_repeater.utils import nodeinfo, wbemlib, cimupdater
+from rpath_repeater.utils import nodeinfo, wbemlib, wmiupdater
 from rpath_repeater.utils.base_forwarding_plugin import BaseHandler, \
     BaseTaskHandler, BaseForwardingPlugin, XML, HTTPClientFactory
 
 PREFIX = 'com.rpath.sputnik'
-CIM_JOB = PREFIX + '.cimplugin'
-CIM_TASK_REGISTER = PREFIX + '.register'
-CIM_TASK_SHUTDOWN = PREFIX + '.shutdown'
-CIM_TASK_POLLING = PREFIX + '.poll'
-CIM_TASK_UPDATE = PREFIX + '.update'
+WMI_JOB = PREFIX + '.wmiplugin'
+WMI_TASK_REGISTER = PREFIX + '.register'
+WMI_TASK_SHUTDOWN = PREFIX + '.shutdown'
+WMI_TASK_POLLING = PREFIX + '.poll'
+WMI_TASK_UPDATE = PREFIX + '.update'
 
-class CimForwardingPlugin(BaseForwardingPlugin):
+class WmiForwardingPlugin(BaseForwardingPlugin):
 
     def dispatcher_pre_setup(self, dispatcher):
-        handler.registerHandler(CimHandler)
+        handler.registerHandler(WmiHandler)
 
     def worker_get_task_types(self):
         return {
-                CIM_TASK_REGISTER: RegisterTask,
-                CIM_TASK_SHUTDOWN: ShutdownTask,
-                CIM_TASK_POLLING: PollingTask,
-                CIM_TASK_UPDATE: UpdateTask,
-                CIM_TASK_SHUTDOWN: ShutdownTask,
+                WMI_TASK_REGISTER: RegisterTask,
+                WMI_TASK_SHUTDOWN: ShutdownTask,
+                WMI_TASK_POLLING: PollingTask,
+                WMI_TASK_UPDATE: UpdateTask,
+                WMI_TASK_SHUTDOWN: ShutdownTask,
                 }
 
-class CimHandler(BaseHandler):
+class WmiHandler(BaseHandler):
 
     timeout = 7200
     port = 5989
 
-    jobType = CIM_JOB
-    firstState = 'cimCall'
+    jobType = WMI_JOB
+    firstState = 'wmiCall'
 
     X_Event_Uuid_Header = 'X-rBuilder-Event-UUID'
 
@@ -74,17 +74,17 @@ class CimHandler(BaseHandler):
                 elif key == 'port':
                     self.port = int(value)
 
-    def cimCall(self):
-        self.setStatus(101, "Starting the CIM call {0/2}")
+    def wmiCall(self):
+        self.setStatus(101, "Starting the WMI call {0/2}")
         self.initCall()
 
         if not self.zone:
-            self.setStatus(400, "CIM call requires a zone")
+            self.setStatus(400, "WMI call requires a zone")
             self.postFailure()
             return
 
-        cp = self.cimParams
-        self.setStatus(102, "CIM call for %s:%s" %
+        cp = self.wmiParams
+        self.setStatus(102, "WMI call for %s:%s" %
             (cp.host, cp.port))
 
         if hasattr(self, self.method):
@@ -98,41 +98,41 @@ class CimHandler(BaseHandler):
         self.setStatus(103, "Starting the registration {1/2}")
 
         nodes = [x + ':8443' for x in self._getZoneAddresses()]
-        args = RactivateData(self.cimParams, nodes,
+        args = RactivateData(self.wmiParams, nodes,
                 self.methodArguments.get('requiredNetwork'))
-        task = self.newTask('register', CIM_TASK_REGISTER, args, zone=self.zone)
+        task = self.newTask('register', WMI_TASK_REGISTER, args, zone=self.zone)
 
         def cb_gather(results):
             task, = results
             result = task.task_data.getObject().response
             self.job.data = types.FrozenObject.fromObject(result)
-            self.setStatus(200, "Done! CIM Registration has been kicked off. {2/2}")
+            self.setStatus(200, "Done! WMI Registration has been kicked off. {2/2}")
             return 'done'
         return self.gatherTasks([task], cb_gather)
 
     def shutdown(self):
         self.setStatus(103, "Shutting down the managed server")
 
-        args = CimData(self.cimParams)
-        task = self.newTask('shutdown', CIM_TASK_SHUTDOWN, args, zone=self.zone)
+        args = WmiData(self.wmiParams)
+        task = self.newTask('shutdown', WMI_TASK_SHUTDOWN, args, zone=self.zone)
         def cb_gather(results):
             task, = results
             result = task.task_data.getObject().response
             self.job.data = types.FrozenObject.fromObject(result)
-            self.setStatus(200, "Done! cim shutdown of %s" % (result))
+            self.setStatus(200, "Done! wmi shutdown of %s" % (result))
             return 'done'
         return self.gatherTasks([task], cb_gather)
 
     def polling(self):
         self.setStatus(103, "Starting the polling {1/2}")
 
-        args = CimData(self.cimParams)
-        task = self.newTask('Polling', CIM_TASK_POLLING, args, zone=self.zone)
+        args = WmiData(self.wmiParams)
+        task = self.newTask('Polling', WMI_TASK_POLLING, args, zone=self.zone)
         def cb_gather(results):
             task, = results
             result = task.task_data.getObject()
             self.job.data = result
-            self.setStatus(200, "Done! cim polling of %s" % (result))
+            self.setStatus(200, "Done! wmi polling of %s" % (result))
             self.postResults()
             return 'done'
         return self.gatherTasks([task], cb_gather)
@@ -152,7 +152,7 @@ class CimHandler(BaseHandler):
         headers = {
             'Content-Type' : 'application/xml; charset="utf-8"',
             'Host' : host, }
-        eventUuid = self.cimParams.eventUuid
+        eventUuid = self.wmiParams.eventUuid
         if eventUuid:
             headers[self.X_Event_Uuid_Header] = eventUuid.encode('ascii')
         agent = "rmake-plugin/1.0"
@@ -170,9 +170,9 @@ class CimHandler(BaseHandler):
         reactor.connectTCP(host, port, fact)
 
     def addEventInfo(self, elt):
-        if not self.cimParams.eventUuid:
+        if not self.wmiParams.eventUuid:
             return
-        elt.appendChild(XML.Text("event_uuid", self.cimParams.eventUuid))
+        elt.appendChild(XML.Text("event_uuid", self.wmiParams.eventUuid))
         return elt
 
     def addJobInfo(self, elt):
@@ -194,27 +194,27 @@ class CimHandler(BaseHandler):
 
         sources = self.methodArguments['sources']
 
-        args = UpdateData(self.cimParams, sources)
-        task = self.newTask('Update', CIM_TASK_UPDATE,args, zone=self.zone)
+        args = UpdateData(self.wmiParams, sources)
+        task = self.newTask('Update', WMI_TASK_UPDATE,args, zone=self.zone)
 
         def cb_gather(results):
             task, = results
             result = task.task_data.getObject()
             self.job.data = result
-            self.setStatus(200, "Done! cim updating of %s" % (result))
+            self.setStatus(200, "Done! wmi updating of %s" % (result))
             self.postResults()
             return 'done'
         return self.gatherTasks([task], cb_gather)
 
-CimParams = types.slottype('CimParams',
+WmiParams = types.slottype('WmiParams',
     'host port clientCert clientKey eventUuid')
 # These are just the starting point attributes
-CimData = types.slottype('CimData', 'p response')
+WmiData = types.slottype('WmiData', 'p response')
 RactivateData = types.slottype('RactivateData',
         'p nodes requiredNetwork response')
 UpdateData = types.slottype('UpdateData', 'p sources response')
 
-class CIMTaskHandler(BaseTaskHandler):
+class WMITaskHandler(BaseTaskHandler):
 
     def getWbemConnection(self, data):
         x509Dict = {}
@@ -241,7 +241,7 @@ class CIMTaskHandler(BaseTaskHandler):
         try:
             self._run(data)
         except nodeinfo.ProbeHostError, e:
-            self.sendStatus(404, "CIM not found on %s:%d: %s" % (
+            self.sendStatus(404, "WMI not found on %s:%d: %s" % (
                 data.p.host, data.p.port, str(e)))
         except:
             typ, value, tb = sys.exc_info()
@@ -250,7 +250,7 @@ class CIMTaskHandler(BaseTaskHandler):
             out.write("\nFull stack:\n")
             formatTrace(typ, value, tb, stream = out, withLocals = True)
 
-            self.sendStatus(450, "Error in CIM call: %s" % str(value),
+            self.sendStatus(450, "Error in WMI call: %s" % str(value),
                     out.getvalue())
 
     def _getServerCert(self):
@@ -285,38 +285,38 @@ class CIMTaskHandler(BaseTaskHandler):
         return XML.Element("installed_software", *troves)
 
 
-class RegisterTask(CIMTaskHandler):
+class RegisterTask(WMITaskHandler):
 
     def _run(self, data):
         self.sendStatus(104, "Contacting host %s on port %d to rActivate itself" % (
             data.p.host, data.p.port))
 
-        #send CIM rActivate request
+        #send WMI rActivate request
         server = self.getWbemConnection(data)
-        cimInstances = server.RPATH_ComputerSystem.EnumerateInstanceNames()
+        wmiInstances = server.RPATH_ComputerSystem.EnumerateInstanceNames()
         arguments = dict(
             ManagementNodeAddresses = sorted(data.nodes))
         if data.p.eventUuid:
             arguments.update(EventUUID = data.p.eventUuid)
         if data.requiredNetwork:
             arguments.update(RequiredNetwork = data.requiredNetwork)
-        server.conn.callMethod(cimInstances[0], 'RemoteRegistration',
+        server.conn.callMethod(wmiInstances[0], 'RemoteRegistration',
             **arguments)
         data.response = ""
 
         self.setData(data)
         self.sendStatus(200, "Host %s will try to rActivate itself" % data.p.host)
 
-class ShutdownTask(CIMTaskHandler):
+class ShutdownTask(WMITaskHandler):
 
     def _run(self, data):
         self.sendStatus(101, "Contacting host %s to shut itself down" % (
             data.p.host))
 
-        #send CIM Shutdown request
+        #send WMI Shutdown request
         server = self.getWbemConnection(data)
-        cimInstances = server.Linux_OperatingSystem.EnumerateInstanceNames()
-        value, args = server.conn.callMethod(cimInstances[0], 'Shutdown')
+        wmiInstances = server.Linux_OperatingSystem.EnumerateInstanceNames()
+        value, args = server.conn.callMethod(wmiInstances[0], 'Shutdown')
         data.response = str(value)
 
         self.setData(data)
@@ -325,7 +325,7 @@ class ShutdownTask(CIMTaskHandler):
         else:
             self.sendStatus(401, "Could not shutdown host %s" % data.p.host)
 
-class PollingTask(CIMTaskHandler):
+class PollingTask(WMITaskHandler):
 
     def _run(self, data):
         self.sendStatus(101, "Contacting host %s on port %d to Poll it for info" % (
@@ -341,7 +341,7 @@ class PollingTask(CIMTaskHandler):
         self.setData(el.toxml(encoding="UTF-8"))
         self.sendStatus(200, "Host %s has been polled" % data.p.host)
 
-class UpdateTask(CIMTaskHandler):
+class UpdateTask(WMITaskHandler):
 
     def _run(self, data):
         self.sendStatus(101, "Contacting host %s on port %d to update it" % (
@@ -359,6 +359,6 @@ class UpdateTask(CIMTaskHandler):
         self.sendStatus(200, "Host %s has been updated" % data.p.host)
 
     def _applySoftwareUpdate(self, host, sources):
-        cimUpdater = cimupdater.CIMUpdater("https://" + host)
-        cimUpdater.applyUpdate(sources)
+        wmiUpdater = wmiupdater.WMIUpdater("https://" + host)
+        wmiUpdater.applyUpdate(sources)
         return None
