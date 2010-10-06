@@ -22,7 +22,6 @@ from twisted.web import client
 
 from rmake3.core import handler
 from rmake3.core import plug_dispatcher
-from rmake3.core import types
 from rmake3.worker import plug_worker
 
 PREFIX = 'com.rpath.sputnik'
@@ -68,17 +67,6 @@ class BaseHandler(handler.JobHandler):
         self.resultsLocation = self.data.pop('resultsLocation', {})
         self.eventUuid = self.data.pop('eventUuid', None)
 
-    def _getZoneAddresses(self):
-        """Return set of IP addresses of all nodes in this zone."""
-        needed = set([
-            types.TaskCapability(BASE_TASK_REGISTER),
-            types.ZoneCapability(self.zone),
-            ])
-        addresses = set()
-        for worker in self.dispatcher.workers.values():
-            if worker.supports(needed):
-                addresses.update(worker.addresses)
-        return addresses
 
 class BaseTaskHandler(plug_worker.TaskHandler):
     TemporaryDir = "/dev/shm"

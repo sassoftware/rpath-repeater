@@ -122,6 +122,19 @@ class CimHandler(BaseHandler):
         self.postFailure()
         return d
 
+    def _getZoneAddresses(self):
+        """Return set of IP addresses of all nodes in this zone."""
+        needed = set([
+            types.TaskCapability(CIM_TASK_REGISTER),
+            types.ZoneCapability(self.zone),
+            ])
+        addresses = set()
+        for worker in self.dispatcher.workers.values():
+            if worker.supports(needed):
+                addresses.update(worker.addresses)
+        return addresses
+
+
     @exposed
     def register(self):
         self.setStatus(103, "Creating task")
