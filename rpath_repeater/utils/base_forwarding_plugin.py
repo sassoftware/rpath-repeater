@@ -53,6 +53,14 @@ class Options(object):
 
 
 class BaseHandler(handler.JobHandler):
+    class __metaclass__(type):
+        def __new__(cls, name, bases, attrs):
+            ret = type.__new__(cls, name, bases, attrs)
+            ret.Meta = Options()
+            for attrName, attrVal in attrs.items():
+                if getattr(attrVal, 'exposed', None):
+                    ret.Meta.addExposed(attrName)
+            return ret
 
     def setup (self):
         pass
