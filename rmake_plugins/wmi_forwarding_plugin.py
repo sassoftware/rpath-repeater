@@ -15,19 +15,16 @@
 import sys
 import StringIO
 
-from xml.dom import minidom
 from conary.lib.formattrace import formatTrace
-
-from twisted.internet import reactor
 
 from rmake3.core import handler
 from rmake3.core import types
 
-from rpath_repeater.utils import nodeinfo, wbemlib, wmiupdater
-from rpath_repeater.utils.base_forwarding_plugin import BaseHandler, \
-    BaseTaskHandler, BaseForwardingPlugin, XML, HTTPClientFactory
+from rpath_repeater import windowsUpdate
+from rpath_repeater.utils import nodeinfo, wmiupdater
+from rpath_repeater.utils.base_forwarding_plugin import PREFIX, BaseHandler, \
+    BaseTaskHandler, BaseForwardingPlugin, XML, exposed
 
-PREFIX = 'com.rpath.sputnik'
 WMI_JOB = PREFIX + '.wmiplugin'
 WMI_TASK_REGISTER = PREFIX + '.register'
 WMI_TASK_SHUTDOWN = PREFIX + '.shutdown'
@@ -51,7 +48,6 @@ class WmiForwardingPlugin(BaseForwardingPlugin):
 class WmiHandler(BaseHandler):
 
     timeout = 7200
-    port = 5989
 
     jobType = WMI_JOB
     firstState = 'wmiCall'
@@ -71,12 +67,11 @@ class WmiHandler(BaseHandler):
 
                 if key == 'timeout':
                     self.timeout = int(value)
-                elif key == 'port':
-                    self.port = int(value)
 
     def wmiCall(self):
-        self.setStatus(101, "Starting the WMI call {0/2}")
+        self.setStatus(101, "Initiating WMI call")
         self.initCall()
+        self.wmiParams = WmiParams(**self.data.pop('wmiParams', {}))
 
         if not self.zone:
             self.setStatus(400, "WMI call requires a zone")
@@ -84,154 +79,86 @@ class WmiHandler(BaseHandler):
             return
 
         cp = self.wmiParams
-        self.setStatus(102, "WMI call for %s:%s" %
-            (cp.host, cp.port))
-
-        if hasattr(self, self.method):
+        if self.method in self.Meta.exposed:
+            self.setStatus(102, "WMI call: %s %s" %
+                           (self.method, cp.host))
             return self.method
 
-        self.setStatus(405, "Method does not exist: %s" % (self.method))
+        self.setStatus(405, "Method does not exist: %s" % (self.method, ))
         self.postFailure()
         return
 
+    def _handleTask(self, task):
+        """
+        Handle responses for a task execution
+        """
+        d = self.waitForTask(task)
+        d.addCallbacks(self._handleTaskCallback, self._handleTaskError)
+        return d
+
+    def _handleTaskCallback(self, task):
+        if task.status.failed:
+            self.setStatus(task.status.code, "Failed")
+            self.postFailure()
+        else:
+            response = task.task_data.getObject().response
+            self.job.data = response
+            self.setStatus(200, "Done")
+            self.postResults()
+        return 'done'
+
+    def _handleTaskError(self, reason):
+        """
+        Error callback that gets invoked if rmake failed to handle the job.
+        Clean errors from the repeater do not see this function.
+        """
+        d = self.failJob(reason)
+        self.postFailure()
+        return d
+
+    @exposed
     def register(self):
-        self.setStatus(103, "Starting the registration {1/2}")
+        self.setStatus(103, "Creating task")
 
+        # FIXME
         nodes = [x + ':8443' for x in self._getZoneAddresses()]
-        args = RactivateData(self.wmiParams, nodes,
-                self.methodArguments.get('requiredNetwork'))
         task = self.newTask('register', WMI_TASK_REGISTER, args, zone=self.zone)
+        return self._handleTask(task)
 
-        def cb_gather(results):
-            task, = results
-            result = task.task_data.getObject().response
-            self.job.data = types.FrozenObject.fromObject(result)
-            self.setStatus(200, "Done! WMI Registration has been kicked off. {2/2}")
-            return 'done'
-        return self.gatherTasks([task], cb_gather)
-
+    @exposed
     def shutdown(self):
-        self.setStatus(103, "Shutting down the managed server")
+        self.setStatus(103, "Creating task")
 
         args = WmiData(self.wmiParams)
         task = self.newTask('shutdown', WMI_TASK_SHUTDOWN, args, zone=self.zone)
-        def cb_gather(results):
-            task, = results
-            result = task.task_data.getObject().response
-            self.job.data = types.FrozenObject.fromObject(result)
-            self.setStatus(200, "Done! wmi shutdown of %s" % (result))
-            return 'done'
-        return self.gatherTasks([task], cb_gather)
+        return self._handleTask(task)
 
+    @exposed
     def polling(self):
-        self.setStatus(103, "Starting the polling {1/2}")
+        self.setStatus(103, "Creating task")
 
         args = WmiData(self.wmiParams)
         task = self.newTask('Polling', WMI_TASK_POLLING, args, zone=self.zone)
-        def cb_gather(results):
-            task, = results
-            result = task.task_data.getObject()
-            self.job.data = result
-            self.setStatus(200, "Done! wmi polling of %s" % (result))
-            self.postResults()
-            return 'done'
-        return self.gatherTasks([task], cb_gather)
+        return self._handleTask(task)
 
-    def postResults(self, elt=None):
-        host = self.resultsLocation.get('host', 'localhost')
-        port = self.resultsLocation.get('port', 80)
-        path = self.resultsLocation.get('path')
-        if not path:
-            return
-        if elt is None:
-            dom = minidom.parseString(self.job.data)
-            elt = dom.firstChild
-        self.addEventInfo(elt)
-        self.addJobInfo(elt)
-        data = self.toXml(elt)
-        headers = {
-            'Content-Type' : 'application/xml; charset="utf-8"',
-            'Host' : host, }
-        eventUuid = self.wmiParams.eventUuid
-        if eventUuid:
-            headers[self.X_Event_Uuid_Header] = eventUuid.encode('ascii')
-        agent = "rmake-plugin/1.0"
-        fact = HTTPClientFactory(path, method='PUT', postdata=data,
-            headers = headers, agent = agent)
-        @fact.deferred.addCallback
-        def processResult(result):
-            print "Received result for", host, result
-            return result
-
-        @fact.deferred.addErrback
-        def processError(error):
-            print "Error!", error.getErrorMessage()
-
-        reactor.connectTCP(host, port, fact)
-
-    def addEventInfo(self, elt):
-        if not self.wmiParams.eventUuid:
-            return
-        elt.appendChild(XML.Text("event_uuid", self.wmiParams.eventUuid))
-        return elt
-
-    def addJobInfo(self, elt):
-        # Parse the data, we need to insert the job uuid
-        T = XML.Text
-        jobStateMap = { False : 'Failed', True : 'Completed' }
-        jobStateString = jobStateMap[self.job.status.completed]
-        job = XML.Element("job",
-            T("job_uuid", self.job.job_uuid),
-            T("job_state", jobStateString),
-        )
-        elt.appendChild(XML.Element("jobs", job))
-
-    def toXml(self, elt):
-        return elt.toxml(encoding="UTF-8").encode("utf-8")
-
+    @exposed
     def update(self):
-        self.setStatus(103, "Starting the updating {1/2}")
+        self.setStatus(103, "Creating task")
 
         sources = self.methodArguments['sources']
 
         args = UpdateData(self.wmiParams, sources)
         task = self.newTask('Update', WMI_TASK_UPDATE,args, zone=self.zone)
+        return self._handleTask(task)
 
-        def cb_gather(results):
-            task, = results
-            result = task.task_data.getObject()
-            self.job.data = result
-            self.setStatus(200, "Done! wmi updating of %s" % (result))
-            self.postResults()
-            return 'done'
-        return self.gatherTasks([task], cb_gather)
 
 WmiParams = types.slottype('WmiParams',
-    'host port clientCert clientKey eventUuid')
+    'host port user password domain eventUuid')
 # These are just the starting point attributes
 WmiData = types.slottype('WmiData', 'p response')
-RactivateData = types.slottype('RactivateData',
-        'p nodes requiredNetwork response')
 UpdateData = types.slottype('UpdateData', 'p sources response')
 
 class WMITaskHandler(BaseTaskHandler):
-
-    def getWbemConnection(self, data):
-        x509Dict = {}
-        if None not in [ data.p.clientCert, data.p.clientKey ]:
-            self._clientCertFile = self._tempFile("client-cert-",
-                data.p.clientCert)
-            self._clientKeyFile = self._tempFile("client-key-",
-                data.p.clientKey)
-            x509Dict = dict(cert_file=self._clientCertFile.name,
-                            key_file=self._clientKeyFile.name)
-
-        # Do the probing early, since WBEMServer does not do proper timeouts
-        # May raise ProbeHostError, which we catch in run()
-        self._serverCert = nodeinfo.probe_host_ssl(data.p.host, data.p.port,
-            **x509Dict)
-        server = wbemlib.WBEMServer("https://" + data.p.host, x509=x509Dict)
-        return server
 
     def run(self):
         """
@@ -252,9 +179,6 @@ class WMITaskHandler(BaseTaskHandler):
 
             self.sendStatus(450, "Error in WMI call: %s" % str(value),
                     out.getvalue())
-
-    def _getServerCert(self):
-        return [ XML.Text("ssl_server_certificate", self._serverCert) ]
 
     def _getUuids(self, server):
         cs = server.RPATH_ComputerSystem.EnumerateInstances()
@@ -288,52 +212,31 @@ class WMITaskHandler(BaseTaskHandler):
 class RegisterTask(WMITaskHandler):
 
     def _run(self, data):
-        self.sendStatus(104, "Contacting host %s on port %d to rActivate itself" % (
-            data.p.host, data.p.port))
+        self.sendStatus(104, "Contacting host %s validate credentials" % (
+            data.p.host, ))
 
-        #send WMI rActivate request
-        server = self.getWbemConnection(data)
-        wmiInstances = server.RPATH_ComputerSystem.EnumerateInstanceNames()
-        arguments = dict(
-            ManagementNodeAddresses = sorted(data.nodes))
-        if data.p.eventUuid:
-            arguments.update(EventUUID = data.p.eventUuid)
-        if data.requiredNetwork:
-            arguments.update(RequiredNetwork = data.requiredNetwork)
-        server.conn.callMethod(wmiInstances[0], 'RemoteRegistration',
-            **arguments)
-        data.response = ""
+        # fetch a registry key that has admin only access
+        wc = windowsUpdate. wmiClient( data.p.host, data.p.domain,
+                                       data.p.user, data.p.password)
+        rc, _ = wc.getRegistryKey(SOME_PATH,SOME_KEY)
 
-        self.setData(data)
-        self.sendStatus(200, "Host %s will try to rActivate itself" % data.p.host)
+        if not rc:
+            self.sendStatus(200, "Registration Complete for %s" % data.p.host)
 
 class ShutdownTask(WMITaskHandler):
 
     def _run(self, data):
-        self.sendStatus(101, "Contacting host %s to shut itself down" % (
-            data.p.host))
-
-        #send WMI Shutdown request
-        server = self.getWbemConnection(data)
-        wmiInstances = server.Linux_OperatingSystem.EnumerateInstanceNames()
-        value, args = server.conn.callMethod(wmiInstances[0], 'Shutdown')
-        data.response = str(value)
-
-        self.setData(data)
-        if not value:
-            self.sendStatus(200, "Host %s will now shutdown" % data.p.host)
-        else:
-            self.sendStatus(401, "Could not shutdown host %s" % data.p.host)
+        self.sendStatus(401, "Shutting down Windows System %s is not supported"
+                        % (data.p.host))
 
 class PollingTask(WMITaskHandler):
 
     def _run(self, data):
-        self.sendStatus(101, "Contacting host %s on port %d to Poll it for info" % (
-            data.p.host, data.p.port))
+        self.sendStatus(101, "Contacting host %s to Poll it for info" % (
+            data.p.host))
 
         server = self.getWbemConnection(data)
         children = self._getUuids(server)
-        children.extend(self._getServerCert())
         children.append(self._getSoftwareVersions(server))
 
         el = XML.Element("system", *children)
