@@ -24,10 +24,9 @@ from rmake3.core import handler
 from rmake3.core import types
 
 from rpath_repeater.utils import nodeinfo, wbemlib, wmiupdater
-from rpath_repeater.utils.base_forwarding_plugin import BaseHandler, \
+from rpath_repeater.utils.base_forwarding_plugin import PREFIX, BaseHandler, \
     BaseTaskHandler, BaseForwardingPlugin, XML, HTTPClientFactory
 
-PREFIX = 'com.rpath.sputnik'
 WMI_JOB = PREFIX + '.wmiplugin'
 WMI_TASK_REGISTER = PREFIX + '.register'
 WMI_TASK_SHUTDOWN = PREFIX + '.shutdown'

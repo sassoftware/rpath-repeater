@@ -24,11 +24,10 @@ from rmake3.core import handler
 from rmake3.core import types
 
 from rpath_repeater.utils import nodeinfo, wbemlib, cimupdater
-from rpath_repeater.utils.base_forwarding_plugin import BaseHandler, \
-    BaseTaskHandler, BaseForwardingPlugin, XML, HTTPClientFactory, Options, \
+from rpath_repeater.utils.base_forwarding_plugin import BaseHandler, PREFIX, \
+    BaseTaskHandler, BaseForwardingPlugin, XML, HTTPClientFactory, \
     exposed
 
-PREFIX = 'com.rpath.sputnik'
 CIM_JOB = PREFIX + '.cimplugin'
 CIM_TASK_REGISTER = PREFIX + '.register'
 CIM_TASK_SHUTDOWN = PREFIX + '.shutdown'

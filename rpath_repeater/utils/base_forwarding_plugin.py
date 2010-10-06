@@ -26,11 +26,6 @@ from rmake3.core import types
 from rmake3.worker import plug_worker
 
 PREFIX = 'com.rpath.sputnik'
-BASE_JOB = PREFIX + '.baseplugin'
-BASE_TASK_REGISTER = PREFIX + '.register'
-BASE_TASK_SHUTDOWN = PREFIX + '.shutdown'
-BASE_TASK_POLLING = PREFIX + '.poll'
-BASE_TASK_UPDATE = PREFIX + '.update'
 
 class BaseForwardingPlugin(plug_dispatcher.DispatcherPlugin,
                            plug_worker.WorkerPlugin):
