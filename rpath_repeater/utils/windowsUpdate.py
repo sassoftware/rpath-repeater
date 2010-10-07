@@ -90,17 +90,17 @@ class wmiClient(object):
         return rc, p.fromchild.read()
 
     def _wmiServiceRequest( self, action, service):
-        wmicmd = "%s service %s '%s' " % (self.baseCmd, service)
+        wmicmd = "%s service %s '%s' " % (self.baseCmd, action, service)
         return self._wmiCall(wmicmd)
 
     def startService(self, service):
-        self._wmiServiceRequest('start', service)
+        return self._wmiServiceRequest('start', service)
 
     def stopService(self, service):
-        self._wmiServiceRequest('stop', service)
+        return self._wmiServiceRequest('stop', service)
 
     def queryService(self, service):
-        self._wmiServiceRequest('getstatus', service)
+        return self._wmiServiceRequest('getstatus', service)
 
     def waitForServiceToStop(self, service):
         # query the service until is is no longer active
@@ -195,13 +195,15 @@ def doUpdate(wc, sources):
         oldConaryManifest = oldConaryManifest.split('\n')
         nv = [ s.split('=') for s in oldConaryManifest if s ]
         nv = [ (t[0],str(versions.ThawVersion(t[1]))) for t in nv ]
-        oldModel = ['install %s=%s' % p for p in oldConaryManifest]
+        oldModel = ['install %s=%s' % p for p in nv]
     else:
         oldConaryManifest = ''
     # determine the new packages to install
     cache = modelupdate.SystemModelTroveCache(
         client.getDatabase(), client.getRepos())
-    newModel = ['install ' + s for s in sources if s]
+    nv = [ s.split('=') for s in sources if s ]
+    nv = [ (t[0],str(versions.ThawVersion(t[1]))) for t in nv ]
+    newModel = ['install %s=%s' % p for p in nv]
     oldTroves, newTroves = modelsToJobs(cache, client, oldModel, newModel)
     newMsiTroves = [x for x in newTroves if x[0].endswith(':msi')]
     oldMsiTroves = [x for x in oldTroves if x[0].endswith(':msi')]
