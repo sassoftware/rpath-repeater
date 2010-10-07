@@ -176,7 +176,9 @@ def doUpdate(wc, sources):
             assert(not rc)
 
             oldManifest = oldManifest.split('\n')
-            oldModel = ['install ' + p for p in oldManifest if p]
+            nv = [ s.split('=') for s in oldManifest if s ]
+            nv = [ (t[0],str(versions.ThawVersion(t[1]))) for t in nv ]
+            oldModel = ['install %s=%s' % p for p in nv]
         else:
             oldModel = oldManifest = ''
 
@@ -189,18 +191,20 @@ def doUpdate(wc, sources):
     rtisWinDir = 'C:\\Windows\\RTIS'
     if not os.path.exists(rtisDir):
         os.mkdir(rtisDir)
-    conaryManifestPath = os.path.join(rtisDir,'conary_manifest')
-    if os.path.exists(conaryManifestPath):
-        oldConaryManifest = open(conaryManifestPath).read()
-        oldConaryManifest = oldConaryManifest.split('\n')
-        nv = [ s.split('=') for s in oldConaryManifest if s ]
-        nv = [ (t[0],str(versions.ThawVersion(t[1]))) for t in nv ]
-        oldModel = ['install %s=%s' % p for p in nv]
-    else:
-        oldConaryManifest = ''
+    #conaryManifestPath = os.path.join(rtisDir,'conary_manifest')
+    #if os.path.exists(conaryManifestPath):
+    #    oldConaryManifest = open(conaryManifestPath).read()
+    #    oldConaryManifest = oldConaryManifest.split('\n')
+    #    nv = [ s.split('=') for s in oldConaryManifest if s ]
+    #    nv = [ (t[0],str(versions.ThawVersion(t[1]))) for t in nv ]
+    #    oldModel = ['install %s=%s' % p for p in nv]
+    #else:
+    #    oldConaryManifest = ''
     # determine the new packages to install
+
     cache = modelupdate.SystemModelTroveCache(
         client.getDatabase(), client.getRepos())
+
     nv = [ s.split('=') for s in sources if s ]
     nv = [ (t[0],str(versions.ThawVersion(t[1]))) for t in nv ]
     newModel = ['install %s=%s' % p for p in nv]
