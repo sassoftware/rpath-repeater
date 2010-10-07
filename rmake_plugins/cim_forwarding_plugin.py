@@ -78,6 +78,7 @@ class CimHandler(bfp.BaseHandler):
         self.setStatus(101, "Initiating CIM call")
         self.initCall()
         self.cimParams = CimParams(**self.data.pop('cimParams', {}))
+        self.eventUuid = self.cimParams.eventUuid
 
         if not self.zone:
             self.setStatus(400, "CIM call requires a zone")

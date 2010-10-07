@@ -76,6 +76,7 @@ class WmiHandler(bfp.BaseHandler):
         self.setStatus(101, "Initiating WMI call")
         self.initCall()
         self.wmiParams = WmiParams(**self.data.pop('wmiParams', {}))
+        self.eventUuid = self.wmiParams.eventUuid
 
         if not self.zone:
             self.setStatus(400, "WMI call requires a zone")
