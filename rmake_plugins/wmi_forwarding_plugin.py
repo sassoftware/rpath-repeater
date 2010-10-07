@@ -134,7 +134,7 @@ class WMITaskHandler(bfp.BaseTaskHandler):
         rc, localUUID = wmiClient.getRegistryKey(r'SOFTWARE\rPath\Inventory',
                                                  'local_uuid')
         rc, generatedUUID = wmiClient.getRegistryKey(r'SOFTWARE\rPath\Inventory',
-                                                     'local_uuid')
+                                                     'generated_uuid')
         if not rc:
             return []
 
