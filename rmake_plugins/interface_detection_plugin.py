@@ -130,20 +130,22 @@ class DetectInterfaceTask(bfp.BaseTaskHandler):
             interfaceName = params['interfaceName']
             self.sendStatus(105, 'Checking %s:%s' % (host, port))
             if self._queryService(host, port):
-                self._sendResponse(data, interfaceName)
+                self._sendResponse(data, interfaceName, port)
                 self.sendStatus(200, 'Found management interface on %s:%s'
                     % (host, port))
                 return
 
-        self._sendResponse(data, None)
+        self._sendResponse(data)
         self.sendStatus(201, 'No management interface discovered')
 
-    def _sendResponse(self, data, interfaceName):
-        if interfaceName:
-            ifaces = [ bfp.XML.Text('interface', interfaceName) ]
+    def _sendResponse(self, data, interfaceRef=None, port=None):
+        if interfaceRef:
+            children = [ bfp.XML.Element('management_interface',
+                href=interfaceRef) ]
+            children.append(bfp.XML.Text('agent_port', str(port)))
         else:
-            ifaces = []
-        el = bfp.XML.Element("system", *ifaces)
+            children = []
+        el = bfp.XML.Element("system", *children)
         data.response = bfp.XML.toString(el)
         self.setData(data)
 

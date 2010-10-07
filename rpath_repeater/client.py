@@ -197,8 +197,8 @@ def main():
     else:
         _P = cli.ManagementInterfaceParams
         plist = [
-            _P('wmi', system, 1234),
-            _P('cim', system, 5989),
+            _P('/api/inventory/management_interfaces/2', system, 1234),
+            _P('/api/inventory/management_interfaces/1', system, 5989),
         ]
         uuid, job = cli.detectMgmtInterface(plist,
             resultsLocation = cli.ResultsLocation(path="/adfadf", port=1234),
