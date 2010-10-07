@@ -146,6 +146,10 @@ class RepeaterClient(object):
         method = 'polling'
         return self._cimCallDispatcher(method, cimParams, resultsLocation, zone)
 
+    def poll_wmi(self, wmiParams, resultsLocation=None, zone=None):
+        method = 'polling'
+        return self._wmiCallDispatcher(method, wmiParams, resultsLocation, zone)
+
     def launchWaitForNetwork(self, cimParams, resultsLocation=None, zone=None,
                              **kwargs):
         params = dict(zone=zone or self.zone)
@@ -227,8 +231,17 @@ def main():
             resultsLocation = cli.ResultsLocation(path="/adfadf", port=1234),
             eventUuid = '0xfeedbeaf',
             zone = zone)
-    else:
+    elif 0:
         uuid, job = cli.register_wmi(
+            cli.WmiParams(host=system, port=135,
+                eventUuid = '0xfeedbeaf',
+                username="Administrator",
+                password="password",
+                domain=system),
+            resultsLocation = cli.ResultsLocation(path="/adfadf", port=1234),
+            zone=zone)
+    else:
+        uuid, job = cli.poll_wmi(
             cli.WmiParams(host=system, port=135,
                 eventUuid = '0xfeedbeaf',
                 username="Administrator",

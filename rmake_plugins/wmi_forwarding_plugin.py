@@ -131,9 +131,9 @@ class WMITaskHandler(bfp.BaseTaskHandler):
     InterfaceName = "WMI"
 
     def _getUuids(self, wmiClient):
-        rc, localUUID = wmiClient.getRegistryKey('SOFTWARE\\rPath\\Inventory',
+        rc, localUUID = wmiClient.getRegistryKey(r'SOFTWARE\rPath\Inventory',
                                                  'local_uuid')
-        rc, generatedUUID = wmiClient.getRegistryKey('SOFTWARE\\rPath\\Inventory',
+        rc, generatedUUID = wmiClient.getRegistryKey(r'SOFTWARE\rPath\Inventory',
                                                      'local_uuid')
         if not rc:
             return []
@@ -143,18 +143,18 @@ class WMITaskHandler(bfp.BaseTaskHandler):
                 T("generated_uuid", generatedUUID)]
 
     def _getSoftwareVersions(self, wmiClient):
-        rc, siList = wmiClient.getRegistryKey("SOFTWARE\rPath\conary",
+        rc, siList = wmiClient.getRegistryKey(r"SOFTWARE\rPath\conary",
                                               "conary_manifest")
-        siList = siList.split('\n')
+        siList = [ x.strip() for x in siList.split('\n') ]
         # Start creating the XML document
-        troves = [ self._trove(si) for si in siList if si ]
+        troves = [ self._trove(tspec) for tspec in siList if tspec ]
         return XML.Element("installed_software", *troves)
 
     def _getLocalUUID(self, wc, generated_uuid):
         def getKey(keyPath, key):
             rc, results = wc.getRegistryKey(keyPath, key)
             if rc:
-                self.sendStatus(400, 'Error accessing key %s\%s: %s'
+                self.sendStatus(400, r'Error accessing key %s\%s: %s'
                     % (keyPath, key, results))
             return rc, results
 
@@ -185,11 +185,11 @@ class WMITaskHandler(bfp.BaseTaskHandler):
         def setKey(keyPath, key, value):
             rc, results = wc.setRegistryKey(keyPath, key, value)
             if rc:
-                self.sendStatus(400, 'Failed to set key %s\%s: %s' % (keyPath,
-                    key, results))
+                self.sendStatus(400, r'Failed to set key %s\%s: %s' %
+                    (keyPath, key, results))
             return rc, results
 
-        keyPath = 'SOFTWARE\\rPath\\Inventory'
+        keyPath = r'SOFTWARE\rPath\Inventory'
         rc, results = setKey(keyPath, 'generated_uuid', generated_uuid)
         if rc: return
 
@@ -226,7 +226,7 @@ class RegisterTask(WMITaskHandler):
                   XML.Text('generated_uuid', generated_uuid), ]
 
         el = XML.Element('system', *uuids)
-        data.response = el.toxml(encoding='UTF-8')
+        data.response = XML.toString(el)
         self.setData(data)
 
         self.sendStatus(200, "Registration Complete for %s" % data.p.host)
@@ -240,8 +240,8 @@ class ShutdownTask(WMITaskHandler):
 
 class PollingTask(WMITaskHandler):
     def _run(self, data):
-        self.sendStatus(101, "Contacting host %s to Poll it for info" % (
-            data.p.host))
+        self.sendStatus(101, "Contacting host %s on port %d to Poll it for info"
+            % (data.p.host, data.p.port))
 
         try:
             wc = windowsUpdate.wmiClient( data.p.host, data.p.domain,
@@ -253,9 +253,9 @@ class PollingTask(WMITaskHandler):
 
         el = XML.Element("system", *children)
 
-        self.setData(el.toxml(encoding="UTF-8"))
+        data.response = XML.toString(el)
+        self.setData(data)
         self.sendStatus(200, "Host %s has been polled" % data.p.host)
-
 
 class UpdateTask(WMITaskHandler):
     def _run(self, data):

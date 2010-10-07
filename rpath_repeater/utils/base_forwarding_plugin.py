@@ -218,10 +218,9 @@ class BaseTaskHandler(plug_worker.TaskHandler):
         return tmpf
 
     @classmethod
-    def _trove(cls, si):
+    def _trove(cls, troveSpec):
         Text = XML.Text
-        nvf = "%s=%s" % (si['name'], si['VersionString'])
-        n, v, f = conaryclient.cmdline.parseTroveSpec(nvf)
+        n, v, f = conaryclient.cmdline.parseTroveSpec(troveSpec)
 
         name = Text("name", n)
         version = cls._version(v, f)

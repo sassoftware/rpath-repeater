@@ -182,6 +182,9 @@ class CIMTaskHandler(bfp.BaseTaskHandler):
         troves = [ self._trove(si) for si in siList ]
         return XML.Element("installed_software", *troves)
 
+    def _trove(self, si):
+        troveSpec = "%s=%s" % (si['name'], si['VersionString'])
+        return bfp.BaseTaskHandler._trove(self, troveSpec)
 
 class RegisterTask(CIMTaskHandler):
     def _run(self, data):
@@ -242,7 +245,7 @@ class PollingTask(CIMTaskHandler):
 
         el = XML.Element("system", *children)
 
-        data.response = el.toxml(encoding="UTF-8")
+        data.response = XML.toString(el)
         self.setData(data)
         self.sendStatus(200, "Host %s has been polled" % data.p.host)
 
@@ -260,7 +263,7 @@ class UpdateTask(CIMTaskHandler):
 
         el = XML.Element("system", *children)
 
-        data.response = el.toxml(encoding="UTF-8")
+        data.response = XML.toString(el)
         self.setData(data)
         self.sendStatus(200, "Host %s has been updated" % data.p.host)
 
