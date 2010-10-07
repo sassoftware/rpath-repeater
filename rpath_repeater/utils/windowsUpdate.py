@@ -24,6 +24,7 @@ from lxml.builder import ElementMaker
 #from conary.lib import log
 from conary import conarycfg
 from conary import conaryclient
+from conary import versions
 from conary.conaryclient import modelupdate, systemmodel
 
 #log.setVerbosity(log.INFO)
@@ -171,7 +172,7 @@ def doUpdate(wc, sources):
         if not bootstrap:
             # fetch old manifest
             rc, oldManifest = wc.getRegistryKey(r"SOFTWARE\rPath\conary",
-                                                "manifest")
+                                                "conary_manifest")
             assert(not rc)
 
             oldManifest = oldManifest.split('\n')
@@ -192,7 +193,9 @@ def doUpdate(wc, sources):
     if os.path.exists(conaryManifestPath):
         oldConaryManifest = open(conaryManifestPath).read()
         oldConaryManifest = oldConaryManifest.split('\n')
-        oldModel = ['install ' + p for p in oldConaryManifest if p]
+        nv = [ s.split('=') for s in oldConaryManifest if s ]
+        nv = [ (t[0],str(versions.ThawVersion(t[1]))) for t in nv ]
+        oldModel = ['install %s=%s' % p for p in oldConaryManifest]
     else:
         oldConaryManifest = ''
     # determine the new packages to install
@@ -311,10 +314,12 @@ def doUpdate(wc, sources):
             etree.tostring(xmlDoc,pretty_print=True))
 
     # write the new conary_manifest
-    conaryManifestPath = os.path.join(rtisDir,'conary_manifest')
-    f = open(conaryManifestPath,'w').write(
-        '\n'.join([ '%s=%s[%s]' %
-          (x[0],str(x[1]),str(x[2])) for x in newTroves]))
+    rc, _ = wc.setRegistryKey(r"SOFTWARE\rPath\conary",
+                              "conary_manifest", sources)
+    #conaryManifestPath = os.path.join(rtisDir,'conary_manifest')
+    #f = open(conaryManifestPath,'w').write(
+    #    '\n'.join([ '%s=%s[%s]' %
+    #      (x[0],str(x[1]),str(x[2])) for x in newTroves]))
 
     # we're now done with the windows fs
     wc.unmount()

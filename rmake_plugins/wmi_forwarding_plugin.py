@@ -22,9 +22,8 @@ from rmake3.lib import uuid
 from rmake3.core import types
 from rmake3.core import handler
 
-from rpath_repeater import windowsUpdate
 from rpath_repeater.utils import nodeinfo
-from rpath_repeater.utils import wmiupdater
+from rpath_repeater.utils import windowsUpdate
 from rpath_repeater.utils.base_forwarding_plugin import XML
 from rpath_repeater.utils.base_forwarding_plugin import PREFIX
 from rpath_repeater.utils.base_forwarding_plugin import exposed
@@ -78,6 +77,8 @@ class WmiHandler(BaseHandler):
 
                 if key == 'timeout':
                     self.timeout = int(value)
+                elif key == 'port':
+                    self.port = int(value)
 
     def wmiCall(self):
         self.setStatus(101, "Initiating WMI call")
@@ -156,9 +157,10 @@ class WMITaskHandler(BaseTaskHandler):
                     out.getvalue())
 
     def _getUuids(self, wmiClient):
-        rc, localUUID = wmiClient.getRegistryKey(SOME_PATH,SOME_KEY)
-        rc, generatedUUID = wmiClient.getRegistryKey(SOME_PATH,SOME_KEY)
-
+        rc, localUUID = wmiClient.getRegistryKey('SOFTWARE\\rPath\\Inventory',
+                                                 'local_uuid')
+        rc, generatedUUID = wmiClient.getRegistryKey('SOFTWARE\\rPath\\Inventory',
+                                                     'local_uuid')
         if not rc:
             return []
 
@@ -167,8 +169,11 @@ class WMITaskHandler(BaseTaskHandler):
                 T("generated_uuid", generatedUUID)]
 
     def _getSoftwareVersions(self, wmiClient):
+        rc, siList = wmiClient.getRegistryKey("SOFTWARE\rPath\conary",
+                                              "conary_manifest")
+        siList = siList.split('\n')
         # Start creating the XML document
-        troves = [ self._trove(si) for si in siList ]
+        troves = [ self._trove(si) for si in siList if si ]
         return XML.Element("installed_software", *troves)
 
     def _getLocalUUID(self, wc, generated_uuid):
@@ -286,7 +291,7 @@ class UpdateTask(WMITaskHandler):
         try:
             wc = windowsUpdate.wmiClient( data.p.host, data.p.domain,
                                           data.p.user, data.p.password)
-            self._applySoftwareUpdate(wc, data.p.host, data.sources)
+            windowsUpdate.doUpdate(wc, data.p.sources)
             children = self._getUuids(wc)
             children.append(self._getSoftwareVersions(wc))
         finally:
@@ -296,7 +301,3 @@ class UpdateTask(WMITaskHandler):
 
         self.setData(el.toxml(encoding="UTF-8"))
         self.sendStatus(200, "Host %s has been updated" % data.p.host)
-
-    def _applySoftwareUpdate(self, wc, sources):
-        windowsUpdate.doUpdate(wc, sources)
-        return None
