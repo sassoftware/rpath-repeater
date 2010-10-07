@@ -15,8 +15,10 @@
 import sys
 import StringIO
 
+from conary.lib import digestlib
 from conary.lib.formattrace import formatTrace
 
+from rmake3.lib import uuid
 from rmake3.core import types
 from rmake3.core import handler
 
@@ -101,8 +103,7 @@ class WmiHandler(BaseHandler):
     def register(self):
         self.setStatus(103, "Creating task")
 
-        # FIXME
-        nodes = [x + ':8443' for x in self._getZoneAddresses()]
+        args = WmiData(self.wmiParams)
         task = self.newTask('register', WMI_TASK_REGISTER, args, zone=self.zone)
         return self._handleTask(task)
 
@@ -170,19 +171,86 @@ class WMITaskHandler(BaseTaskHandler):
         troves = [ self._trove(si) for si in siList ]
         return XML.Element("installed_software", *troves)
 
+    def _getLocalUUID(self, wc, generated_uuid):
+        def getKey(keyPath, key):
+            rc, results = wc.getRegistryKey(keyPath, key)
+            if rc:
+                self.sendStatus(400, 'Error accessing key %s\%s: %s'
+                    % (keyPath, key, results))
+            return rc, results
+
+        # Get some data from the target machine so that we can generate a
+        # local uuid
+        # FIXME: Should use SMBIOS interface once available to get real
+        #        information.
+        keyPath = 'HARDWARE\\System\\BIOS'
+        rc, baseBoard = getKey(keyPath, 'BaseBoardManufacturer')
+        if rc: return
+
+        rc, biosMajorRelease = getKey(keyPath, 'BiosMajorRelease')
+        if rc: return
+
+        rc, biosMinorRelease = getKey(keyPath, 'BiosMinorRelease')
+        if rc: return
+
+        sha1 = digestlib.sha1()
+        sha1.update(baseBoard)
+        sha1.update(biosMajorRelease)
+        sha1.update(biosMinorRelease)
+        sha1.update(generated_uuid)
+        bytes = sha1.digest()[:16]
+        local_uuid = str(uuid.UUID(bytes=bytes))
+        return local_uuid
+
+    def _setUUIDs(self, wc, generated_uuid, local_uuid):
+        def setKey(keyPath, key, value):
+            rc, results = wc.setRegistryKey(keyPath, key, value)
+            if rc:
+                self.sendStatus(400, 'Failed to set key %s\%s: %s' % (keyPath,
+                    key, results))
+            return rc, results
+
+        keyPath = 'SOFTWARE\\rPath\\Inventory'
+        rc, results = setKey(keyPath, 'generated_uuid', generated_uuid)
+        if rc: return
+
+        rc, results = setKey(keyPath, 'local_uuid', local_uuid)
+        if rc: return
+
+        self.sendStatus(106, 'Stored UUIDs on Windows system')
+
 
 class RegisterTask(WMITaskHandler):
     def _run(self, data):
+        # fetch a registry key that has admin only access
+        wc = windowsUpdate.wmiClient(data.p.host, data.p.domain,
+                                     data.p.user, data.p.password)
+
         self.sendStatus(104, "Contacting host %s validate credentials" % (
             data.p.host, ))
 
-        # fetch a registry key that has admin only access
-        wc = windowsUpdate.wmiClient( data.p.host, data.p.domain,
-                                      data.p.user, data.p.password)
-        rc, _ = wc.getRegistryKey(SOME_PATH,SOME_KEY)
+        # FIXME: Validate creds by accessng a key that only admin should be able
+        #        to get to.
+        #rc, _ = wc.getRegistryKey(SOME_PATH,SOME_KEY)
 
-        if not rc:
-            self.sendStatus(200, "Registration Complete for %s" % data.p.host)
+        self.sendStatus(105, 'Generating UUIDs')
+
+        # Generate a UUID for the system.
+        generated_uuid = str(uuid.uuid4())
+
+        # Generate local UUID based on system data
+        local_uuid = self._getLocalUUID(wc, generated_uuid)
+
+        self._setUUIDs(wc, generated_uuid, local_uuid)
+
+        uuids = [ XML.Text('local_uuid', local_uuid),
+                  XML.Text('generated_uuid', generated_uuid), ]
+
+        el = XML.Element('system', uuids)
+        data.response = el.toxml(encoding='UTF-8')
+        self.setData(data)
+
+        self.sendStatus(200, "Registration Complete for %s" % data.p.host)
 
 
 class ShutdownTask(WMITaskHandler):
@@ -212,7 +280,7 @@ class PollingTask(WMITaskHandler):
 
 class UpdateTask(WMITaskHandler):
     def _run(self, data):
-        self.sendStatus(101, "Contacting host %s to update it" % (
+        self.sendStatus(101, "Contacting host %s on port %d to update it" % (
             data.p.host, data.p.port))
 
         try:
