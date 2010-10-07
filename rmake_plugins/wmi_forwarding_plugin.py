@@ -88,34 +88,6 @@ class WmiHandler(BaseHandler):
         self.postFailure()
         return
 
-    def _handleTask(self, task):
-        """
-        Handle responses for a task execution
-        """
-        d = self.waitForTask(task)
-        d.addCallbacks(self._handleTaskCallback, self._handleTaskError)
-        return d
-
-    def _handleTaskCallback(self, task):
-        if task.status.failed:
-            self.setStatus(task.status.code, "Failed")
-            self.postFailure()
-        else:
-            response = task.task_data.getObject().response
-            self.job.data = response
-            self.setStatus(200, "Done")
-            self.postResults()
-        return 'done'
-
-    def _handleTaskError(self, reason):
-        """
-        Error callback that gets invoked if rmake failed to handle the job.
-        Clean errors from the repeater do not see this function.
-        """
-        d = self.failJob(reason)
-        self.postFailure()
-        return d
-
     @exposed
     def register(self):
         self.setStatus(103, "Creating task")
