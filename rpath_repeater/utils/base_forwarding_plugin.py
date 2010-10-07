@@ -12,11 +12,14 @@
 # full details.
 #
 
+import StringIO
+import sys
 import tempfile
 from xml.dom import minidom
 
 from conary import versions
 from conary import conaryclient
+from conary.lib.formattrace import formatTrace
 
 from twisted.web import client
 from twisted.internet import reactor
@@ -32,6 +35,8 @@ BASE_TASK_REGISTER = PREFIX + '.register'
 BASE_TASK_SHUTDOWN = PREFIX + '.shutdown'
 BASE_TASK_POLLING = PREFIX + '.poll'
 BASE_TASK_UPDATE = PREFIX + '.update'
+
+from rpath_repeater.utils import nodeinfo
 
 class BaseForwardingPlugin(plug_dispatcher.DispatcherPlugin,
                            plug_worker.WorkerPlugin):
@@ -180,6 +185,28 @@ class BaseHandler(handler.JobHandler):
 
 class BaseTaskHandler(plug_worker.TaskHandler):
     TemporaryDir = "/dev/shm"
+    InterfaceName = None
+
+    def run(self):
+        """
+        Exception handing for the _run method doing the real work
+        """
+        data = self.getData()
+        try:
+            self._run(data)
+        except nodeinfo.ProbeHostError, e:
+            self.sendStatus(404, "%s not found on %s:%d: %s" % (
+                self.InterfaceName, data.p.host, data.p.port, str(e)))
+        except:
+            typ, value, tb = sys.exc_info()
+            out = StringIO.StringIO()
+            formatTrace(typ, value, tb, stream = out, withLocals = False)
+            out.write("\nFull stack:\n")
+            formatTrace(typ, value, tb, stream = out, withLocals = True)
+
+            self.sendStatus(450, "Error in %s call: %s" %
+                    (self.InterfaceName, str(value)),
+                out.getvalue())
 
     @classmethod
     def _tempFile(cls, prefix, contents):

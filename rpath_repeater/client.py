@@ -23,6 +23,7 @@ from rmake3.core.types import SlotCompare
 from rpath_repeater.utils.immutabledict import FrozenImmutableDict
 
 class RepeaterClient(object):
+    __WMI_PLUGIN_NS = 'com.rpath.sputnik.wmiplugin'
     __CIM_PLUGIN_NS = 'com.rpath.sputnik.cimplugin'
     __LAUNCH_PLUGIN_NS = 'com.rpath.sputnik.launchplugin'
     __MGMT_IFACE_PLUGIN_NS = 'com.rpath.sputnik.interfacedetectionplugin'
@@ -72,21 +73,19 @@ class RepeaterClient(object):
         self.client = RmakeClient(address)
         self.zone = zone
 
-    def _cimCallDispatcher(self, method, cimParams, resultsLocation, zone,
-            **kwargs):
+    def _callParams(self, method, resultsLocation, zone, **kwargs):
         params = dict(method=method, zone=zone or self.zone)
         if kwargs:
             params['methodArguments'] = kwargs
-        assert isinstance(cimParams, self.CimParams)
-        if cimParams.port is None:
-            cimParams.port = 5989
-        params['cimParams'] = cimParams.toDict()
         if resultsLocation is not None:
             assert isinstance(resultsLocation, self.ResultsLocation)
             params['resultsLocation'] = resultsLocation.toDict()
         data = FrozenImmutableDict(params)
+        return params
 
-        job = RmakeJob(RmakeUuid.uuid4(), self.__CIM_PLUGIN_NS, owner='nobody',
+    def _launchRmakeJob(self, namespace, params):
+        data = FrozenImmutableDict(params)
+        job = RmakeJob(RmakeUuid.uuid4(), namespace, owner='nobody',
                        data=data,
                        ).freeze()
 
@@ -95,10 +94,34 @@ class RepeaterClient(object):
 
         return (uuid, job.thaw())
 
+    def _cimCallDispatcher(self, method, cimParams, resultsLocation, zone,
+            **kwargs):
+        params = self._callParams(method, resultsLocation, zone, **kwargs)
+        assert isinstance(cimParams, self.CimParams)
+        if cimParams.port is None:
+            cimParams.port = 5989
+        params['cimParams'] = cimParams.toDict()
+        return self._launchRmakeJob(self.__CIM_PLUGIN_NS, params)
+
+    def _wmiCallDispatcher(self, method, wmiParams, resultsLocation, zone,
+            **kwargs):
+        params = self._callParams(method, resultsLocation, zone, **kwargs)
+        assert isinstance(wmiParams, self.WmiParams)
+        if wmiParams.port is None:
+            wmiParams.port = 135
+        params['wmiParams'] = wmiParams.toDict()
+        return self._launchRmakeJob(self.__WMI_PLUGIN_NS, params)
+
     def register(self, cimParams, resultsLocation=None, zone=None,
             requiredNetwork=None):
         method = 'register'
         return self._cimCallDispatcher(method, cimParams, resultsLocation, zone,
+            requiredNetwork=requiredNetwork)
+
+    def register_wmi(self, wmiParams, resultsLocation=None, zone=None,
+            requiredNetwork=None):
+        method = 'register'
+        return self._wmiCallDispatcher(method, wmiParams, resultsLocation, zone,
             requiredNetwork=requiredNetwork)
 
     def shutdown(self, cimParams, resultsLocation=None, zone=None):
@@ -194,7 +217,7 @@ def main():
             ),
             cli.ResultsLocation(path="/adfadf", port=1234),
             zone=zone)
-    else:
+    elif 0:
         _P = cli.ManagementInterfaceParams
         plist = [
             _P('/api/inventory/management_interfaces/2', system, 1234),
@@ -204,6 +227,15 @@ def main():
             resultsLocation = cli.ResultsLocation(path="/adfadf", port=1234),
             eventUuid = '0xfeedbeaf',
             zone = zone)
+    else:
+        uuid, job = cli.register_wmi(
+            cli.WmiParams(host=system, port=135,
+                eventUuid = '0xfeedbeaf',
+                username="Administrator",
+                password="password",
+                domain=system),
+            resultsLocation = cli.ResultsLocation(path="/adfadf", port=1234),
+            zone=zone)
     while 1:
         job = cli.getJob(uuid)
         if job.status.final:

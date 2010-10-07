@@ -12,18 +12,13 @@
 # full details.
 #
 
-import sys
-import StringIO
-
 from conary.lib import digestlib
-from conary.lib.formattrace import formatTrace
 
 from rmake3.lib import uuid
 from rmake3.core import types
 from rmake3.core import handler
 
 from rpath_repeater.utils import windowsUpdate
-from rpath_repeater.utils import nodeinfo
 from rpath_repeater.utils import base_forwarding_plugin as bfp
 
 XML = bfp.XML
@@ -35,7 +30,7 @@ WMI_TASK_POLLING = bfp.PREFIX + '.poll'
 WMI_TASK_UPDATE = bfp.PREFIX + '.update'
 
 WmiParams = types.slottype('WmiParams',
-    'host port user password domain eventUuid')
+    'host port username password domain eventUuid')
 # These are just the starting point attributes
 WmiData = types.slottype('WmiData', 'p response')
 UpdateData = types.slottype('UpdateData', 'p sources response')
@@ -133,25 +128,7 @@ class WmiHandler(bfp.BaseHandler):
 
 
 class WMITaskHandler(bfp.BaseTaskHandler):
-    def run(self):
-        """
-        Exception handing for the _run method doing the real work
-        """
-        data = self.getData()
-        try:
-            self._run(data)
-        except nodeinfo.ProbeHostError, e:
-            self.sendStatus(404, "WMI not found on %s:%d: %s" % (
-                data.p.host, data.p.port, str(e)))
-        except:
-            typ, value, tb = sys.exc_info()
-            out = StringIO.StringIO()
-            formatTrace(typ, value, tb, stream = out, withLocals = False)
-            out.write("\nFull stack:\n")
-            formatTrace(typ, value, tb, stream = out, withLocals = True)
-
-            self.sendStatus(450, "Error in WMI call: %s" % str(value),
-                    out.getvalue())
+    InterfaceName = "WMI"
 
     def _getUuids(self, wmiClient):
         rc, localUUID = wmiClient.getRegistryKey('SOFTWARE\\rPath\\Inventory',
@@ -185,7 +162,7 @@ class WMITaskHandler(bfp.BaseTaskHandler):
         # local uuid
         # FIXME: Should use SMBIOS interface once available to get real
         #        information.
-        keyPath = 'HARDWARE\\System\\BIOS'
+        keyPath = r'HARDWARE\DESCRIPTION\System\BIOS'
         rc, baseBoard = getKey(keyPath, 'BaseBoardManufacturer')
         if rc: return
 
@@ -226,7 +203,7 @@ class RegisterTask(WMITaskHandler):
     def _run(self, data):
         # fetch a registry key that has admin only access
         wc = windowsUpdate.wmiClient(data.p.host, data.p.domain,
-                                     data.p.user, data.p.password)
+                                     data.p.username, data.p.password)
 
         self.sendStatus(104, "Contacting host %s validate credentials" % (
             data.p.host, ))
@@ -248,7 +225,7 @@ class RegisterTask(WMITaskHandler):
         uuids = [ XML.Text('local_uuid', local_uuid),
                   XML.Text('generated_uuid', generated_uuid), ]
 
-        el = XML.Element('system', uuids)
+        el = XML.Element('system', *uuids)
         data.response = el.toxml(encoding='UTF-8')
         self.setData(data)
 
@@ -268,7 +245,7 @@ class PollingTask(WMITaskHandler):
 
         try:
             wc = windowsUpdate.wmiClient( data.p.host, data.p.domain,
-                                          data.p.user, data.p.password)
+                                          data.p.username, data.p.password)
             children = self._getUuids(wc)
             children.append(self._getSoftwareVersions(wc))
         finally:
@@ -287,7 +264,7 @@ class UpdateTask(WMITaskHandler):
 
         try:
             wc = windowsUpdate.wmiClient( data.p.host, data.p.domain,
-                                          data.p.user, data.p.password)
+                                          data.p.username, data.p.password)
             windowsUpdate.doUpdate(wc, data.p.sources)
             children = self._getUuids(wc)
             children.append(self._getSoftwareVersions(wc))

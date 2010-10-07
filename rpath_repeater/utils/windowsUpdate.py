@@ -113,9 +113,9 @@ class wmiClient(object):
         return self._wmiCall(wmicmd)
 
     def setRegistryKey(self, keyPath, key, valueList):
-        if type(valueList) is str:
+        if not isinstance(valueList, list):
             valueList = [valueList]
-        valueStr =  ' '.join(["'%s'" % x for x in valueList])
+        valueStr =  ' '.join("'%s'" % x for x in valueList)
         wmicmd = "%s registry setkey '%s' '%s' %s" % (self.baseCmd, keyPath,
                                                       key, valueStr)
         return self._wmiCall(wmicmd)

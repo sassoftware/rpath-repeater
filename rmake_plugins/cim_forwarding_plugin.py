@@ -12,11 +12,6 @@
 # full details.
 #
 
-import sys
-import StringIO
-
-from conary.lib.formattrace import formatTrace
-
 from rmake3.core import types
 from rmake3.core import handler
 
@@ -137,6 +132,8 @@ class CimHandler(bfp.BaseHandler):
 
 
 class CIMTaskHandler(bfp.BaseTaskHandler):
+    InterfaceName = "CIM"
+
     def getWbemConnection(self, data):
         x509Dict = {}
         if None not in [ data.p.clientCert, data.p.clientKey ]:
@@ -153,26 +150,6 @@ class CIMTaskHandler(bfp.BaseTaskHandler):
             **x509Dict)
         server = wbemlib.WBEMServer("https://" + data.p.host, x509=x509Dict)
         return server
-
-    def run(self):
-        """
-        Exception handing for the _run method doing the real work
-        """
-        data = self.getData()
-        try:
-            self._run(data)
-        except nodeinfo.ProbeHostError, e:
-            self.sendStatus(404, "CIM not found on %s:%d: %s" % (
-                data.p.host, data.p.port, str(e)))
-        except:
-            typ, value, tb = sys.exc_info()
-            out = StringIO.StringIO()
-            formatTrace(typ, value, tb, stream = out, withLocals = False)
-            out.write("\nFull stack:\n")
-            formatTrace(typ, value, tb, stream = out, withLocals = True)
-
-            self.sendStatus(450, "Error in CIM call: %s" % str(value),
-                    out.getvalue())
 
     def _getServerCert(self):
         return [ XML.Text("ssl_server_certificate", self._serverCert) ]
