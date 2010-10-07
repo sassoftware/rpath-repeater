@@ -224,9 +224,14 @@ class BaseTaskHandler(plug_worker.TaskHandler):
 
         name = Text("name", n)
         version = cls._version(v, f)
-        flavor = Text("flavor", str(f))
-
+        flavor = cls._flavor(f)
         return XML.Element("trove", name, version, flavor)
+
+    @classmethod
+    def _flavor(cls, flavor):
+        if flavor is None:
+            return XML.Element("flavor")
+        return XML.Text("flavor", str(flavor))
 
     @classmethod
     def _version(cls, v, f):
@@ -236,7 +241,7 @@ class BaseTaskHandler(plug_worker.TaskHandler):
         ordering = Text("ordering", thawed_v.timeStamps()[0])
         revision = Text("revision", str(thawed_v.trailingRevision()))
         label = Text("label", str(thawed_v.trailingLabel()))
-        flavor = Text("flavor", str(f))
+        flavor = cls._flavor(f)
         return XML.Element("version", full, label, revision, ordering, flavor)
 
 
