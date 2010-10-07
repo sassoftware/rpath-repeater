@@ -72,7 +72,7 @@ class BaseHandler(handler.JobHandler):
     def initCall(self):
         self.data = self.getData().thaw().getDict()
         self.zone = self.data.pop('zone', None)
-        self.method = self.data['method']
+        self.method = self.data.get('method')
         self.methodArguments = self.data.pop('methodArguments', {})
         self.resultsLocation = self.data.pop('resultsLocation', {})
         self.eventUuid = self.data.pop('eventUuid', None)
@@ -92,7 +92,7 @@ class BaseHandler(handler.JobHandler):
         headers = {
             'Content-Type' : 'application/xml; charset="utf-8"',
             'Host' : host, }
-        eventUuid = self.cimParams.eventUuid
+        eventUuid = self.eventUuid
         if eventUuid:
             headers[self.X_Event_Uuid_Header] = eventUuid.encode('ascii')
         agent = "rmake-plugin/1.0"
@@ -109,10 +109,14 @@ class BaseHandler(handler.JobHandler):
 
         reactor.connectTCP(host, port, fact)
 
+    def postFailure(self):
+        el = XML.Element("system")
+        self.postResults(el)
+
     def addEventInfo(self, elt):
-        if not self.cimParams.eventUuid:
+        if not self.eventUuid:
             return
-        elt.appendChild(XML.Text("event_uuid", self.cimParams.eventUuid))
+        elt.appendChild(XML.Text("event_uuid", self.eventUuid))
         return elt
 
     def addJobInfo(self, elt):
@@ -126,8 +130,9 @@ class BaseHandler(handler.JobHandler):
         )
         elt.appendChild(XML.Element("jobs", job))
 
-    def toXml(self, elt):
-        return elt.toxml(encoding="UTF-8").encode("utf-8")
+    @classmethod
+    def toXml(cls, elt):
+        return XML.toString(elt)
 
     def _getZoneAddresses(self):
         """Return set of IP addresses of all nodes in this zone."""
@@ -230,6 +235,9 @@ class XML(object):
         node = factory(tagName)
         return node
 
+    @classmethod
+    def toString(cls, elt):
+        return elt.toxml(encoding="UTF-8").encode("utf-8")
 
 class HTTPClientFactory(client.HTTPClientFactory):
     def __init__(self, url, *args, **kwargs):

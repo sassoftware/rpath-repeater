@@ -25,7 +25,7 @@ from rpath_repeater.utils.immutabledict import FrozenImmutableDict
 class RepeaterClient(object):
     __CIM_PLUGIN_NS = 'com.rpath.sputnik.cimplugin'
     __LAUNCH_PLUGIN_NS = 'com.rpath.sputnik.launchplugin'
-    __PRESENCE_PLUGIN_NS = 'com.rpath.sputnik.presence'
+    __MGMT_IFACE_PLUGIN_NS = 'com.rpath.sputnik.interfacedetectionplugin'
 
     class _BaseSlotCompare(SlotCompare):
         def toDict(self):
@@ -42,6 +42,22 @@ class RepeaterClient(object):
         """
         __slots__ = [ 'host', 'port', 'clientCert', 'clientKey', 
             'eventUuid', 'instanceId', 'targetName', 'targetType' ]
+        # XXX instanceId, targetName, targetType have nothing to do with
+        # CimParams, they should be in a different data structure
+
+    class WmiParams(_BaseSlotCompare):
+        """
+        Information required in order to talk to a WBEM endpoint
+        """
+        __slots__ = [ 'host', 'port', 'username', 'password', 'domain',
+            'eventUuid', ]
+
+    class ManagementInterfaceParams(_BaseSlotCompare):
+        """
+        Information needed for probing for a management interface (e.g. WMI,
+        WBEM)
+        """
+        __slots__ = [ 'interfaceName', 'host', 'port', ]
 
     class ResultsLocation(_BaseSlotCompare):
         """
@@ -129,6 +145,31 @@ class RepeaterClient(object):
 
         return (uuid, job.thaw())
 
+    def detectMgmtInterface(self, ifaceParamList, resultsLocation=None,
+            zone=None, eventUuid=None):
+        """
+        ifaceParamList is a list of ManagementInterfaceParams to be probed
+        """
+        params = dict(zone=zone or self.zone)
+        params.update(ifaceParamList = [x.toDict() for x in ifaceParamList])
+
+        if resultsLocation is not None:
+            assert isinstance(resultsLocation, self.ResultsLocation)
+            params['resultsLocation'] = resultsLocation.toDict()
+        if eventUuid is not None:
+            params.update(eventUuid = eventUuid)
+
+        data = FrozenImmutableDict(params)
+        job = RmakeJob(RmakeUuid.uuid4(), self.__MGMT_IFACE_PLUGIN_NS,
+                       owner='nobody',
+                       data=data,
+                       ).freeze()
+
+        uuid = job.job_uuid
+        job = self.client.createJob(job)
+
+        return (uuid, job.thaw())
+
     def getJob(self, uuid):
         return self.client.getJob(uuid).thaw()
 
@@ -138,14 +179,14 @@ def main():
         print "Usage: %s system" % sys.argv[0]
         return 1
     system = sys.argv[1]
-    zone = None
+    zone = 'Local rBuilder'
     cli = RepeaterClient()
     if 0:
         uuid, job = cli.register(
             cli.CimParams(host=system),
             #requiredNetwork="1.1.1.1",
             zone=zone)
-    else:
+    elif 0:
         uuid, job = cli.poll(
             cli.CimParams(host=system, eventUuid="unique uuid",
 #              clientCert=file("/tmp/reinhold.crt").read(),
@@ -153,6 +194,16 @@ def main():
             ),
             cli.ResultsLocation(path="/adfadf", port=1234),
             zone=zone)
+    else:
+        _P = cli.ManagementInterfaceParams
+        plist = [
+            _P('wmi', system, 1234),
+            _P('cim', system, 5989),
+        ]
+        uuid, job = cli.detectMgmtInterface(plist,
+            resultsLocation = cli.ResultsLocation(path="/adfadf", port=1234),
+            eventUuid = '0xfeedbeaf',
+            zone = zone)
     while 1:
         job = cli.getJob(uuid)
         if job.status.final:

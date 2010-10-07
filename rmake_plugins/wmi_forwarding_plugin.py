@@ -22,8 +22,8 @@ from rmake3.lib import uuid
 from rmake3.core import types
 from rmake3.core import handler
 
-from rpath_repeater.utils import nodeinfo
 from rpath_repeater.utils import windowsUpdate
+from rpath_repeater.utils import nodeinfo
 from rpath_repeater.utils.base_forwarding_plugin import XML
 from rpath_repeater.utils.base_forwarding_plugin import PREFIX
 from rpath_repeater.utils.base_forwarding_plugin import exposed

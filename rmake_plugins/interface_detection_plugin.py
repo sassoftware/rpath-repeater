@@ -21,19 +21,17 @@ from rmake3.core import handler
 from conary.lib.formattrace import formatTrace
 
 from rpath_repeater.utils import nodeinfo
-from rpath_repeater.utils.base_forward_plugin import XML
-from rpath_repeater.utils.base_forward_plugin import exposed
-from rpath_repeater.utils.base_forward_plugin import BaseHandler
-from rpath_repeater.utils.base_forward_plugin import BaseTaskHandler
-from rpath_repeater.utils.base_forward_plugin import BaseForwardingPlugin
+from rpath_repeater.utils import base_forwarding_plugin as bfp
 
 PREFIX = 'com.rpath.sputnik'
 INTERFACE_JOB = PREFIX + '.interfacedetectionplugin'
 INTERFACE_DETECT_TASK = PREFIX + '.detect_management_interface'
 
+ManagementInterfaceParams = types.slottype(
+    'ManagementInterfaceParams', 'interfaceName host port')
 IDData = types.slottype('IDData', 'p response')
 
-class InterfaceDetectionForwardPlugin(BaseForwardingPlugin):
+class InterfaceDetectionForwardPlugin(bfp.BaseForwardingPlugin):
     """
     Setup dispatcher side of the interface detection.
     """
@@ -47,7 +45,7 @@ class InterfaceDetectionForwardPlugin(BaseForwardingPlugin):
         }
 
 
-class InterfaceDetectionHandler(BaseHandler):
+class InterfaceDetectionHandler(bfp.BaseHandler):
     """
     Dispatcher plugin.
     """
@@ -56,7 +54,7 @@ class InterfaceDetectionHandler(BaseHandler):
     firstState = 'callDetectInterface'
 
     def setup(self):
-        BaseHandler.setup()
+        bfp.BaseHandler.setup(self)
 
         cfg = self.dispatcher.cfg
 
@@ -71,6 +69,10 @@ class InterfaceDetectionHandler(BaseHandler):
                 elif key == 'port':
                     self.port = int(value)
 
+    def initCall(self):
+        bfp.BaseHandler.initCall(self)
+        self.ifaceParamList = self.data.pop('ifaceParamList', None)
+
     def callDetectInterface(self):
         self.setStatus(101, 'Initializing Interface Detection')
         self.initCall()
@@ -80,26 +82,23 @@ class InterfaceDetectionHandler(BaseHandler):
             self.postFailure()
             return
 
-        if 'ifaceParamList' not in self.data:
+        if not self.ifaceParamList:
             self.setStatus(401, 'Interface detection requires ifaceParamList')
             self.postFailure()
             return
 
-        if self.method in self.Meta.exposed:
-            self.setStatus(102, 'Calling %s' % self.method)
-            return self.method
+        return 'detect_management_interface'
 
-    @exposed
     def detect_management_interface(self):
         self.setStatus(103, 'Creating task')
 
-        args = IDData(self.data['ifaceParamList'])
+        args = IDData(self.ifaceParamList)
         task = self.newTask('detect_management_interface',
             INTERFACE_DETECT_TASK, args, zone=self.zone)
         return self._handleTask(task)
 
 
-class DetectInterfaceTask(BaseTaskHandler):
+class DetectInterfaceTask(bfp.BaseTaskHandler):
     """
     Task that runs on the rUS to query the target systems.
     """
@@ -115,7 +114,7 @@ class DetectInterfaceTask(BaseTaskHandler):
             formatTrace(typ, value, tb, stream = out, withLocals = True)
 
             self.sendStatus(450, "Error in Interface Detection call: %s"
-                % (str(value), out.getvalue()))
+                % str(value), out.getvalue())
 
     def _run(self):
         """
@@ -125,20 +124,27 @@ class DetectInterfaceTask(BaseTaskHandler):
         self.sendStatus(104, 'Detecting Management Interface')
 
         data = self.getData()
-        for (service, (host, port)) in data.p:
+        for params in data.p:
+            host = params['host']
+            port = params['port']
+            interfaceName = params['interfaceName']
             self.sendStatus(105, 'Checking %s:%s' % (host, port))
             if self._queryService(host, port):
-                self._sendResponse(service)
+                self._sendResponse(data, interfaceName)
                 self.sendStatus(200, 'Found management interface on %s:%s'
                     % (host, port))
                 return
 
-        self._sendResponse('None')
+        self._sendResponse(data, None)
         self.sendStatus(201, 'No management interface discovered')
 
-    def _sendResponse(self, data, service):
-        element = XML.Element('interface', service)
-        data.response = element.toxml(encoding='UTF-8')
+    def _sendResponse(self, data, interfaceName):
+        if interfaceName:
+            ifaces = [ bfp.XML.Text('interface', interfaceName) ]
+        else:
+            ifaces = []
+        el = bfp.XML.Element("system", *ifaces)
+        data.response = bfp.XML.toString(el)
         self.setData(data)
 
     def _queryService(self, host, port):
