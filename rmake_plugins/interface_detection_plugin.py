@@ -27,8 +27,9 @@ PREFIX = 'com.rpath.sputnik'
 INTERFACE_JOB = PREFIX + '.interfacedetectionplugin'
 INTERFACE_DETECT_TASK = PREFIX + '.detect_management_interface'
 
-ManagementInterfaceParams = types.slottype(
-    'ManagementInterfaceParams', 'interfaceName host port')
+IDParams = types.slottype(
+    'IDParams', 'host interfacesList')
+
 IDData = types.slottype('IDData', 'p response')
 
 class InterfaceDetectionForwardPlugin(bfp.BaseForwardingPlugin):
@@ -71,7 +72,8 @@ class InterfaceDetectionHandler(bfp.BaseHandler):
 
     def initCall(self):
         bfp.BaseHandler.initCall(self)
-        self.ifaceParamList = self.data.pop('ifaceParamList', None)
+        self.params = self.data.pop('params', None)
+        self.interfacesList = self.params.pop('interfacesList', None)
 
     def callDetectInterface(self):
         self.setStatus(101, 'Initializing Interface Detection')
@@ -82,8 +84,8 @@ class InterfaceDetectionHandler(bfp.BaseHandler):
             self.postFailure()
             return
 
-        if not self.ifaceParamList:
-            self.setStatus(401, 'Interface detection requires ifaceParamList')
+        if not self.interfacesList:
+            self.setStatus(401, 'Interface detection requires a list of interfaces')
             self.postFailure()
             return
 
@@ -92,7 +94,7 @@ class InterfaceDetectionHandler(bfp.BaseHandler):
     def detect_management_interface(self):
         self.setStatus(103, 'Creating task')
 
-        args = IDData(self.ifaceParamList)
+        args = IDData(IDParams(self.params['host'], self.interfacesList))
         task = self.newTask('detect_management_interface',
             INTERFACE_DETECT_TASK, args, zone=self.zone)
         return self._handleTask(task)
@@ -124,13 +126,13 @@ class DetectInterfaceTask(bfp.BaseTaskHandler):
         self.sendStatus(104, 'Detecting Management Interface')
 
         data = self.getData()
-        for params in data.p:
-            host = params['host']
+        host = data.p.host
+        for params in data.p.interfacesList:
             port = params['port']
-            interfaceName = params['interfaceName']
+            interfaceHref = params['interfaceHref']
             self.sendStatus(105, 'Checking %s:%s' % (host, port))
             if self._queryService(host, port):
-                self._sendResponse(data, interfaceName, port)
+                self._sendResponse(data, interfaceHref, port)
                 self.sendStatus(200, 'Found management interface on %s:%s'
                     % (host, port))
                 return
@@ -138,10 +140,10 @@ class DetectInterfaceTask(bfp.BaseTaskHandler):
         self._sendResponse(data)
         self.sendStatus(201, 'No management interface discovered')
 
-    def _sendResponse(self, data, interfaceRef=None, port=None):
-        if interfaceRef:
+    def _sendResponse(self, data, interfaceHref=None, port=None):
+        if interfaceHref:
             children = [ bfp.XML.Element('management_interface',
-                href=interfaceRef) ]
+                href=interfaceHref) ]
             children.append(bfp.XML.Text('agent_port', str(port)))
         else:
             children = []

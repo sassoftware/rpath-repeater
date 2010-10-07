@@ -58,7 +58,7 @@ class RepeaterClient(object):
         Information needed for probing for a management interface (e.g. WMI,
         WBEM)
         """
-        __slots__ = [ 'interfaceName', 'host', 'port', ]
+        __slots__ = [ 'host', 'interfacesList', 'eventUuid', ]
 
     class ResultsLocation(_BaseSlotCompare):
         """
@@ -177,19 +177,16 @@ class RepeaterClient(object):
 
         return (uuid, job.thaw())
 
-    def detectMgmtInterface(self, ifaceParamList, resultsLocation=None,
-            zone=None, eventUuid=None):
+    def detectMgmtInterface(self, mgmtParams, resultsLocation=None,
+            zone=None):
         """
         ifaceParamList is a list of ManagementInterfaceParams to be probed
         """
-        params = dict(zone=zone or self.zone)
-        params.update(ifaceParamList = [x.toDict() for x in ifaceParamList])
+        params = dict(zone=zone or self.zone, params=mgmtParams.toDict())
 
         if resultsLocation is not None:
             assert isinstance(resultsLocation, self.ResultsLocation)
             params['resultsLocation'] = resultsLocation.toDict()
-        if eventUuid is not None:
-            params.update(eventUuid = eventUuid)
 
         data = FrozenImmutableDict(params)
         job = RmakeJob(RmakeUuid.uuid4(), self.__MGMT_IFACE_PLUGIN_NS,
@@ -232,15 +229,17 @@ def main():
     elif 0:
         uuid, job = cli.poll(cimParams, resultsLocation=resultsLocation,
             zone=zone)
-    elif 0:
-        _P = cli.ManagementInterfaceParams
-        plist = [
-            _P('/api/inventory/management_interfaces/2', system, 1234),
-            _P('/api/inventory/management_interfaces/1', system, 5989),
-        ]
-        uuid, job = cli.detectMgmtInterface(plist,
-            resultsLocation = resultsLocation,
+    elif 1:
+        params = cli.ManagementInterfaceParams(host=system,
             eventUuid = eventUuid,
+            interfacesList = [
+                dict(interfaceHref='/api/inventory/management_interfaces/2',
+                     port=1234),
+                dict(interfaceHref='/api/inventory/management_interfaces/1',
+                     port=5989),
+            ])
+        uuid, job = cli.detectMgmtInterface(params,
+            resultsLocation = resultsLocation,
             zone = zone)
     elif 0:
         uuid, job = cli.register_wmi(wmiParams,
