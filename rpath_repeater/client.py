@@ -223,7 +223,7 @@ def main():
         zone=zone,
     )
     wmiParams = cli.WmiParams(host=system, port=135,
-        eventUuid = '0xfeedbeaf',
+        eventUuid = eventUuid,
         username="Administrator",
         password="password",
         domain=system)
