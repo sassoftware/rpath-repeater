@@ -154,30 +154,18 @@ class WMITaskHandler(BaseTaskHandler):
             self.sendStatus(450, "Error in WMI call: %s" % str(value),
                     out.getvalue())
 
-    def _getUuids(self, server):
-        cs = server.RPATH_ComputerSystem.EnumerateInstances()
-        if not cs:
+    def _getUuids(self, wmiClient):
+        rc, localUUID = wmiClient.getRegistryKey(SOME_PATH,SOME_KEY)
+        rc, generatedUUID = wmiClient.getRegistryKey(SOME_PATH,SOME_KEY)
+
+        if not rc:
             return []
-        cs = cs[0]
+
         T = XML.Text
-        return [ T("local_uuid", cs['LocalUUID']),
-            T("generated_uuid", cs['GeneratedUUID']) ]
+        return [T("local_uuid", localUUID),
+                T("generated_uuid", generatedUUID)]
 
-    def _getSoftwareVersions(self, server):
-        # Fetch instances of the ElementSoftwareIdentity association.
-        # We need to figure out which SoftwareIdentity instances are installed
-        # We do this by filtering the state
-        states = set([2, 6])
-        esi = server.RPATH_ElementSoftwareIdentity.EnumerateInstances()
-        installedSofwareIdentityNames = set(g['Antecedent']['InstanceID']
-            for g in esi
-                if states.issubset(g.properties['ElementSoftwareStatus'].value))
-        # Now fetch all SoftwareIdentity elements and filter out the ones not
-        # installed (i.e. InstanceID not in installedSofwareIdentityNames)
-        siList = server.RPATH_SoftwareIdentity.EnumerateInstances()
-        siList = [ si for si in siList
-            if si['InstanceID'] in installedSofwareIdentityNames ]
-
+    def _getSoftwareVersions(self, wmiClient):
         # Start creating the XML document
         troves = [ self._trove(si) for si in siList ]
         return XML.Element("installed_software", *troves)
@@ -189,8 +177,8 @@ class RegisterTask(WMITaskHandler):
             data.p.host, ))
 
         # fetch a registry key that has admin only access
-        wc = windowsUpdate. wmiClient( data.p.host, data.p.domain,
-                                       data.p.user, data.p.password)
+        wc = windowsUpdate.wmiClient( data.p.host, data.p.domain,
+                                      data.p.user, data.p.password)
         rc, _ = wc.getRegistryKey(SOME_PATH,SOME_KEY)
 
         if not rc:
@@ -208,9 +196,13 @@ class PollingTask(WMITaskHandler):
         self.sendStatus(101, "Contacting host %s to Poll it for info" % (
             data.p.host))
 
-        server = self.getWbemConnection(data)
-        children = self._getUuids(server)
-        children.append(self._getSoftwareVersions(server))
+        try:
+            wc = windowsUpdate.wmiClient( data.p.host, data.p.domain,
+                                          data.p.user, data.p.password)
+            children = self._getUuids(wc)
+            children.append(self._getSoftwareVersions(wc))
+        finally:
+            wc.unmount()
 
         el = XML.Element("system", *children)
 
@@ -220,21 +212,23 @@ class PollingTask(WMITaskHandler):
 
 class UpdateTask(WMITaskHandler):
     def _run(self, data):
-        self.sendStatus(101, "Contacting host %s on port %d to update it" % (
+        self.sendStatus(101, "Contacting host %s to update it" % (
             data.p.host, data.p.port))
 
-        server = self.getWbemConnection(data)
-        self._applySoftwareUpdate(data.p.host, data.sources)
-        children = self._getUuids(server)
-        children.extend(self._getServerCert())
-        children.append(self._getSoftwareVersions(server))
+        try:
+            wc = windowsUpdate.wmiClient( data.p.host, data.p.domain,
+                                          data.p.user, data.p.password)
+            self._applySoftwareUpdate(wc, data.p.host, data.sources)
+            children = self._getUuids(wc)
+            children.append(self._getSoftwareVersions(wc))
+        finally:
+            wc.unmount()
 
         el = XML.Element("system", *children)
 
         self.setData(el.toxml(encoding="UTF-8"))
         self.sendStatus(200, "Host %s has been updated" % data.p.host)
 
-    def _applySoftwareUpdate(self, host, sources):
-        wmiUpdater = wmiupdater.WMIUpdater("https://" + host)
-        wmiUpdater.applyUpdate(sources)
+    def _applySoftwareUpdate(self, wc, sources):
+        windowsUpdate.doUpdate(wc, sources)
         return None

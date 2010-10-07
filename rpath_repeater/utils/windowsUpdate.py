@@ -18,12 +18,15 @@ import popen2
 import tempfile
 import itertools
 
-from conary.lib import log
+from lxml import etree
+from lxml.builder import ElementMaker
+
+#from conary.lib import log
 from conary import conarycfg
 from conary import conaryclient
-from conary.conaryclient import systemmodel
+from conary.conaryclient import modelupdate, systemmodel
 
-log.setVerbosity(log.INFO)
+#log.setVerbosity(log.INFO)
 
 def runModel(client, cache, modelText):
     model = systemmodel.SystemModelText(client.cfg)
@@ -152,3 +155,187 @@ def getConaryClient():
         'http://rbatrunk.eng.rpath.com/repos/omni-components/')
     cfg.configLine('installLabelPath windows.rpath.com@rpath:windows-common')
     return conaryclient.ConaryClient(cfg = cfg)
+
+
+def doUpdate(wc, sources):
+    bootstrap=False
+
+    client = getConaryClient()
+
+    rc, status = wc.queryService('rPath Tools Install Service')
+    if rc:
+        bootstrap=True
+    else:
+        wc.waitForServiceToStop('rPath Tools Install Service')
+
+        if not bootstrap:
+            # fetch old manifest
+            rc, oldManifest = wc.getRegistryKey(r"SOFTWARE\rPath\conary",
+                                                "manifest")
+            assert(not rc)
+
+            oldManifest = oldManifest.split('\n')
+            oldModel = ['install ' + p for p in oldManifest if p]
+        else:
+            oldModel = oldManifest = ''
+
+    # mount the windows filesystem
+    rootDir, rc = wc.mount()
+    assert(not rc)
+
+    # Set the rtis root dir
+    rtisDir = os.path.join(rootDir,'Windows/RTIS')
+    rtisWinDir = 'C:\\Windows\\RTIS'
+    if not os.path.exists(rtisDir):
+        os.mkdir(rtisDir)
+    conaryManifestPath = os.path.join(rtisDir,'conary_manifest')
+    if os.path.exists(conaryManifestPath):
+        oldConaryManifest = open(conaryManifestPath).read()
+        oldConaryManifest = oldConaryManifest.split('\n')
+        oldModel = ['install ' + p for p in oldConaryManifest if p]
+    else:
+        oldConaryManifest = ''
+    # determine the new packages to install
+    cache = modelupdate.SystemModelTroveCache(
+        client.getDatabase(), client.getRepos())
+    newModel = ['install ' + s for s in sources if s]
+    oldTroves, newTroves = modelsToJobs(cache, client, oldModel, newModel)
+    newMsiTroves = [x for x in newTroves if x[0].endswith(':msi')]
+    oldMsiTroves = [x for x in oldTroves if x[0].endswith(':msi')]
+    oldMsiDict = dict(zip([x[0] for x in oldMsiTroves],[x[1:] for x
+                                                        in oldMsiTroves]))
+
+    # fetch the new packages
+    trvs = client.repos.getTroves(newMsiTroves, withFiles=True)
+    filesToGet = []
+    for t in trvs:
+        filesToGet.append((list(t.iterFileList(capsules=True))[0], t))
+
+    contents = client.repos.getFileContents([(f[0][2],f[0][3])
+                                             for f in filesToGet],
+                                             compressed=False)
+
+    # bootstrap if we need to
+    if bootstrap:
+        # fetch the rTIS MSI
+        nvf = client.repos.findTrove(None, ('rtis',
+            '/windows.rpath.com@rpath:windows-common',None))
+        trv = client.repos.getTrove(*nvf[0])
+        f = (list(trv.iterFileList(capsules=True)))[0]
+        contents = client.repos.getFileContents(((f[2],f[3]),),
+                                                compressed=False)
+        contents = contents[0]
+        # copy it to the target machine
+        contentsPath = os.path.join(rtisDir,f[1])
+        winContentsPath = 'C:\\Windows\\RTIS\\' + f[1]
+        winLogPath = 'C:\\Windows\\RTIS\\' + 'rPath_Tools_Install.log'
+        open(contentsPath,'w').write(contents.f.read())
+        rc, _ = wc.runCmd(r'msiexec.exe /i %s /quiet /l*vx %s' %
+                              (winContentsPath, winLogPath))
+        assert(not rc)
+
+    # Set the update dir
+    updateDir = tempfile.mkdtemp('', 'update', rtisDir)
+    updateBaseDir = os.path.basename(updateDir)
+
+    # write the files and installation instructions
+    E = ElementMaker()
+    UPDATE = E.update
+    SEQUENCE = E.sequence
+    LOGFILE = E.logFile
+    UPDATE_JOBS = E.updateJobs
+    UPDATE_JOB = E.updateJob
+    PACKAGES = E.packages
+    PACKAGE = E.package
+    TYPE = E.type
+    OPERATION = E.operation
+    PRODUCT_CODE = E.productCode
+    PRODUCT_NAME = E.productName
+    PRODUCT_VERSION = E.productVersion
+    FILE = E.file
+    MANIFEST = E.manifestEntry
+    PREV_MANIFEST = E.previousManifestEntry
+
+    xmlDocStr = '''UPDATE(
+        LOGFILE('install.log'),
+        UPDATE_JOBS(
+
+            UPDATE_JOB(
+                SEQUENCE('0'),
+                PACKAGES(
+                    %s
+                    )
+                )
+            )
+        )'''
+
+    pkgTemplate = '''PACKAGE(
+        TYPE('msi'),
+        SEQUENCE('%s'),
+        LOGFILE('install.log'),
+        OPERATION('install'),
+        PRODUCT_CODE("%s"),
+        PRODUCT_NAME("%s"),
+        PRODUCT_VERSION("%s"),
+        FILE("%s"),
+        MANIFEST("%s"),
+        PREV_MANIFEST("%s")
+        )'''
+    pkgStr = ''
+    for s, ((f, t),c) in enumerate(zip(filesToGet,contents)):
+        if t.name() in oldMsiDict:
+            o = oldMsiDict[t.name()]
+            oldManifestName = '%s=%s[%s]' % (t.name(),str(o[0]),str(o[1]))
+        else:
+            oldManifestName = ''
+        values = (str(s),
+                  t.troveInfo.capsule.msi.productCode(),
+                  t.troveInfo.capsule.msi.name(),
+                  t.troveInfo.capsule.msi.version(),
+                  f[1],
+                  '%s=%s[%s]' % (t.name(),str(t.version()),str(t.flavor())),
+                  '%s' % oldManifestName)
+        pkgStr = pkgStr + pkgTemplate % values + ',\n'
+
+        # write contents
+        packageDir = os.path.join(updateDir,
+                                  t.troveInfo.capsule.msi.productCode())
+        os.mkdir(packageDir)
+        contentsPath = os.path.join(packageDir,f[1])
+        open(contentsPath,'w').write(c.f.read())
+
+    # write servicing.xml
+    xmlDocStr = xmlDocStr % pkgStr
+    xmlDoc = eval(xmlDocStr)
+    open(os.path.join(updateDir,'servicing.xml'),'w').write(
+            etree.tostring(xmlDoc,pretty_print=True))
+
+    # write the new conary_manifest
+    conaryManifestPath = os.path.join(rtisDir,'conary_manifest')
+    f = open(conaryManifestPath,'w').write(
+        '\n'.join([ '%s=%s[%s]' %
+          (x[0],str(x[1]),str(x[2])) for x in newTroves]))
+
+    # we're now done with the windows fs
+    wc.unmount()
+
+    if bootstrap:
+        wc.waitForServiceToStop('rPath Tools Install Service')
+
+    # set the registry keys
+    #rc, _ = uc.setRegistryKey(
+    #    r"SYSTEM\CurrentControlSet\Services\rPath Tools Install Service\Parameters",
+    #    'Root', rtisWinDir)
+    #assert(not rc)
+    commandValue = ["job=0", "update=%s" % updateBaseDir]
+    rc, _ = wc.setRegistryKey(
+        r"SYSTEM\CurrentControlSet\Services\rPath Tools Install Service\Parameters",
+        'Commands', commandValue)
+    assert(not rc)
+
+    # start the service
+    rc, _ = wc.startService("rPath Tools Install Service")
+    assert(not rc)
+
+    # wait until completed
+    wc.waitForServiceToStop('rPath Tools Install Service')
