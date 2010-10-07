@@ -114,8 +114,8 @@ class DetectInterfaceTask(BaseTaskHandler):
             out.write("\nFull stack:\n")
             formatTrace(typ, value, tb, stream = out, withLocals = True)
 
-            self.sendStatus(450, "Error in CIM call: %s" % str(value),
-                    out.getvalue())
+            self.sendStatus(450, "Error in Interface Detection call: %s"
+                % (str(value), out.getvalue()))
 
     def _run(self):
         """
