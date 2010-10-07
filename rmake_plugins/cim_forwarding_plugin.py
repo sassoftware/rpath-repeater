@@ -24,18 +24,15 @@ from rpath_repeater.utils import wbemlib
 from rpath_repeater.utils import nodeinfo
 from rpath_repeater.utils import cimupdater
 
-from rpath_repeater.utils.base_forwarding_plugin import XML
-from rpath_repeater.utils.base_forwarding_plugin import exposed
-from rpath_repeater.utils.base_forwarding_plugin import BaseHandler
-from rpath_repeater.utils.base_forwarding_plugin import BaseTaskHandler
-from rpath_repeater.utils.base_forwarding_plugin import BaseForwardingPlugin
+from rpath_repeater.utils import base_forwarding_plugin as bfp
 
-PREFIX = 'com.rpath.sputnik'
-CIM_JOB = PREFIX + '.cimplugin'
-CIM_TASK_REGISTER = PREFIX + '.register'
-CIM_TASK_SHUTDOWN = PREFIX + '.shutdown'
-CIM_TASK_POLLING = PREFIX + '.poll'
-CIM_TASK_UPDATE = PREFIX + '.update'
+XML = bfp.XML
+
+CIM_JOB = bfp.PREFIX + '.cimplugin'
+CIM_TASK_REGISTER = bfp.PREFIX + '.register'
+CIM_TASK_SHUTDOWN = bfp.PREFIX + '.shutdown'
+CIM_TASK_POLLING = bfp.PREFIX + '.poll'
+CIM_TASK_UPDATE = bfp.PREFIX + '.update'
 
 CimParams = types.slottype('CimParams',
     'host port clientCert clientKey eventUuid instanceId targetName targetType')
@@ -45,7 +42,7 @@ RactivateData = types.slottype('RactivateData',
         'p nodes requiredNetwork response')
 UpdateData = types.slottype('UpdateData', 'p sources response')
 
-class CimForwardingPlugin(BaseForwardingPlugin):
+class CimForwardingPlugin(bfp.BaseForwardingPlugin):
     def dispatcher_pre_setup(self, dispatcher):
         handler.registerHandler(CimHandler)
 
@@ -59,7 +56,7 @@ class CimForwardingPlugin(BaseForwardingPlugin):
         }
 
 
-class CimHandler(BaseHandler):
+class CimHandler(bfp.BaseHandler):
     timeout = 7200
     port = 5989
 
@@ -67,7 +64,7 @@ class CimHandler(BaseHandler):
     firstState = 'cimCall'
 
     def setup (self):
-        BaseHandler.setup()
+        bfp.BaseHandler.setup(self)
 
         cfg = self.dispatcher.cfg
 
@@ -102,7 +99,7 @@ class CimHandler(BaseHandler):
         self.postFailure()
         return
 
-    @exposed
+    @bfp.exposed
     def register(self):
         self.setStatus(103, "Creating task")
 
@@ -112,7 +109,7 @@ class CimHandler(BaseHandler):
         task = self.newTask('register', CIM_TASK_REGISTER, args, zone=self.zone)
         return self._handleTask(task)
 
-    @exposed
+    @bfp.exposed
     def shutdown(self):
         self.setStatus(103, "Creating task")
 
@@ -120,7 +117,7 @@ class CimHandler(BaseHandler):
         task = self.newTask('shutdown', CIM_TASK_SHUTDOWN, args, zone=self.zone)
         return self._handleTask(task)
 
-    @exposed
+    @bfp.exposed
     def polling(self):
         self.setStatus(103, "Creating task")
 
@@ -128,7 +125,7 @@ class CimHandler(BaseHandler):
         task = self.newTask('Polling', CIM_TASK_POLLING, args, zone=self.zone)
         return self._handleTask(task)
 
-    @exposed
+    @bfp.exposed
     def update(self):
         self.setStatus(103, "Creating task")
 
@@ -139,7 +136,7 @@ class CimHandler(BaseHandler):
         return self._handleTask(task)
 
 
-class CIMTaskHandler(BaseTaskHandler):
+class CIMTaskHandler(bfp.BaseTaskHandler):
     def getWbemConnection(self, data):
         x509Dict = {}
         if None not in [ data.p.clientCert, data.p.clientKey ]:

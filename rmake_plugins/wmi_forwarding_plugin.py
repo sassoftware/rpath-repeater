@@ -22,20 +22,17 @@ from rmake3.lib import uuid
 from rmake3.core import types
 from rmake3.core import handler
 
-from rpath_repeater.utils import nodeinfo
 from rpath_repeater.utils import windowsUpdate
-from rpath_repeater.utils.base_forwarding_plugin import XML
-from rpath_repeater.utils.base_forwarding_plugin import PREFIX
-from rpath_repeater.utils.base_forwarding_plugin import exposed
-from rpath_repeater.utils.base_forwarding_plugin import BaseHandler
-from rpath_repeater.utils.base_forwarding_plugin import BaseTaskHandler
-from rpath_repeater.utils.base_forwarding_plugin import BaseForwardingPlugin
+from rpath_repeater.utils import nodeinfo
+from rpath_repeater.utils import base_forwarding_plugin as bfp
 
-WMI_JOB = PREFIX + '.wmiplugin'
-WMI_TASK_REGISTER = PREFIX + '.register'
-WMI_TASK_SHUTDOWN = PREFIX + '.shutdown'
-WMI_TASK_POLLING = PREFIX + '.poll'
-WMI_TASK_UPDATE = PREFIX + '.update'
+XML = bfp.XML
+
+WMI_JOB = bfp.PREFIX + '.wmiplugin'
+WMI_TASK_REGISTER = bfp.PREFIX + '.register'
+WMI_TASK_SHUTDOWN = bfp.PREFIX + '.shutdown'
+WMI_TASK_POLLING = bfp.PREFIX + '.poll'
+WMI_TASK_UPDATE = bfp.PREFIX + '.update'
 
 WmiParams = types.slottype('WmiParams',
     'host port user password domain eventUuid')
@@ -43,7 +40,7 @@ WmiParams = types.slottype('WmiParams',
 WmiData = types.slottype('WmiData', 'p response')
 UpdateData = types.slottype('UpdateData', 'p sources response')
 
-class WmiForwardingPlugin(BaseForwardingPlugin):
+class WmiForwardingPlugin(bfp.BaseForwardingPlugin):
 
     def dispatcher_pre_setup(self, dispatcher):
         handler.registerHandler(WmiHandler)
@@ -58,14 +55,14 @@ class WmiForwardingPlugin(BaseForwardingPlugin):
         }
 
 
-class WmiHandler(BaseHandler):
+class WmiHandler(bfp.BaseHandler):
     timeout = 7200
 
     jobType = WMI_JOB
     firstState = 'wmiCall'
 
     def setup (self):
-        BaseHandler.setup()
+        bfp.BaseHandler.setup(self)
 
         cfg = self.dispatcher.cfg
 
@@ -100,7 +97,7 @@ class WmiHandler(BaseHandler):
         self.postFailure()
         return
 
-    @exposed
+    @bfp.exposed
     def register(self):
         self.setStatus(103, "Creating task")
 
@@ -108,7 +105,7 @@ class WmiHandler(BaseHandler):
         task = self.newTask('register', WMI_TASK_REGISTER, args, zone=self.zone)
         return self._handleTask(task)
 
-    @exposed
+    @bfp.exposed
     def shutdown(self):
         self.setStatus(103, "Creating task")
 
@@ -116,7 +113,7 @@ class WmiHandler(BaseHandler):
         task = self.newTask('shutdown', WMI_TASK_SHUTDOWN, args, zone=self.zone)
         return self._handleTask(task)
 
-    @exposed
+    @bfp.exposed
     def polling(self):
         self.setStatus(103, "Creating task")
 
@@ -124,7 +121,7 @@ class WmiHandler(BaseHandler):
         task = self.newTask('Polling', WMI_TASK_POLLING, args, zone=self.zone)
         return self._handleTask(task)
 
-    @exposed
+    @bfp.exposed
     def update(self):
         self.setStatus(103, "Creating task")
 
@@ -135,7 +132,7 @@ class WmiHandler(BaseHandler):
         return self._handleTask(task)
 
 
-class WMITaskHandler(BaseTaskHandler):
+class WMITaskHandler(bfp.BaseTaskHandler):
     def run(self):
         """
         Exception handing for the _run method doing the real work
