@@ -133,6 +133,11 @@ class RepeaterClient(object):
         return self._cimCallDispatcher(method, cimParams, resultsLocation, zone,
             sources=sources)
 
+    def update_wmi(self, wmiParams, resultsLocation=None, zone=None, sources=None):
+        method = 'update'
+        return self._wmiCallDispatcher(method, wmiParams, resultsLocation, zone,
+            sources=sources)
+
     def retireNode(self, node, zone, port = None):
         """ This is a temporary large hammer for handling the retirement
             of a management node.
@@ -208,18 +213,24 @@ def main():
     system = sys.argv[1]
     zone = 'Local rBuilder'
     cli = RepeaterClient()
+    eventUuid = "0xDeadBeef"
+    resultsLocation = cli.ResultsLocation(path="/adfadf", port=1234)
+    cimParams = cli.CimParams(host=system,
+        eventUuid=eventUuid,
+        #requiredNetwork="1.1.1.1",
+        #clientCert=file("/tmp/reinhold.crt").read(),
+        #clientKey=file("/tmp/reinhold.key").read(),
+        zone=zone,
+    )
+    wmiParams = cli.WmiParams(host=system, port=135,
+        eventUuid = '0xfeedbeaf',
+        username="Administrator",
+        password="password",
+        domain=system)
     if 0:
-        uuid, job = cli.register(
-            cli.CimParams(host=system),
-            #requiredNetwork="1.1.1.1",
-            zone=zone)
+        uuid, job = cli.register(cimParams)
     elif 0:
-        uuid, job = cli.poll(
-            cli.CimParams(host=system, eventUuid="unique uuid",
-#              clientCert=file("/tmp/reinhold.crt").read(),
-#              clientKey=file("/tmp/reinhold.key").read(),
-            ),
-            cli.ResultsLocation(path="/adfadf", port=1234),
+        uuid, job = cli.poll(cimParams, resultsLocation=resultsLocation,
             zone=zone)
     elif 0:
         _P = cli.ManagementInterfaceParams
@@ -228,27 +239,25 @@ def main():
             _P('/api/inventory/management_interfaces/1', system, 5989),
         ]
         uuid, job = cli.detectMgmtInterface(plist,
-            resultsLocation = cli.ResultsLocation(path="/adfadf", port=1234),
-            eventUuid = '0xfeedbeaf',
+            resultsLocation = resultsLocation,
+            eventUuid = eventUuid,
             zone = zone)
     elif 0:
-        uuid, job = cli.register_wmi(
-            cli.WmiParams(host=system, port=135,
-                eventUuid = '0xfeedbeaf',
-                username="Administrator",
-                password="password",
-                domain=system),
-            resultsLocation = cli.ResultsLocation(path="/adfadf", port=1234),
+        uuid, job = cli.register_wmi(wmiParams,
+            resultsLocation = resultsLocation,
             zone=zone)
+    elif 0:
+        uuid, job = cli.poll_wmi(wmiParams,
+            resultsLocation = resultsLocation,
+            zone = zone)
     else:
-        uuid, job = cli.poll_wmi(
-            cli.WmiParams(host=system, port=135,
-                eventUuid = '0xfeedbeaf',
-                username="Administrator",
-                password="password",
-                domain=system),
-            resultsLocation = cli.ResultsLocation(path="/adfadf", port=1234),
-            zone=zone)
+        uuid, job = cli.update_wmi(wmiParams,
+            resultsLocation = resultsLocation,
+            zone = zone,
+            sources = [
+                'group-windemo-appliance=/windemo.eng.rpath.com@rpath:windemo-1-devel/123:1-3-1',
+            ],
+            )
     while 1:
         job = cli.getJob(uuid)
         if job.status.final:

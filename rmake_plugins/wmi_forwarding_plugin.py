@@ -265,7 +265,7 @@ class UpdateTask(WMITaskHandler):
         try:
             wc = windowsUpdate.wmiClient( data.p.host, data.p.domain,
                                           data.p.username, data.p.password)
-            windowsUpdate.doUpdate(wc, data.p.sources)
+            windowsUpdate.doUpdate(wc, data.sources)
             children = self._getUuids(wc)
             children.append(self._getSoftwareVersions(wc))
         finally:
@@ -273,5 +273,6 @@ class UpdateTask(WMITaskHandler):
 
         el = XML.Element("system", *children)
 
-        self.setData(el.toxml(encoding="UTF-8"))
+        data.response = XML.toString(el)
+        self.setData(data)
         self.sendStatus(200, "Host %s has been updated" % data.p.host)
