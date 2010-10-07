@@ -42,7 +42,9 @@ class InterfaceDetectionForwardPlugin(BaseForwardingPlugin):
         handler.registerHandler(InterfaceDetectionHandler)
 
     def worker_get_task_types(self):
-        return {INTERFACE_DETECT_TASK: DetectInterfaceTask, }
+        return {
+            INTERFACE_DETECT_TASK: DetectInterfaceTask,
+        }
 
 
 class InterfaceDetectionHandler(BaseHandler):

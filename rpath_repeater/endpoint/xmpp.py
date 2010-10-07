@@ -11,21 +11,20 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 
-from jabberlink.client import LinkClient
-from jabberlink.cred import XmppClientCredentials
-from jabberlink import message
-
-from rpath_repeater.endpoint import interfaces
-
+from zope.interface import implements
 from twisted.application import service
 
-from zope.interface import implements
+from jabberlink import message
+from jabberlink.client import LinkClient
+from jabberlink.cred import XmppClientCredentials
+
+from rpath_repeater.endpoint import interfaces
 
 NS = 'http://rpath.com/permanent/xmpp/repeater-1.0'
 
 class RepeaterMessageHandler(message.MessageHandler):
     namespace = NS
-    
+
     def __init__(self, repeater):
         self.repeater = repeater
 
@@ -34,84 +33,93 @@ class RepeaterMessageHandler(message.MessageHandler):
 
         header = eval(rows[0])
         body = "".join(rows[1:])
-        
+
         if self.repeater:
             response = self.repeater.dispatch(header['method'],
                          header['url'], body, 
                          {'X-rpathManagementNetworkNode': header['endpoint']})
-            headers = {'status':response.status, 'headers':response.getheaders()}
+
+            headers = {
+                'status': response.status,
+                'headers': response.getheaders()
+            }
+
             reply = "%s\n%s" % (headers, response.read())
-        
-            neighbor.send(message.Message(self.namespace, reply, in_reply_to=msg))
+
+            neighbor.send(message.Message(self.namespace, reply,
+                in_reply_to=msg))
         else:
             raise
 
+
 class RepeaterLinkClient(LinkClient):
-    
-    def __init__(self, domain, creds, handlers=None, resource = "rPathManagementNetwork"):
+    def __init__(self, domain, creds, handlers=None,
+        resource="rPathManagementNetwork"):
+
         self.resource = resource
         super(RepeaterLinkClient,self).__init__(domain, creds, handlers)
-        
-           
+
     def onNeighborDown(self, jid):
         print "we lost %s" % jid
-        
+
     def onNeighborUp(self, jid):
-        print "%s is back in business" % jid    
+        print "%s is back in business" % jid 
 
 class EndPointXMPPService(service.Service):
     implements(interfaces.IRepeaterPublishService)
-    
+
     def __init__(self, cfg):
         self.cfg = cfg
-       
+
         creds = XmppClientCredentials(cfg.credentialPath)
-        
+
         if self.cfg.xmppUser:
             creds.set(self.cfg.xmppUser, self.cfg.xmppDomain, self.cfg.xmppUser)
-        
+
         self.client = RepeaterLinkClient(cfg.xmppDomain, creds)
         self.client.logTraffic = True
- 
+
         self.addNeighbors(self.cfg.neighbors)
-        
-        self.client.startService()  
+
+        self.client.startService()
 
         self.sender = creds.get(cfg.xmppDomain)[0]
         self.recipient = self.cfg.neighbors[0]
-        
+
     def addNeighbors(self, neighbors):
         if neighbors:
             for idx, neighbor in enumerate(neighbors):
                 if self.cfg.repeaterHub and idx == 0:
-                    self.client.connectNeighbor(neighbor)      
+                    self.client.connectNeighbor(neighbor)
                 else:
                     self.client.listenNeighbor(neighbor)
-        
+
     def addMessageHandler(self, messageHandler):
         self.client.link.addMessageHandler(messageHandler)
-             
+
     def sendMsg(self, request, method, recipient = None):
         request.content.seek(0, 0)
         msg = request.content.read()
-        
-        headers = {'url':request.uri,
-                   'sender':self.sender,
-                   'method':method.upper(), 
-                   'endpoint':self.cfg.xmppUsername}
-        
+
+        headers = {
+            'url': request.uri,
+            'sender': self.sender,
+            'method': method.upper(),
+            'endpoint': self.cfg.xmppUsername
+        }
+
         msg = "%s\n%s" % (headers, msg)
         msg = message.Message(NS, msg)
-        
+
         if not recipient:
             recipient = self.recipient
-        
+
         d = self.client.link.sendWithDeferred(recipient, msg)
-        
+
         @d.addCallback
         def on_reply(replies):
             for reply in replies:
-                rows = reply.payload.split('\n')     
+                rows = reply.payload.split('\n')
                 header = eval(rows[0])
                 body = "".join(rows[1:])
 
@@ -119,5 +127,5 @@ class EndPointXMPPService(service.Service):
                 if body:
                     request.write(body)
                 request.finish()
-        
+
         return d

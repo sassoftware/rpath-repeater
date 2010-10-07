@@ -11,43 +11,39 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 
+from twisted.web import server
+from twisted.web import resource
+from twisted.python import components
+
 from rpath_repeater.endpoint import interfaces
 
-from twisted.python import components
-from twisted.web import resource, server
-
 class EndPoint(resource.Resource):
-    """ """
-    
     isLeaf=True
-    
+
     def __init__(self, service):
 
         resource.Resource.__init__(self)
         self.service = service
-        
+
     def render_GET(self, request):
-        
-        self.service.sendMsg(request, 'GET')        
+        self.service.sendMsg(request, 'GET')
         return server.NOT_DONE_YET
-        
+
     def render_POST(self, request):
         self.service.sendMsg(request, 'POST')
         return server.NOT_DONE_YET
-    
+
     def render_PUT(self, request):
 
         self.service.sendMsg(request, 'PUT')
         return server.NOT_DONE_YET
-    
-    def render_DELETE(self, request):
 
+    def render_DELETE(self, request):
         self.service.sendMsg(request, 'DELETE')
         return server.NOT_DONE_YET
-        
+
     def getChild(self, path, request):
-        
         return self
-        
+
 components.registerAdapter(EndPoint, interfaces.IRepeaterPublishService,
                            resource.IResource)

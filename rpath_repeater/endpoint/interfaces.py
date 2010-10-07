@@ -14,6 +14,5 @@
 from zope.interface import Interface
 
 class IRepeaterPublishService(Interface):
-    
     def sendMsg(self, endpoint, msg, headers):
         """Transfer the message over the desired channel"""

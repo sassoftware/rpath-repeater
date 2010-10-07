@@ -11,15 +11,18 @@
 # full details.
 #
 
-import sys, time
+import sys
+import time
+
 from rmake3.client import RmakeClient
 from rmake3.lib import uuid as RmakeUuid
-from rmake3.core.types import RmakeJob, SlotCompare
+
+from rmake3.core.types import RmakeJob
+from rmake3.core.types import SlotCompare
 
 from rpath_repeater.utils.immutabledict import FrozenImmutableDict
 
 class RepeaterClient(object):
-    
     __CIM_PLUGIN_NS = 'com.rpath.sputnik.cimplugin'
     __LAUNCH_PLUGIN_NS = 'com.rpath.sputnik.launchplugin'
     __PRESENCE_PLUGIN_NS = 'com.rpath.sputnik.presence'
@@ -96,7 +99,7 @@ class RepeaterClient(object):
             of a management node.
         """
         return self.shutdown(node, zone, port)
-    
+
     def getNodes(self):
         return self.client.getWorkerList()
 
@@ -129,6 +132,7 @@ class RepeaterClient(object):
     def getJob(self, uuid):
         return self.client.getJob(uuid).thaw()
 
+
 def main():
     if len(sys.argv) < 2:
         print "Usage: %s system" % sys.argv[0]
@@ -156,6 +160,6 @@ def main():
         time.sleep(1)
     print "Failed: %s" % job.status.failed
     #import epdb; epdb.st()
- 
+
 if __name__ == "__main__":
     main()

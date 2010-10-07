@@ -17,19 +17,30 @@ import StringIO
 
 from conary.lib.formattrace import formatTrace
 
-from rmake3.core import handler
 from rmake3.core import types
+from rmake3.core import handler
 
 from rpath_repeater import windowsUpdate
-from rpath_repeater.utils import nodeinfo, wmiupdater
-from rpath_repeater.utils.base_forwarding_plugin import PREFIX, BaseHandler, \
-    BaseTaskHandler, BaseForwardingPlugin, XML, exposed
+from rpath_repeater.utils import nodeinfo
+from rpath_repeater.utils import wmiupdater
+from rpath_repeater.utils.base_forwarding_plugin import XML
+from rpath_repeater.utils.base_forwarding_plugin import PREFIX
+from rpath_repeater.utils.base_forwarding_plugin import exposed
+from rpath_repeater.utils.base_forwarding_plugin import BaseHandler
+from rpath_repeater.utils.base_forwarding_plugin import BaseTaskHandler
+from rpath_repeater.utils.base_forwarding_plugin import BaseForwardingPlugin
 
 WMI_JOB = PREFIX + '.wmiplugin'
 WMI_TASK_REGISTER = PREFIX + '.register'
 WMI_TASK_SHUTDOWN = PREFIX + '.shutdown'
 WMI_TASK_POLLING = PREFIX + '.poll'
 WMI_TASK_UPDATE = PREFIX + '.update'
+
+WmiParams = types.slottype('WmiParams',
+    'host port user password domain eventUuid')
+# These are just the starting point attributes
+WmiData = types.slottype('WmiData', 'p response')
+UpdateData = types.slottype('UpdateData', 'p sources response')
 
 class WmiForwardingPlugin(BaseForwardingPlugin):
 
@@ -38,21 +49,19 @@ class WmiForwardingPlugin(BaseForwardingPlugin):
 
     def worker_get_task_types(self):
         return {
-                WMI_TASK_REGISTER: RegisterTask,
-                WMI_TASK_SHUTDOWN: ShutdownTask,
-                WMI_TASK_POLLING: PollingTask,
-                WMI_TASK_UPDATE: UpdateTask,
-                WMI_TASK_SHUTDOWN: ShutdownTask,
-                }
+            WMI_TASK_REGISTER: RegisterTask,
+            WMI_TASK_SHUTDOWN: ShutdownTask,
+            WMI_TASK_POLLING: PollingTask,
+            WMI_TASK_UPDATE: UpdateTask,
+            WMI_TASK_SHUTDOWN: ShutdownTask,
+        }
+
 
 class WmiHandler(BaseHandler):
-
     timeout = 7200
 
     jobType = WMI_JOB
     firstState = 'wmiCall'
-
-    X_Event_Uuid_Header = 'X-rBuilder-Event-UUID'
 
     def setup (self):
         BaseHandler.setup()
@@ -124,14 +133,7 @@ class WmiHandler(BaseHandler):
         return self._handleTask(task)
 
 
-WmiParams = types.slottype('WmiParams',
-    'host port user password domain eventUuid')
-# These are just the starting point attributes
-WmiData = types.slottype('WmiData', 'p response')
-UpdateData = types.slottype('UpdateData', 'p sources response')
-
 class WMITaskHandler(BaseTaskHandler):
-
     def run(self):
         """
         Exception handing for the _run method doing the real work
@@ -182,7 +184,6 @@ class WMITaskHandler(BaseTaskHandler):
 
 
 class RegisterTask(WMITaskHandler):
-
     def _run(self, data):
         self.sendStatus(104, "Contacting host %s validate credentials" % (
             data.p.host, ))
@@ -195,14 +196,14 @@ class RegisterTask(WMITaskHandler):
         if not rc:
             self.sendStatus(200, "Registration Complete for %s" % data.p.host)
 
-class ShutdownTask(WMITaskHandler):
 
+class ShutdownTask(WMITaskHandler):
     def _run(self, data):
         self.sendStatus(401, "Shutting down Windows System %s is not supported"
                         % (data.p.host))
 
-class PollingTask(WMITaskHandler):
 
+class PollingTask(WMITaskHandler):
     def _run(self, data):
         self.sendStatus(101, "Contacting host %s to Poll it for info" % (
             data.p.host))
@@ -216,8 +217,8 @@ class PollingTask(WMITaskHandler):
         self.setData(el.toxml(encoding="UTF-8"))
         self.sendStatus(200, "Host %s has been polled" % data.p.host)
 
-class UpdateTask(WMITaskHandler):
 
+class UpdateTask(WMITaskHandler):
     def _run(self, data):
         self.sendStatus(101, "Contacting host %s on port %d to update it" % (
             data.p.host, data.p.port))

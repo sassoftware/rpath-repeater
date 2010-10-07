@@ -2,6 +2,16 @@
 #
 # Copyright (c) 2009 rPath, Inc.
 #
+# This program is distributed under the terms of the Common Public License,
+# version 1.0. A copy of this license should have been distributed with this
+# source file in a file called LICENSE. If it is not present, the license
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
+#
+# This program is distributed in the hope that it will be useful, but
+# without any warranty; without even the implied warranty of merchantability
+# or fitness for a particular purpose. See the Common Public License for
+# full details.
+#
 
 import time
 
@@ -75,12 +85,14 @@ class CIMUpdater(object):
         return self._elementSoftwareStatusValues
     elementSoftwareStatusValues = property(_getSoftwareElementStatusValues)
 
-    def _unexpectedReturnCode(self, CIMClassName, methodName, returnCode, expectedReturnCode):
+    def _unexpectedReturnCode(self, CIMClassName, methodName, returnCode,
+        expectedReturnCode):
+
         returnCodes = self.server.getMethodReturnCodes(CIMClassName, methodName)
         returnMsg = returnCodes[str(returnCode)]
         raise wbemlib.WBEMUnexpectedReturnException(
             expectedReturnCode, returnCode, returnMsg)
-        
+
     def isJobComplete(self, instance):
         jobState = instance.properties['JobState'].value
         # Any state >= 7 (Completed) is final
@@ -102,7 +114,8 @@ class CIMUpdater(object):
         while time.time() < timeEnd:
             instance = self.server.GetInstance(job)
             jobCompleted, instance = self.isJobComplete(instance)
-            print "jobCompleted", jobCompleted, instance.properties['JobState'].value
+            print ("jobCompleted", jobCompleted,
+                instance.properties['JobState'].value)
             if jobCompleted:
                 return instance
             time.sleep(1)
@@ -163,7 +176,8 @@ class CIMUpdater(object):
         if not self.isJobSuccessful(job):
             error = self.server.getError(job)
             self.log_error(error)
-            raise RuntimeError("Error while applying updates. The error from the managed system was: %s" % error)
+            raise RuntimeError('Error while applying updates. The error from '
+                'the managed system was: %s' % error)
 
     def checkAndApplyUpdate(self, timeout = DEFAULT_TIMEOUT):
         job = self.updateCheck(timeout = timeout)
@@ -177,7 +191,8 @@ class CIMUpdater(object):
         if not self.isJobSuccessful(job):
             error = self.server.getError(job)
             self.log_error(error)
-            raise RuntimeError("Error while applying updates. The error from the managed system was: %s" % error)
+            raise RuntimeError('Error while applying updates. The error from '
+                'the managed system was: %s' % error)
 
     def log_error(self, error):
         if self.logger:

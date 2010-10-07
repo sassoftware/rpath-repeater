@@ -12,18 +12,20 @@
 # full details.
 #
 
-from rmake3.core.types import freezify, SlotCompare
+from rmake3.core.types import freezify
+from rmake3.core.types import SlotCompare
 
-class ImmutableDict(SlotCompare):   
+class ImmutableDict(SlotCompare):
     """
     An immutable dictionary.
     """
+
     __slots__ = ('data',)
-    
+
     def __init__(self, d):
         if isinstance(d, dict):
             self.data = tuple(d.items())
-    
+
     def getDict(self):
         return dict(self.data)
 

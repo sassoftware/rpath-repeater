@@ -13,17 +13,17 @@
 #
 
 import tempfile
-
 from xml.dom import minidom
-from conary import conaryclient
+
 from conary import versions
+from conary import conaryclient
 
 from twisted.web import client
 from twisted.internet import reactor
 
+from rmake3.core import types
 from rmake3.core import handler
 from rmake3.core import plug_dispatcher
-from rmake3.core import types
 from rmake3.worker import plug_worker
 
 PREFIX = 'com.rpath.sputnik'
@@ -45,7 +45,8 @@ def exposed(func):
 
 
 class Options(object):
-    __slots__ = [ 'exposed', ]
+    __slots__ = ('exposed', )
+
     def __init__(self):
         self.exposed = set()
 
@@ -228,6 +229,7 @@ class XML(object):
     def _Node(cls, tagName, factory):
         node = factory(tagName)
         return node
+
 
 class HTTPClientFactory(client.HTTPClientFactory):
     def __init__(self, url, *args, **kwargs):

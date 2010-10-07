@@ -12,15 +12,17 @@
 # full details.
 #
 
-import itertools, os, sys, tempfile, popen2, time
-from lxml import etree
-from lxml.builder import ElementMaker
-from conary.lib import util
-sys.excepthook = util.genExcepthook(debug=True)
+import os
+import time
+import popen2
+import tempfile
+import itertools
 
-from conary import conarycfg, conaryclient
-from conary.conaryclient import modelupdate, systemmodel
 from conary.lib import log
+from conary import conarycfg
+from conary import conaryclient
+from conary.conaryclient import systemmodel
+
 log.setVerbosity(log.INFO)
 
 def runModel(client, cache, modelText):
@@ -55,25 +57,29 @@ def modelsToJobs(cache, client, oldModel, newModel):
 
     return oldTroves, newTroves
 
-class wmiClient:
+
+class wmiClient(object):
     def __init__(self, target, domain, user, password):
-        self.baseCmd = '/usr/bin/wmic --host %(host)s --user %(user)s --password %(password)s --domain %(domain)s' % {'host': target, 'user': user, 'password':password, 'domain': (domain or target)}
-        self.mountCmd = "/bin/mount -t cifs -o user=%s,password=%s '//%s/c$' "\
-            % (user,password,target)
+        self.baseCmd = ('/usr/bin/wmic --host %(host)s --user %(user)s '
+            '--password %(password)s --domain %(domain)s' % {'host': target,
+            'user': user, 'password':password, 'domain': (domain or target)})
+
+        self.mountCmd = ("/bin/mount -t cifs -o user=%s,password=%s '//%s/c$' "
+            % (user,password,target))
 
         self._rootDir = None
         self._rootMounted = False
 
     def unmount(self):
         # unmount and delete the root file system
-	if self._rootDir and self._rootMounted:
+        if self._rootDir and self._rootMounted:
             os.system('/bin/umount ' + self._rootDir)
             os.rmdir(self._rootDir)
             self._rootMounted = False
 
     def _wmiCall(self, cmd):
         p = popen2.Popen3(cmd,True)
-	rc = p.wait()
+        rc = p.wait()
 
         if rc:
             return rc, p.childerr.read()
@@ -94,8 +100,8 @@ class wmiClient:
 
     def waitForServiceToStop(self, service):
         # query the service until is is no longer active
-        while self.queryService('rPath Tools Install Service')[1] \
-                != 'Service Not Active\n':
+        while (self.queryService('rPath Tools Install Service')[1]
+            != 'Service Not Active\n'):
             time.sleep(5.0)
 
     def getRegistryKey(self, keyPath, key):
@@ -138,8 +144,11 @@ def getConaryClient():
     cfg.dbPath = ':memory:'
 
     # HACK, FIX ME!
-    cfg.configLine('repositoryMap windemo.eng.rpath.com http://rbatrunk.eng.rpath.com/repos/windemo/')
-    cfg.configLine('repositoryMap windows.rpath.com https://windows.eng.rpath.com/conary/')
-    cfg.configLine('repositoryMap omni-components.eng.rpath.com http://rbatrunk.eng.rpath.com/repos/omni-components/')
+    cfg.configLine('repositoryMap windemo.eng.rpath.com '
+        'http://rbatrunk.eng.rpath.com/repos/windemo/')
+    cfg.configLine('repositoryMap windows.rpath.com '
+        'https://windows.eng.rpath.com/conary/')
+    cfg.configLine('repositoryMap omni-components.eng.rpath.com '
+        'http://rbatrunk.eng.rpath.com/repos/omni-components/')
     cfg.configLine('installLabelPath windows.rpath.com@rpath:windows-common')
     return conaryclient.ConaryClient(cfg = cfg)

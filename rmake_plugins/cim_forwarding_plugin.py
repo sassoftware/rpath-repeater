@@ -17,12 +17,18 @@ import StringIO
 
 from conary.lib.formattrace import formatTrace
 
-from rmake3.core import handler
 from rmake3.core import types
+from rmake3.core import handler
 
-from rpath_repeater.utils import nodeinfo, wbemlib, cimupdater
-from rpath_repeater.utils.base_forwarding_plugin import BaseHandler, \
-    BaseTaskHandler, BaseForwardingPlugin, XML, exposed
+from rpath_repeater.utils import wbemlib
+from rpath_repeater.utils import nodeinfo
+from rpath_repeater.utils import cimupdater
+
+from rpath_repeater.utils.base_forwarding_plugin import XML
+from rpath_repeater.utils.base_forwarding_plugin import exposed
+from rpath_repeater.utils.base_forwarding_plugin import BaseHandler
+from rpath_repeater.utils.base_forwarding_plugin import BaseTaskHandler
+from rpath_repeater.utils.base_forwarding_plugin import BaseForwardingPlugin
 
 PREFIX = 'com.rpath.sputnik'
 CIM_JOB = PREFIX + '.cimplugin'
@@ -31,19 +37,26 @@ CIM_TASK_SHUTDOWN = PREFIX + '.shutdown'
 CIM_TASK_POLLING = PREFIX + '.poll'
 CIM_TASK_UPDATE = PREFIX + '.update'
 
-class CimForwardingPlugin(BaseForwardingPlugin):
+CimParams = types.slottype('CimParams',
+    'host port clientCert clientKey eventUuid instanceId targetName targetType')
+# These are just the starting point attributes
+CimData = types.slottype('CimData', 'p response')
+RactivateData = types.slottype('RactivateData',
+        'p nodes requiredNetwork response')
+UpdateData = types.slottype('UpdateData', 'p sources response')
 
+class CimForwardingPlugin(BaseForwardingPlugin):
     def dispatcher_pre_setup(self, dispatcher):
         handler.registerHandler(CimHandler)
 
     def worker_get_task_types(self):
         return {
-                CIM_TASK_REGISTER: RegisterTask,
-                CIM_TASK_SHUTDOWN: ShutdownTask,
-                CIM_TASK_POLLING: PollingTask,
-                CIM_TASK_UPDATE: UpdateTask,
-                CIM_TASK_SHUTDOWN: ShutdownTask,
-                }
+            CIM_TASK_REGISTER: RegisterTask,
+            CIM_TASK_SHUTDOWN: ShutdownTask,
+            CIM_TASK_POLLING: PollingTask,
+            CIM_TASK_UPDATE: UpdateTask,
+            CIM_TASK_SHUTDOWN: ShutdownTask,
+        }
 
 
 class CimHandler(BaseHandler):
@@ -125,16 +138,8 @@ class CimHandler(BaseHandler):
         task = self.newTask('Update', CIM_TASK_UPDATE,args, zone=self.zone)
         return self._handleTask(task)
 
-CimParams = types.slottype('CimParams',
-    'host port clientCert clientKey eventUuid instanceId targetName targetType')
-# These are just the starting point attributes
-CimData = types.slottype('CimData', 'p response')
-RactivateData = types.slottype('RactivateData',
-        'p nodes requiredNetwork response')
-UpdateData = types.slottype('UpdateData', 'p sources response')
 
 class CIMTaskHandler(BaseTaskHandler):
-
     def getWbemConnection(self, data):
         x509Dict = {}
         if None not in [ data.p.clientCert, data.p.clientKey ]:
@@ -205,10 +210,9 @@ class CIMTaskHandler(BaseTaskHandler):
 
 
 class RegisterTask(CIMTaskHandler):
-
     def _run(self, data):
-        self.sendStatus(104, "Contacting host %s on port %d to rActivate itself" % (
-            data.p.host, data.p.port))
+        self.sendStatus(104, "Contacting host %s on port %d to rActivate itself"
+            % (data.p.host, data.p.port))
 
         #send CIM rActivate request
         server = self.getWbemConnection(data)
@@ -233,8 +237,8 @@ class RegisterTask(CIMTaskHandler):
             self.sendStatus(451, "Host %s registration failed: %s" %
                 (data.p.host, errorSummary), errorDetails)
 
-class ShutdownTask(CIMTaskHandler):
 
+class ShutdownTask(CIMTaskHandler):
     def _run(self, data):
         self.sendStatus(101, "Contacting host %s to shut itself down" % (
             data.p.host))
@@ -251,11 +255,11 @@ class ShutdownTask(CIMTaskHandler):
         else:
             self.sendStatus(401, "Could not shutdown host %s" % data.p.host)
 
-class PollingTask(CIMTaskHandler):
 
+class PollingTask(CIMTaskHandler):
     def _run(self, data):
-        self.sendStatus(101, "Contacting host %s on port %d to Poll it for info" % (
-            data.p.host, data.p.port))
+        self.sendStatus(101, "Contacting host %s on port %d to Poll it for info"
+            % (data.p.host, data.p.port))
 
         server = self.getWbemConnection(data)
         children = self._getUuids(server)
@@ -268,8 +272,8 @@ class PollingTask(CIMTaskHandler):
         self.setData(data)
         self.sendStatus(200, "Host %s has been polled" % data.p.host)
 
-class UpdateTask(CIMTaskHandler):
 
+class UpdateTask(CIMTaskHandler):
     def _run(self, data):
         self.sendStatus(101, "Contacting host %s on port %d to update it" % (
             data.p.host, data.p.port))

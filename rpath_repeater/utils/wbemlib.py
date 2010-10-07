@@ -2,8 +2,19 @@
 #
 # Copyright (c) 2009 rPath, Inc.
 #
+# This program is distributed under the terms of the Common Public License,
+# version 1.0. A copy of this license should have been distributed with this
+# source file in a file called LICENSE. If it is not present, the license
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
+#
+# This program is distributed in the hope that it will be useful, but
+# without any warranty; without even the implied warranty of merchantability
+# or fitness for a particular purpose. See the Common Public License for
+# full details.
+#
 
 import inspect
+
 import pywbem
 
 class WBEMException(Exception):
@@ -12,8 +23,11 @@ class WBEMException(Exception):
     '''
     pass
 
+
 class WBEMUnexpectedReturnException(WBEMException):
-    def __init__(self, expectedReturnCode, returnCode, returnMsg, *args, **kwargs):
+    def __init__(self, expectedReturnCode, returnCode, returnMsg, *args,
+        **kwargs):
+
         self.expectedReturnCode = expectedReturnCode
         self.returnCode = returnCode
         self.returnMsg = returnMsg
@@ -21,7 +35,9 @@ class WBEMUnexpectedReturnException(WBEMException):
 
     def __str__(self):
         return "Expected return code %s, got %s: %s" % \
-            (str(self.expectedReturnCode), str(self.returnCode), str(self.returnMsg))
+            (str(self.expectedReturnCode), str(self.returnCode),
+             str(self.returnMsg))
+
 
 class WBEMConnection(pywbem.WBEMConnection):
     '''
@@ -52,6 +68,7 @@ class WBEMConnection(pywbem.WBEMConnection):
 
         return func(self, *args, **kw)
 
+
 class _CallableMethod(object):
     '''
     Class to implement a __call__ method so that we can call CIM methods in a
@@ -74,6 +91,7 @@ class _CallableMethod(object):
 
     def __call__(self, *args, **kw):
         return self._send(self._CIMClassName, self._name, *args, **kw)
+
 
 class WBEMServer(object):
     '''
@@ -125,7 +143,8 @@ class WBEMServer(object):
 
     def _normalizeValueMap(self, values, valueMap):
         valuesDict = {}
-        valuePairs = [(valueMap.pop(), values.pop()) for x in xrange(len(values))]
+        valuePairs = [(valueMap.pop(), values.pop())
+            for x in xrange(len(values))]
         for k, v in valuePairs:
             valuesDict[k] = v
         return valuesDict
@@ -148,7 +167,7 @@ class WBEMServer(object):
         returnCode, error = self.GetError(job.path)
 
         if returnCode != 0:
-            raise WBEMUnexpectedReturnException(0, returnCode, 
+            raise WBEMUnexpectedReturnException(0, returnCode,
                 "Error calling GetError.")
 
-        return error['Error'].properties['Message'].value              
+        return error['Error'].properties['Message'].value

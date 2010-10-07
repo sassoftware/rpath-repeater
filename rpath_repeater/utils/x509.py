@@ -1,14 +1,15 @@
 #
 # Copyright (c) 2008-2009 rPath, Inc.  All Rights Reserved.
 #
+
 "Simple module for generating x509 certificates"
 
 import os
 import tempfile
+
 from rmake.lib import gencert
 
 class X509(object):
-
     class Options(object):
         __slots__ = ['C', 'ST', 'L', 'O', 'OU', 'CN', 'site_user',
                      'key_length', 'expiry', 'output', 'output_key']

@@ -18,36 +18,40 @@ import StringIO
 
 from conary.lib.formattrace import formatTrace
 
+from rmake3.core import types
 from rmake3.core import handler
 from rmake3.core import plug_dispatcher
-from rmake3.core import types
+
 from rmake3.worker import plug_worker
 
 from catalogService import storage
 from catalogService.rest.database import RestDatabase
 
-from mint import config
 from mint import users
+from mint import config
 from mint.db import database
-from mint.django_rest.rbuilder.inventory import models
 from mint.rest.db import authmgr
+from mint.django_rest.rbuilder.inventory import models
 
 PREFIX = 'com.rpath.sputnik'
 LAUNCH_JOB = PREFIX + '.launchplugin'
 LAUNCH_TASK_WAIT_FOR_NETWORK = PREFIX + '.waitForNetwork'
 
-class LaunchPlugin(plug_dispatcher.DispatcherPlugin, plug_worker.WorkerPlugin):
+CimParams = types.slottype('CimParams',
+    'host port clientCert clientKey eventUuid instanceId targetName targetType')
+LaunchData = types.slottype('LaunchData', 'p response')
 
+class LaunchPlugin(plug_dispatcher.DispatcherPlugin, plug_worker.WorkerPlugin):
     def dispatcher_pre_setup(self, dispatcher):
         handler.registerHandler(LaunchHandler)
 
     def worker_get_task_types(self):
         return {
-                LAUNCH_TASK_WAIT_FOR_NETWORK: WaitForNetworkTask
-                }     
+            LAUNCH_TASK_WAIT_FOR_NETWORK: WaitForNetworkTask,
+        }
+
 
 class LaunchHandler(handler.JobHandler):
-
     timeout = 7200
 
     jobType = LAUNCH_JOB
@@ -104,9 +108,6 @@ class LaunchHandler(handler.JobHandler):
             "available for instance %s" % self.cimParams.instanceId)
         return 'waitForNetwork'
 
-CimParams = types.slottype('CimParams',
-    'host port clientCert clientKey eventUuid instanceId targetName targetType')
-LaunchData = types.slottype('LaunchData', 'p response')
 
 class WaitForNetworkTask(plug_worker.TaskHandler):
     TemporaryDir = "/dev/shm"
@@ -202,22 +203,23 @@ class WaitForNetworkTask(plug_worker.TaskHandler):
 
         if setDnsName:
             mgr.scheduleSystemRegistrationEvent(system)
-            response = \
-                "dns name for %s updated to %s.  Scheduled registration event" % (instanceId, dnsName) 
+            response = ("dns name for %s updated to %s.  Scheduled "
+                "registration event" % (instanceId, dnsName))
             data.response = response
             self.setData(data)
             self.sendStatus(200, response)
         elif hasDnsName:
-            response = "dns name for %s became avaiable. no longer checking target"  % instanceId
+            response = ("dns name for %s became avaiable. no longer checking "
+                "target"  % instanceId)
             data.response = response
             self.setData(data)
             self.sendStatus(200, response)
         else:
-            response = "timed out waiting for dns name for instance %s" % instanceId
+            response = ("timed out waiting for dns name for instance %s"
+                % instanceId)
             data.response = response
             self.setData(data)
             self.sendStatus(451, response)
-
 
     def run(self):
         """
