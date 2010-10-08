@@ -130,7 +130,7 @@ class RepeaterClient(object):
 
     def shutdown_wmi(self, cimParams, resultsLocation=None, zone=None):
         method = 'shutdown'
-        raise NotImplementedError()
+        raise NotImplementedError(method)
 
     def update_cim(self, cimParams, resultsLocation=None, zone=None, sources=None):
         method = 'update'
