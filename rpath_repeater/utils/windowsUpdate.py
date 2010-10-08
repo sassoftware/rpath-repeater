@@ -154,6 +154,8 @@ def getConaryClient():
         'https://windows.eng.rpath.com/conary/')
     cfg.configLine('repositoryMap omni-components.eng.rpath.com '
         'http://rbatrunk.eng.rpath.com/repos/omni-components/')
+    cfg.configLine('repositoryMap murfdemo.eng.rpath.com '
+        'http://rbatrunk.eng.rpath.com/repos/murfdemo/')
     cfg.configLine('installLabelPath windows.rpath.com@rpath:windows-common')
     return conaryclient.ConaryClient(cfg = cfg)
 
