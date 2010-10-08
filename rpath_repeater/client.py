@@ -112,7 +112,7 @@ class RepeaterClient(object):
         params['wmiParams'] = wmiParams.toDict()
         return self._launchRmakeJob(self.__WMI_PLUGIN_NS, params)
 
-    def register(self, cimParams, resultsLocation=None, zone=None,
+    def register_cim(self, cimParams, resultsLocation=None, zone=None,
             requiredNetwork=None):
         method = 'register'
         return self._cimCallDispatcher(method, cimParams, resultsLocation, zone,
@@ -124,11 +124,15 @@ class RepeaterClient(object):
         return self._wmiCallDispatcher(method, wmiParams, resultsLocation, zone,
             requiredNetwork=requiredNetwork)
 
-    def shutdown(self, cimParams, resultsLocation=None, zone=None):
+    def shutdown_cim(self, cimParams, resultsLocation=None, zone=None):
         method = 'shutdown'
         return self._cimCallDispatcher(method, cimParams, resultsLocation, zone)
 
-    def update(self, cimParams, resultsLocation=None, zone=None, sources=None):
+    def shutdown_wmi(self, cimParams, resultsLocation=None, zone=None):
+        method = 'shutdown'
+        raise NotImplementedError()
+
+    def update_cim(self, cimParams, resultsLocation=None, zone=None, sources=None):
         method = 'update'
         return self._cimCallDispatcher(method, cimParams, resultsLocation, zone,
             sources=sources)
@@ -147,7 +151,7 @@ class RepeaterClient(object):
     def getNodes(self):
         return self.client.getWorkerList()
 
-    def poll(self, cimParams, resultsLocation=None, zone=None):
+    def poll_cim(self, cimParams, resultsLocation=None, zone=None):
         method = 'polling'
         return self._cimCallDispatcher(method, cimParams, resultsLocation, zone)
 
@@ -225,9 +229,9 @@ def main():
         password="password",
         domain=system)
     if 0:
-        uuid, job = cli.register(cimParams)
+        uuid, job = cli.register_cim(cimParams)
     elif 0:
-        uuid, job = cli.poll(cimParams, resultsLocation=resultsLocation,
+        uuid, job = cli.poll_cim(cimParams, resultsLocation=resultsLocation,
             zone=zone)
     elif 1:
         params = cli.ManagementInterfaceParams(host=system,
