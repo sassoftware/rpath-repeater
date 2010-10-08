@@ -74,6 +74,7 @@ class InterfaceDetectionHandler(bfp.BaseHandler):
         bfp.BaseHandler.initCall(self)
         self.params = self.data.pop('params', None)
         self.interfacesList = self.params.pop('interfacesList', None)
+        self.eventUuid = self.params.pop('eventUuid', None)
 
     def callDetectInterface(self):
         self.setStatus(101, 'Initializing Interface Detection')
