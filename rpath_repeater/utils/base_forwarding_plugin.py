@@ -158,7 +158,7 @@ class BaseHandler(handler.JobHandler):
 
     def _handleTaskCallback(self, task):
         if task.status.failed:
-            self.setStatus(task.status.code, "Failed")
+            self.setStatus(task.status.thaw())
             self.postFailure()
         else:
             self._handleTaskComplete(task)
