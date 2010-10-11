@@ -151,7 +151,7 @@ class WMITaskHandler(bfp.BaseTaskHandler):
 
     def _getSoftwareVersions(self, wmiClient):
         rc, siList = wmiClient.getRegistryKey(r"SOFTWARE\rPath\conary",
-                                              "conary_manifest")
+                                              "polling_manifest")
         siList = [ x.strip() for x in siList.split('\n') ]
         # Start creating the XML document
         troves = [ self._trove(tspec) for tspec in siList if tspec ]

@@ -25,7 +25,7 @@ from lxml.builder import ElementMaker
 from conary import conarycfg
 from conary import conaryclient
 from conary import versions
-from conary.conaryclient import modelupdate, systemmodel
+from conary.conaryclient import modelupdate, systemmodel, cmdline
 
 #log.setVerbosity(log.INFO)
 
@@ -165,22 +165,25 @@ def doUpdate(wc, sources):
 
     client = getConaryClient()
 
+    # see if we have rTIS installed
     rc, status = wc.queryService('rPath Tools Install Service')
     if rc:
         bootstrap=True
     else:
         wc.waitForServiceToStop('rPath Tools Install Service')
-
         if not bootstrap:
             # fetch old manifest
             rc, oldManifest = wc.getRegistryKey(r"SOFTWARE\rPath\conary",
-                                                "conary_manifest")
+                                                "system_manifest")
+            assert(not rc)
+
+            # fetch old sys model
+            rc, oldModel = wc.getRegistryKey(r"SOFTWARE\rPath\conary",
+                                                "system_model")
             assert(not rc)
 
             oldManifest = oldManifest.split('\n')
-            nv = [ s.split('=') for s in oldManifest if s ]
-            nv = [ (t[0],str(versions.ThawVersion(t[1]))) for t in nv ]
-            oldModel = ['install %s=%s' % p for p in nv]
+            oldTrvTups = [cmdline.parseTroveSpec(t) for t in oldManifest if t]
         else:
             oldModel = oldManifest = ''
 
@@ -193,23 +196,19 @@ def doUpdate(wc, sources):
     rtisWinDir = 'C:\\Windows\\RTIS'
     if not os.path.exists(rtisDir):
         os.mkdir(rtisDir)
-    #conaryManifestPath = os.path.join(rtisDir,'conary_manifest')
-    #if os.path.exists(conaryManifestPath):
-    #    oldConaryManifest = open(conaryManifestPath).read()
-    #    oldConaryManifest = oldConaryManifest.split('\n')
-    #    nv = [ s.split('=') for s in oldConaryManifest if s ]
-    #    nv = [ (t[0],str(versions.ThawVersion(t[1]))) for t in nv ]
-    #    oldModel = ['install %s=%s' % p for p in nv]
-    #else:
-    #    oldConaryManifest = ''
-    # determine the new packages to install
+    #rc, _ = wc.setRegistryKey(
+    #    r"SYSTEM\CurrentControlSet\Services\rPath Tools Install Service\Parameters",
+    #    'Root', rtisWinDir)
+    #assert(not rc)
 
+    # determine the new packages to install
     cache = modelupdate.SystemModelTroveCache(
         client.getDatabase(), client.getRepos())
 
-    nv = [ s.split('=') for s in sources if s ]
-    nv = [ (t[0],str(versions.ThawVersion(t[1]))) for t in nv ]
-    newModel = ['install %s=%s' % p for p in nv]
+    newTrvTups = [cmdline.parseTroveSpec(name) for name in sources if name]
+    newModel = ['install %s=%s' % (p[0],[1]) for p in newTrvTups]
+
+    # TODO: set flavors taken from newTroveTups in client.cfg here
     oldTroves, newTroves = modelsToJobs(cache, client, oldModel, newModel)
     newMsiTroves = [x for x in newTroves if x[0].endswith(':msi')]
     oldMsiTroves = [x for x in oldTroves if x[0].endswith(':msi')]
@@ -321,25 +320,10 @@ def doUpdate(wc, sources):
     open(os.path.join(updateDir,'servicing.xml'),'w').write(
             etree.tostring(xmlDoc,pretty_print=True))
 
-    # write the new conary_manifest
-    rc, _ = wc.setRegistryKey(r"SOFTWARE\rPath\conary",
-                              "conary_manifest", sources)
-    #conaryManifestPath = os.path.join(rtisDir,'conary_manifest')
-    #f = open(conaryManifestPath,'w').write(
-    #    '\n'.join([ '%s=%s[%s]' %
-    #      (x[0],str(x[1]),str(x[2])) for x in newTroves]))
-
-    # we're now done with the windows fs
-    wc.unmount()
-
     if bootstrap:
         wc.waitForServiceToStop('rPath Tools Install Service')
 
     # set the registry keys
-    #rc, _ = uc.setRegistryKey(
-    #    r"SYSTEM\CurrentControlSet\Services\rPath Tools Install Service\Parameters",
-    #    'Root', rtisWinDir)
-    #assert(not rc)
     commandValue = ["job=0", "update=%s" % updateBaseDir]
     rc, _ = wc.setRegistryKey(
         r"SYSTEM\CurrentControlSet\Services\rPath Tools Install Service\Parameters",
@@ -352,3 +336,22 @@ def doUpdate(wc, sources):
 
     # wait until completed
     wc.waitForServiceToStop('rPath Tools Install Service')
+
+    # TODO: Check for Errors
+
+    # write the new system_model
+    rc, _ = wc.setRegistryKey(r"SOFTWARE\rPath\conary",
+                              "system_model", newModel)
+
+    # write the new polling manifest
+    pollManifest = []
+    for t in newTrvTups:
+        trv = client.repos.getTrove(*t)
+        s = "%s=%s[%s]" % (trv.getName(), trv.getVersion().freeze(), str(trv.getFlavor()))
+        pollManifest.append(s)
+    rc, _ = wc.setRegistryKey(r"SOFTWARE\rPath\conary",
+                              "poll_manifest", pollManifest)
+
+    # we're now done with the windows fs
+    wc.unmount()
+
