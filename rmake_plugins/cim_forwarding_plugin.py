@@ -15,6 +15,7 @@
 from rmake3.core import types
 from rmake3.core import handler
 
+from rpath_repeater.codes import Codes as C
 from rpath_repeater.utils import wbemlib
 from rpath_repeater.utils import nodeinfo
 from rpath_repeater.utils import cimupdater
@@ -75,29 +76,30 @@ class CimHandler(bfp.BaseHandler):
                     self.port = int(value)
 
     def cimCall(self):
-        self.setStatus(101, "Initiating CIM call")
+        self.setStatus(C.MSG_START, "Initiating CIM call")
         self.initCall()
         self.cimParams = CimParams(**self.data.pop('cimParams', {}))
         self.eventUuid = self.cimParams.eventUuid
 
         if not self.zone:
-            self.setStatus(400, "CIM call requires a zone")
+            self.setStatus(C.ERR_ZONE_MISSING, "CIM call requires a zone")
             self.postFailure()
             return
 
         cp = self.cimParams
         if self.method in self.Meta.exposed:
-            self.setStatus(102, "CIM call: %s %s:%s" %
+            self.setStatus(C.MSG_CALL, "CIM call: %s %s:%s" %
                 (self.method, cp.host, cp.port))
             return self.method
 
-        self.setStatus(405, "Method does not exist: %s" % (self.method, ))
+        self.setStatus(C.ERR_METHOD_NOT_ALLOWED,
+            "Method does not exist: %s" % (self.method, ))
         self.postFailure()
         return
 
     @bfp.exposed
     def register(self):
-        self.setStatus(103, "Creating task")
+        self.setStatus(C.MSG_NEW_TASK, "Creating task")
 
         nodes = [x + ':8443' for x in self._getZoneAddresses()]
         args = RactivateData(self.cimParams, nodes,
@@ -108,7 +110,7 @@ class CimHandler(bfp.BaseHandler):
 
     @bfp.exposed
     def shutdown(self):
-        self.setStatus(103, "Creating task")
+        self.setStatus(C.MSG_NEW_TASK, "Creating task")
 
         args = CimData(self.cimParams)
         task = self.newTask(CIM_TASK_SHUTDOWN, CIM_TASK_SHUTDOWN, args,
@@ -117,7 +119,7 @@ class CimHandler(bfp.BaseHandler):
 
     @bfp.exposed
     def polling(self):
-        self.setStatus(103, "Creating task")
+        self.setStatus(C.MSG_NEW_TASK, "Creating task")
 
         args = CimData(self.cimParams)
         task = self.newTask(CIM_TASK_POLLING, CIM_TASK_POLLING, args,
@@ -126,7 +128,7 @@ class CimHandler(bfp.BaseHandler):
 
     @bfp.exposed
     def update(self):
-        self.setStatus(103, "Creating task")
+        self.setStatus(C.MSG_NEW_TASK, "Creating task")
 
         sources = self.methodArguments['sources']
 
@@ -193,8 +195,9 @@ class CIMTaskHandler(bfp.BaseTaskHandler):
 
 class RegisterTask(CIMTaskHandler):
     def _run(self, data):
-        self.sendStatus(104, "Contacting host %s on port %d to rActivate itself"
-            % (data.p.host, data.p.port))
+        self.sendStatus(C.MSG_REGISTRATION_REQ,
+            "Contacting host %s on port %d to rActivate itself"
+                % (data.p.host, data.p.port))
 
         #send CIM rActivate request
         server = self.getWbemConnection(data)
@@ -212,17 +215,19 @@ class RegisterTask(CIMTaskHandler):
 
         retVal, outParams = ret
         if retVal == 0:
-            self.sendStatus(200, "Host %s registration initiated" % data.p.host)
+            self.sendStatus(C.OK, "Host %s registration initiated" %
+                data.p.host)
         else:
             errorSummary = outParams.get('errorSummary', '')
             errorDetails = outParams.get('errorDetails', '')
-            self.sendStatus(451, "Host %s registration failed: %s" %
-                (data.p.host, errorSummary), errorDetails)
+            self.sendStatus(C.ERR_GENERIC,
+                "Host %s registration failed: %s" %
+                    (data.p.host, errorSummary), errorDetails)
 
 
 class ShutdownTask(CIMTaskHandler):
     def _run(self, data):
-        self.sendStatus(101, "Contacting host %s to shut itself down" % (
+        self.sendStatus(C.MSG_START, "Contacting host %s to shut itself down" % (
             data.p.host))
 
         #send CIM Shutdown request
@@ -233,14 +238,15 @@ class ShutdownTask(CIMTaskHandler):
 
         self.setData(data)
         if not value:
-            self.sendStatus(200, "Host %s will now shutdown" % data.p.host)
+            self.sendStatus(C.OK, "Host %s will now shutdown" % data.p.host)
         else:
-            self.sendStatus(401, "Could not shutdown host %s" % data.p.host)
+            self.sendStatus(C.ERR_GENERIC,
+                "Could not shutdown host %s" % data.p.host)
 
 
 class PollingTask(CIMTaskHandler):
     def _run(self, data):
-        self.sendStatus(101, "Contacting host %s on port %d to Poll it for info"
+        self.sendStatus(C.MSG_START, "Contacting host %s on port %d to Poll it for info"
             % (data.p.host, data.p.port))
 
         server = self.getWbemConnection(data)
@@ -252,12 +258,12 @@ class PollingTask(CIMTaskHandler):
 
         data.response = XML.toString(el)
         self.setData(data)
-        self.sendStatus(200, "Host %s has been polled" % data.p.host)
+        self.sendStatus(C.OK, "Host %s has been polled" % data.p.host)
 
 
 class UpdateTask(CIMTaskHandler):
     def _run(self, data):
-        self.sendStatus(101, "Contacting host %s on port %d to update it" % (
+        self.sendStatus(C.MSG_START, "Contacting host %s on port %d to update it" % (
             data.p.host, data.p.port))
 
         server = self.getWbemConnection(data)
@@ -270,7 +276,7 @@ class UpdateTask(CIMTaskHandler):
 
         data.response = XML.toString(el)
         self.setData(data)
-        self.sendStatus(200, "Host %s has been updated" % data.p.host)
+        self.sendStatus(C.OK, "Host %s has been updated" % data.p.host)
 
     def _applySoftwareUpdate(self, server, sources):
         cimUpdater = cimupdater.CIMUpdater(server)

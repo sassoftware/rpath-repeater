@@ -37,6 +37,8 @@ PREFIX = 'com.rpath.sputnik'
 LAUNCH_JOB = PREFIX + '.launchplugin'
 LAUNCH_TASK_WAIT_FOR_NETWORK = PREFIX + '.waitForNetwork'
 
+from rpath_repeater.codes import Codes as C
+
 CimParams = types.slottype('CimParams',
     'host port clientCert clientKey eventUuid instanceId targetName targetType')
 LaunchData = types.slottype('LaunchData', 'p response')
@@ -69,11 +71,11 @@ class LaunchHandler(handler.JobHandler):
 
     def _handleTaskCallback(self, task):
         if task.status.failed:
-            self.setStatus(task.status.code, "Failed")
+            self.setStatus(task.status.thaw())
         else:
             response = task.task_data.getObject().response
             self.job.data = response
-            self.setStatus(200, "Done. %s" % response)
+            self.setStatus(C.OK, "Done. %s" % response)
             jobState = models.JobState.objects.get(name=models.JobState.COMPLETED)
             job = models.Job.objects.get(job_uuid=self.job.job_uuid)
             job.job_state = jobState
@@ -90,7 +92,7 @@ class LaunchHandler(handler.JobHandler):
         return d
 
     def waitForNetwork(self):
-        self.setStatus(103, "Creating task")
+        self.setStatus(C.MSG_NEW_TASK, "Creating task")
 
         args = LaunchData(self.cimParams)
         task = self.newTask('waitForNetwork', LAUNCH_TASK_WAIT_FOR_NETWORK,
@@ -104,7 +106,8 @@ class LaunchHandler(handler.JobHandler):
         self.resultsLocation = self.data.pop('resultsLocation', {})
         self.eventUuid = self.data.pop('eventUuid', None)
 
-        self.setStatus(101, "Waiting for the network information to become "
+        self.setStatus(C.MSG_START,
+            "Waiting for the network information to become "
             "available for instance %s" % self.cimParams.instanceId)
         return 'waitForNetwork'
 
@@ -207,19 +210,19 @@ class WaitForNetworkTask(plug_worker.TaskHandler):
                 "registration event" % (instanceId, dnsName))
             data.response = response
             self.setData(data)
-            self.sendStatus(200, response)
+            self.sendStatus(C.OK, response)
         elif hasDnsName:
             response = ("dns name for %s became avaiable. no longer checking "
                 "target"  % instanceId)
             data.response = response
             self.setData(data)
-            self.sendStatus(200, response)
+            self.sendStatus(C.OK, response)
         else:
             response = ("timed out waiting for dns name for instance %s"
                 % instanceId)
             data.response = response
             self.setData(data)
-            self.sendStatus(451, response)
+            self.sendStatus(C.ERR_GENERIC, response)
 
     def run(self):
         """
@@ -235,5 +238,6 @@ class WaitForNetworkTask(plug_worker.TaskHandler):
             out.write("\nFull stack:\n")
             formatTrace(typ, value, tb, stream = out, withLocals = True)
 
-            self.sendStatus(450, "Error in launch wait task: %s" % value,
-                    out.getvalue())
+            self.sendStatus(C.ERR_GENERIC,
+                "Error in launch wait task: %s" % value,
+                 out.getvalue())

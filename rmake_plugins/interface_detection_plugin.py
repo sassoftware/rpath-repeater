@@ -20,6 +20,7 @@ from rmake3.core import handler
 
 from conary.lib.formattrace import formatTrace
 
+from rpath_repeater.codes import Codes as C
 from rpath_repeater.utils import nodeinfo
 from rpath_repeater.utils import base_forwarding_plugin as bfp
 
@@ -77,23 +78,24 @@ class InterfaceDetectionHandler(bfp.BaseHandler):
         self.eventUuid = self.params.pop('eventUuid', None)
 
     def callDetectInterface(self):
-        self.setStatus(101, 'Initializing Interface Detection')
+        self.setStatus(C.MSG_START, 'Initializing Interface Detection')
         self.initCall()
 
         if not self.zone:
-            self.setStatus(400, 'Interface detection call requires a zone')
+            self.setStatus(C.ERR_ZONE_MISSING, 'Interface detection call requires a zone')
             self.postFailure()
             return
 
         if not self.interfacesList:
-            self.setStatus(401, 'Interface detection requires a list of interfaces')
+            self.setStatus(C.ERR_BAD_ARGS,
+                'Interface detection requires a list of interfaces')
             self.postFailure()
             return
 
         return 'detect_management_interface'
 
     def detect_management_interface(self):
-        self.setStatus(103, 'Creating task')
+        self.setStatus(C.MSG_NEW_TASK, 'Creating task')
 
         args = IDData(IDParams(self.params['host'], self.interfacesList))
         task = self.newTask('detect_management_interface',
@@ -116,30 +118,31 @@ class DetectInterfaceTask(bfp.BaseTaskHandler):
             out.write("\nFull stack:\n")
             formatTrace(typ, value, tb, stream = out, withLocals = True)
 
-            self.sendStatus(450, "Error in Interface Detection call: %s"
-                % str(value), out.getvalue())
+            self.sendStatus(C.ERR_GENERIC,
+                "Error in Interface Detection call: %s"
+                    % str(value), out.getvalue())
 
     def _run(self):
         """
         Probe the machine to determine which management interface is available.
         """
 
-        self.sendStatus(104, 'Detecting Management Interface')
+        self.sendStatus(C.MSG_PROBE, 'Detecting Management Interface')
 
         data = self.getData()
         host = data.p.host
         for params in data.p.interfacesList:
             port = params['port']
             interfaceHref = params['interfaceHref']
-            self.sendStatus(105, 'Checking %s:%s' % (host, port))
+            self.sendStatus(C.MSG_PROBE, 'Checking %s:%s' % (host, port))
             if self._queryService(host, port):
                 self._sendResponse(data, interfaceHref, port)
-                self.sendStatus(200, 'Found management interface on %s:%s'
+                self.sendStatus(C.OK, 'Found management interface on %s:%s'
                     % (host, port))
                 return
 
         self._sendResponse(data)
-        self.sendStatus(201, 'No management interface discovered')
+        self.sendStatus(C.OK_1, 'No management interface discovered')
 
     def _sendResponse(self, data, interfaceHref=None, port=None):
         if interfaceHref:
@@ -157,6 +160,6 @@ class DetectInterfaceTask(bfp.BaseTaskHandler):
             nodeinfo.probe_host(host, port)
             return True
         except nodeinfo.ProbeHostError, e:
-            self.sendStatus(106, 'Error probing %s:%s %s'
+            self.sendStatus(C.MSG_GENERIC, 'Error probing %s:%s %s'
                 % (host, port, str(e)))
             return False

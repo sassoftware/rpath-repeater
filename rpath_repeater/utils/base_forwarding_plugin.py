@@ -33,6 +33,7 @@ PREFIX = 'com.rpath.sputnik'
 BASE_JOB = PREFIX + '.baseplugin'
 BASE_TASK_REGISTER = PREFIX + '.register'
 
+from rpath_repeater.codes import Codes as C
 from rpath_repeater.utils import nodeinfo
 
 class BaseForwardingPlugin(plug_dispatcher.DispatcherPlugin,
@@ -167,7 +168,7 @@ class BaseHandler(handler.JobHandler):
     def _handleTaskComplete(self, task):
         response = task.task_data.getObject().response
         self.job.data = response
-        self.setStatus(200, "Done")
+        self.setStatus(C.OK, "Done")
         self.postResults()
 
     def _handleTaskError(self, reason):
@@ -192,7 +193,7 @@ class BaseTaskHandler(plug_worker.TaskHandler):
         try:
             self._run(data)
         except nodeinfo.ProbeHostError, e:
-            self.sendStatus(404, "%s not found on %s:%d: %s" % (
+            self.sendStatus(C.ERR_NOT_FOUND, "%s not found on %s:%d: %s" % (
                 self.InterfaceName, data.p.host, data.p.port, str(e)))
         except:
             typ, value, tb = sys.exc_info()
@@ -201,7 +202,7 @@ class BaseTaskHandler(plug_worker.TaskHandler):
             out.write("\nFull stack:\n")
             formatTrace(typ, value, tb, stream = out, withLocals = True)
 
-            self.sendStatus(450, "Error in %s call: %s" %
+            self.sendStatus(C.ERR_GENERIC, "Error in %s call: %s" %
                     (self.InterfaceName, str(value)),
                 out.getvalue())
 

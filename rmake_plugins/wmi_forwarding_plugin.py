@@ -18,6 +18,7 @@ from rmake3.lib import uuid
 from rmake3.core import types
 from rmake3.core import handler
 
+from rpath_repeater.codes import Codes as C
 from rpath_repeater.utils import windowsUpdate
 from rpath_repeater.utils import base_forwarding_plugin as bfp
 
@@ -73,29 +74,30 @@ class WmiHandler(bfp.BaseHandler):
                     self.port = int(value)
 
     def wmiCall(self):
-        self.setStatus(101, "Initiating WMI call")
+        self.setStatus(C.MSG_START, "Initiating WMI call")
         self.initCall()
         self.wmiParams = WmiParams(**self.data.pop('wmiParams', {}))
         self.eventUuid = self.wmiParams.eventUuid
 
         if not self.zone:
-            self.setStatus(400, "WMI call requires a zone")
+            self.setStatus(C.ERR_ZONE_MISSING, "WMI call requires a zone")
             self.postFailure()
             return
 
         cp = self.wmiParams
         if self.method in self.Meta.exposed:
-            self.setStatus(102, "WMI call: %s %s" %
+            self.setStatus(C.MSG_CALL, "WMI call: %s %s" %
                            (self.method, cp.host))
             return self.method
 
-        self.setStatus(405, "Method does not exist: %s" % (self.method, ))
+        self.setStatus(C.ERR_METHOD_NOT_ALLOWED,
+            "Method does not exist: %s" % (self.method, ))
         self.postFailure()
         return
 
     @bfp.exposed
     def register(self):
-        self.setStatus(103, "Creating task")
+        self.setStatus(C.MSG_NEW_TASK, "Creating task")
 
         args = WmiData(self.wmiParams)
         task = self.newTask(WMI_TASK_REGISTER, WMI_TASK_REGISTER, args,
@@ -104,7 +106,7 @@ class WmiHandler(bfp.BaseHandler):
 
     @bfp.exposed
     def shutdown(self):
-        self.setStatus(103, "Creating task")
+        self.setStatus(C.MSG_NEW_TASK, "Creating task")
 
         args = WmiData(self.wmiParams)
         task = self.newTask(WMI_TASK_SHUTDOWN, WMI_TASK_SHUTDOWN, args,
@@ -113,7 +115,7 @@ class WmiHandler(bfp.BaseHandler):
 
     @bfp.exposed
     def polling(self):
-        self.setStatus(103, "Creating task")
+        self.setStatus(C.MSG_NEW_TASK, "Creating task")
 
         args = WmiData(self.wmiParams)
         task = self.newTask(WMI_TASK_POLLING, WMI_TASK_POLLING, args,
@@ -122,7 +124,7 @@ class WmiHandler(bfp.BaseHandler):
 
     @bfp.exposed
     def update(self):
-        self.setStatus(103, "Creating task")
+        self.setStatus(C.MSG_NEW_TASK, "Creating task")
 
         sources = self.methodArguments['sources']
 
@@ -159,7 +161,7 @@ class WMITaskHandler(bfp.BaseTaskHandler):
         def getKey(keyPath, key):
             rc, results = wc.getRegistryKey(keyPath, key)
             if rc:
-                self.sendStatus(400, r'Error accessing key %s\%s: %s'
+                self.sendStatus(C.ERR_GENERIC, r'Error accessing key %s\%s: %s'
                     % (keyPath, key, results))
             return rc, results
 
@@ -190,7 +192,7 @@ class WMITaskHandler(bfp.BaseTaskHandler):
         def setKey(keyPath, key, value):
             rc, results = wc.setRegistryKey(keyPath, key, value)
             if rc:
-                self.sendStatus(400, r'Failed to set key %s\%s: %s' %
+                self.sendStatus(C.ERR_GENERIC, r'Failed to set key %s\%s: %s' %
                     (keyPath, key, results))
             return rc, results
 
@@ -201,7 +203,7 @@ class WMITaskHandler(bfp.BaseTaskHandler):
         rc, results = setKey(keyPath, 'local_uuid', local_uuid)
         if rc: return
 
-        self.sendStatus(106, 'Stored UUIDs on Windows system')
+        self.sendStatus(C.MSG_GENERIC, 'Stored UUIDs on Windows system')
 
 
 class RegisterTask(WMITaskHandler):
@@ -210,14 +212,14 @@ class RegisterTask(WMITaskHandler):
         wc = windowsUpdate.wmiClient(data.p.host, data.p.domain,
                                      data.p.username, data.p.password)
 
-        self.sendStatus(104, "Contacting host %s validate credentials" % (
-            data.p.host, ))
+        self.sendStatus(C.MSG_CREDENTIALS_VALIDATION,
+            "Contacting host %s validate credentials" % (data.p.host, ))
 
         # FIXME: Validate creds by accessng a key that only admin should be able
         #        to get to.
         #rc, _ = wc.getRegistryKey(SOME_PATH,SOME_KEY)
 
-        self.sendStatus(105, 'Generating UUIDs')
+        self.sendStatus(C.MSG_GENERIC, 'Generating UUIDs')
 
         # Generate a UUID for the system.
         generated_uuid = str(uuid.uuid4())
@@ -234,18 +236,18 @@ class RegisterTask(WMITaskHandler):
         data.response = XML.toString(el)
         self.setData(data)
 
-        self.sendStatus(200, "Registration Complete for %s" % data.p.host)
+        self.sendStatus(C.OK, "Registration Complete for %s" % data.p.host)
 
 
 class ShutdownTask(WMITaskHandler):
     def _run(self, data):
-        self.sendStatus(401, "Shutting down Windows System %s is not supported"
-                        % (data.p.host))
+        self.sendStatus(C.ERR_METHOD_NOT_ALLOWED,
+            "Shutting down Windows System %s is not supported" % (data.p.host))
 
 
 class PollingTask(WMITaskHandler):
     def _run(self, data):
-        self.sendStatus(101, "Contacting host %s on port %d to Poll it for info"
+        self.sendStatus(C.MSG_START, "Contacting host %s on port %d to Poll it for info"
             % (data.p.host, data.p.port))
 
         try:
@@ -260,11 +262,11 @@ class PollingTask(WMITaskHandler):
 
         data.response = XML.toString(el)
         self.setData(data)
-        self.sendStatus(200, "Host %s has been polled" % data.p.host)
+        self.sendStatus(C.OK, "Host %s has been polled" % data.p.host)
 
 class UpdateTask(WMITaskHandler):
     def _run(self, data):
-        self.sendStatus(101, "Contacting host %s on port %d to update it" % (
+        self.sendStatus(C.MSG_START, "Contacting host %s on port %d to update it" % (
             data.p.host, data.p.port))
 
         try:
@@ -280,4 +282,4 @@ class UpdateTask(WMITaskHandler):
 
         data.response = XML.toString(el)
         self.setData(data)
-        self.sendStatus(200, "Host %s has been updated" % data.p.host)
+        self.sendStatus(C.OK, "Host %s has been updated" % data.p.host)
