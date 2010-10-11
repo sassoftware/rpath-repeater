@@ -233,7 +233,7 @@ def main():
     elif 0:
         uuid, job = cli.poll_cim(cimParams, resultsLocation=resultsLocation,
             zone=zone)
-    elif 1:
+    elif 0:
         params = cli.ManagementInterfaceParams(host=system,
             eventUuid = eventUuid,
             interfacesList = [
@@ -258,7 +258,7 @@ def main():
             resultsLocation = resultsLocation,
             zone = zone,
             sources = [
-                'group-windemo-appliance=/windemo.eng.rpath.com@rpath:windemo-1-devel/123:1-3-1',
+                'group-windemo-appliance=/windemo.eng.rpath.com@rpath:windemo-1-devel/1-2-1[]',
             ],
             )
     while 1:

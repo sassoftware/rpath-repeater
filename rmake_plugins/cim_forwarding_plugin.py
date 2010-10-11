@@ -24,10 +24,10 @@ from rpath_repeater.utils import base_forwarding_plugin as bfp
 XML = bfp.XML
 
 CIM_JOB = bfp.PREFIX + '.cimplugin'
-CIM_TASK_REGISTER = bfp.PREFIX + '.register'
-CIM_TASK_SHUTDOWN = bfp.PREFIX + '.shutdown'
-CIM_TASK_POLLING = bfp.PREFIX + '.poll'
-CIM_TASK_UPDATE = bfp.PREFIX + '.update'
+CIM_TASK_REGISTER = CIM_JOB + '.register'
+CIM_TASK_SHUTDOWN = CIM_JOB + '.shutdown'
+CIM_TASK_POLLING = CIM_JOB + '.poll'
+CIM_TASK_UPDATE = CIM_JOB + '.update'
 
 CimParams = types.slottype('CimParams',
     'host port clientCert clientKey eventUuid instanceId targetName targetType')
@@ -102,7 +102,8 @@ class CimHandler(bfp.BaseHandler):
         nodes = [x + ':8443' for x in self._getZoneAddresses()]
         args = RactivateData(self.cimParams, nodes,
                 self.methodArguments.get('requiredNetwork'))
-        task = self.newTask('register', CIM_TASK_REGISTER, args, zone=self.zone)
+        task = self.newTask(CIM_TASK_REGISTER, CIM_TASK_REGISTER, args,
+            zone=self.zone)
         return self._handleTask(task)
 
     @bfp.exposed
@@ -110,7 +111,8 @@ class CimHandler(bfp.BaseHandler):
         self.setStatus(103, "Creating task")
 
         args = CimData(self.cimParams)
-        task = self.newTask('shutdown', CIM_TASK_SHUTDOWN, args, zone=self.zone)
+        task = self.newTask(CIM_TASK_SHUTDOWN, CIM_TASK_SHUTDOWN, args,
+            zone=self.zone)
         return self._handleTask(task)
 
     @bfp.exposed
@@ -118,7 +120,8 @@ class CimHandler(bfp.BaseHandler):
         self.setStatus(103, "Creating task")
 
         args = CimData(self.cimParams)
-        task = self.newTask('Polling', CIM_TASK_POLLING, args, zone=self.zone)
+        task = self.newTask(CIM_TASK_POLLING, CIM_TASK_POLLING, args,
+            zone=self.zone)
         return self._handleTask(task)
 
     @bfp.exposed
@@ -128,7 +131,8 @@ class CimHandler(bfp.BaseHandler):
         sources = self.methodArguments['sources']
 
         args = UpdateData(self.cimParams, sources)
-        task = self.newTask('Update', CIM_TASK_UPDATE,args, zone=self.zone)
+        task = self.newTask(CIM_TASK_UPDATE, CIM_TASK_UPDATE, args,
+            zone=self.zone)
         return self._handleTask(task)
 
 

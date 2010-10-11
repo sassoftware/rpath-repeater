@@ -24,10 +24,10 @@ from rpath_repeater.utils import base_forwarding_plugin as bfp
 XML = bfp.XML
 
 WMI_JOB = bfp.PREFIX + '.wmiplugin'
-WMI_TASK_REGISTER = bfp.PREFIX + '.register'
-WMI_TASK_SHUTDOWN = bfp.PREFIX + '.shutdown'
-WMI_TASK_POLLING = bfp.PREFIX + '.poll'
-WMI_TASK_UPDATE = bfp.PREFIX + '.update'
+WMI_TASK_REGISTER = WMI_JOB + '.register'
+WMI_TASK_SHUTDOWN = WMI_JOB + '.shutdown'
+WMI_TASK_POLLING = WMI_JOB + '.poll'
+WMI_TASK_UPDATE = WMI_JOB + '.update'
 
 WmiParams = types.slottype('WmiParams',
     'host port username password domain eventUuid')
@@ -98,7 +98,8 @@ class WmiHandler(bfp.BaseHandler):
         self.setStatus(103, "Creating task")
 
         args = WmiData(self.wmiParams)
-        task = self.newTask('register', WMI_TASK_REGISTER, args, zone=self.zone)
+        task = self.newTask(WMI_TASK_REGISTER, WMI_TASK_REGISTER, args,
+            zone=self.zone)
         return self._handleTask(task)
 
     @bfp.exposed
@@ -106,7 +107,8 @@ class WmiHandler(bfp.BaseHandler):
         self.setStatus(103, "Creating task")
 
         args = WmiData(self.wmiParams)
-        task = self.newTask('shutdown', WMI_TASK_SHUTDOWN, args, zone=self.zone)
+        task = self.newTask(WMI_TASK_SHUTDOWN, WMI_TASK_SHUTDOWN, args,
+            zone=self.zone)
         return self._handleTask(task)
 
     @bfp.exposed
@@ -114,7 +116,8 @@ class WmiHandler(bfp.BaseHandler):
         self.setStatus(103, "Creating task")
 
         args = WmiData(self.wmiParams)
-        task = self.newTask('Polling', WMI_TASK_POLLING, args, zone=self.zone)
+        task = self.newTask(WMI_TASK_POLLING, WMI_TASK_POLLING, args,
+            zone=self.zone)
         return self._handleTask(task)
 
     @bfp.exposed
@@ -124,7 +127,8 @@ class WmiHandler(bfp.BaseHandler):
         sources = self.methodArguments['sources']
 
         args = UpdateData(self.wmiParams, sources)
-        task = self.newTask('Update', WMI_TASK_UPDATE,args, zone=self.zone)
+        task = self.newTask(WMI_TASK_UPDATE, WMI_TASK_UPDATE, args,
+            zone=self.zone)
         return self._handleTask(task)
 
 
