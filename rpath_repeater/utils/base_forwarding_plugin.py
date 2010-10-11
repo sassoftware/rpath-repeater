@@ -32,9 +32,6 @@ from rmake3.worker import plug_worker
 PREFIX = 'com.rpath.sputnik'
 BASE_JOB = PREFIX + '.baseplugin'
 BASE_TASK_REGISTER = PREFIX + '.register'
-BASE_TASK_SHUTDOWN = PREFIX + '.shutdown'
-BASE_TASK_POLLING = PREFIX + '.poll'
-BASE_TASK_UPDATE = PREFIX + '.update'
 
 from rpath_repeater.utils import nodeinfo
 
