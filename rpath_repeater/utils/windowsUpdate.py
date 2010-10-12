@@ -150,6 +150,8 @@ def getConaryClient():
     # HACK, FIX ME!
     cfg.configLine('repositoryMap windemo.eng.rpath.com '
         'http://rbatrunk.eng.rpath.com/repos/windemo/')
+    cfg.configLine('repositoryMap windemo-reqs.eng.rpath.com '
+        'http://rbatrunk.eng.rpath.com/repos/windemo-reqs/')
     cfg.configLine('repositoryMap windows.rpath.com '
         'https://windows.eng.rpath.com/conary/')
     cfg.configLine('repositoryMap omni-components.eng.rpath.com '
