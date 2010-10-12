@@ -184,6 +184,7 @@ def doUpdate(wc, sources):
 
             oldManifest = oldManifest.split('\n')
             oldTrvTups = [cmdline.parseTroveSpec(t) for t in oldManifest if t]
+            oldModel = [l for l in oldModel.split('\n') if l]
         else:
             oldModel = oldManifest = ''
 
@@ -206,7 +207,7 @@ def doUpdate(wc, sources):
         client.getDatabase(), client.getRepos())
 
     newTrvTups = [cmdline.parseTroveSpec(name) for name in sources if name]
-    newModel = ['install %s=%s' % (p[0],[1]) for p in newTrvTups]
+    newModel = [str('install %s=%s'%(p[0],p[1])) for p in newTrvTups]
 
     # TODO: set flavors taken from newTroveTups in client.cfg here
     oldTroves, newTroves = modelsToJobs(cache, client, oldModel, newModel)
@@ -346,11 +347,12 @@ def doUpdate(wc, sources):
     # write the new polling manifest
     pollManifest = []
     for t in newTrvTups:
-        trv = client.repos.getTrove(*t)
-        s = "%s=%s[%s]" % (trv.getName(), trv.getVersion().freeze(), str(trv.getFlavor()))
+        trv = client.repos.getTrove(t[0],versions.VersionFromString(t[1]),t[2])
+        s = "%s=%s[%s]" % (trv.getName(), trv.getVersion().freeze(),
+                           str(trv.getFlavor()))
         pollManifest.append(s)
     rc, _ = wc.setRegistryKey(r"SOFTWARE\rPath\conary",
-                              "poll_manifest", pollManifest)
+                              "polling_manifest", pollManifest)
 
     # we're now done with the windows fs
     wc.unmount()

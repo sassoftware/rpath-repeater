@@ -268,7 +268,6 @@ class UpdateTask(WMITaskHandler):
     def _run(self, data):
         self.sendStatus(C.MSG_START, "Contacting host %s on port %d to update it" % (
             data.p.host, data.p.port))
-
         try:
             wc = windowsUpdate.wmiClient( data.p.host, data.p.domain,
                                           data.p.username, data.p.password)
