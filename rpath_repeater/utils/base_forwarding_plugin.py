@@ -130,6 +130,9 @@ class BaseHandler(handler.JobHandler):
         job = XML.Element("job",
             T("job_uuid", self.job.job_uuid),
             T("job_state", jobStateString),
+            T("status_code", self.job.status.code),
+            T("status_text", self.job.status.text),
+            T("status_detail", self.job.status.detail),
         )
         elt.appendChild(XML.Element("jobs", job))
 
