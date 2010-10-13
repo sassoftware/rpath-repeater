@@ -149,15 +149,15 @@ def getConaryClient():
 
     # HACK, FIX ME!
     cfg.configLine('repositoryMap windemo.eng.rpath.com '
-        'http://rbatrunk.eng.rpath.com/repos/windemo/')
+        'http://rbanext-eng.eng.rpath.com/repos/windemo/')
     cfg.configLine('repositoryMap windemo-reqs.eng.rpath.com '
-        'http://rbatrunk.eng.rpath.com/repos/windemo-reqs/')
+        'http://rbanext-eng.eng.rpath.com/repos/windemo-reqs/')
     cfg.configLine('repositoryMap windows.rpath.com '
         'https://windows.eng.rpath.com/conary/')
     cfg.configLine('repositoryMap omni-components.eng.rpath.com '
-        'http://rbatrunk.eng.rpath.com/repos/omni-components/')
+        'http://rbanext-eng.eng.rpath.com/repos/omni-components/')
     cfg.configLine('repositoryMap murfdemo.eng.rpath.com '
-        'http://rbatrunk.eng.rpath.com/repos/murfdemo/')
+        'http://rbanext-eng.eng.rpath.com/repos/murfdemo/')
     cfg.configLine('installLabelPath windows.rpath.com@rpath:windows-common')
     return conaryclient.ConaryClient(cfg = cfg)
 
