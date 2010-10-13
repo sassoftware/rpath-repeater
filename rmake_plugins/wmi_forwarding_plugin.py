@@ -230,7 +230,6 @@ class RegisterTask(WMITaskHandler):
             self.sendStatus(C.MSG_GENERIC, 'Installing rPath Tools')
             windowsUpdate.doBootstrap(wc)
 
-
         # Generate a UUID for the system.
         self.sendStatus(C.MSG_GENERIC, 'Generating UUIDs')
         generated_uuid = str(uuid.uuid4())

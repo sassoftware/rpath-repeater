@@ -162,33 +162,43 @@ def getConaryClient():
     return conaryclient.ConaryClient(cfg = cfg)
 
 
-def doUpdate(wc, sources):
-    bootstrap=False
+def doBootstrap(wc):
+    client = getConaryClient()
+    # fetch the rTIS MSI
+    nvf = client.repos.findTrove(None, ('rtis',
+            '/windows.rpath.com@rpath:windows-common',None))
+    trv = client.repos.getTrove(*nvf[0])
+    f = (list(trv.iterFileList(capsules=True)))[0]
+    contents = client.repos.getFileContents(((f[2],f[3]),),
+                                            compressed=False)
+    contents = contents[0]
+    # copy it to the target machine
+    contentsPath = os.path.join(rtisDir,f[1])
+    winContentsPath = 'C:\\Windows\\RTIS\\' + f[1]
+    winLogPath = 'C:\\Windows\\RTIS\\' + 'rPath_Tools_Install.log'
+    open(contentsPath,'w').write(contents.f.read())
+    rc, _ = wc.runCmd(r'msiexec.exe /i %s /quiet /l*vx %s' %
+                      (winContentsPath, winLogPath))
 
+    wc.waitForServiceToStop('rPath Tools Install Service')
+
+def doUpdate(wc, sources):
     client = getConaryClient()
 
-    # see if we have rTIS installed
-    rc, status = wc.queryService('rPath Tools Install Service')
-    if rc:
-        bootstrap=True
-    else:
-        wc.waitForServiceToStop('rPath Tools Install Service')
-        if not bootstrap:
-            # fetch old manifest
-            rc, oldManifest = wc.getRegistryKey(r"SOFTWARE\rPath\conary",
-                                                "system_manifest")
-            assert(not rc)
+    wc.waitForServiceToStop('rPath Tools Install Service')
+    # fetch old manifest
+    rc, oldManifest = wc.getRegistryKey(r"SOFTWARE\rPath\conary",
+                                        "system_manifest")
+    assert(not rc)
 
-            # fetch old sys model
-            rc, oldModel = wc.getRegistryKey(r"SOFTWARE\rPath\conary",
-                                                "system_model")
-            assert(not rc)
+    # fetch old sys model
+    rc, oldModel = wc.getRegistryKey(r"SOFTWARE\rPath\conary",
+                                     "system_model")
+    assert(not rc)
 
-            oldManifest = oldManifest.split('\n')
-            #oldTrvTups = [cmdline.parseTroveSpec(t) for t in oldManifest if t]
-            oldModel = [l for l in oldModel.split('\n') if l]
-        else:
-            oldModel = oldManifest = ''
+    oldManifest = oldManifest.split('\n')
+    #oldTrvTups = [cmdline.parseTroveSpec(t) for t in oldManifest if t]
+    oldModel = [l for l in oldModel.split('\n') if l]
 
     # mount the windows filesystem
     rootDir, rc = wc.mount()
@@ -199,10 +209,11 @@ def doUpdate(wc, sources):
     rtisWinDir = 'C:\\Windows\\RTIS'
     if not os.path.exists(rtisDir):
         os.mkdir(rtisDir)
-    #rc, _ = wc.setRegistryKey(
-    #    r"SYSTEM\CurrentControlSet\Services\rPath Tools Install Service\Parameters",
-    #    'Root', rtisWinDir)
-    #assert(not rc)
+
+    rc, _ = wc.setRegistryKey(
+        r"SYSTEM\CurrentControlSet\Services\rPath Tools Install Service\Parameters",
+        'Root', rtisWinDir)
+    assert(not rc)
 
     # determine the new packages to install
     cache = modelupdate.SystemModelTroveCache(
@@ -227,25 +238,6 @@ def doUpdate(wc, sources):
     contents = client.repos.getFileContents([(f[0][2],f[0][3])
                                              for f in filesToGet],
                                              compressed=False)
-
-    # bootstrap if we need to
-    if bootstrap:
-        # fetch the rTIS MSI
-        nvf = client.repos.findTrove(None, ('rtis',
-            '/windows.rpath.com@rpath:windows-common',None))
-        trv = client.repos.getTrove(*nvf[0])
-        f = (list(trv.iterFileList(capsules=True)))[0]
-        contents = client.repos.getFileContents(((f[2],f[3]),),
-                                                compressed=False)
-        contents = contents[0]
-        # copy it to the target machine
-        contentsPath = os.path.join(rtisDir,f[1])
-        winContentsPath = 'C:\\Windows\\RTIS\\' + f[1]
-        winLogPath = 'C:\\Windows\\RTIS\\' + 'rPath_Tools_Install.log'
-        open(contentsPath,'w').write(contents.f.read())
-        rc, _ = wc.runCmd(r'msiexec.exe /i %s /quiet /l*vx %s' %
-                              (winContentsPath, winLogPath))
-        assert(not rc)
 
     # Set the update dir
     updateDir = tempfile.mkdtemp('', 'update', rtisDir)
@@ -322,9 +314,6 @@ def doUpdate(wc, sources):
     xmlDoc = eval(xmlDocStr)
     open(os.path.join(updateDir,'servicing.xml'),'w').write(
             etree.tostring(xmlDoc,pretty_print=True))
-
-    if bootstrap:
-        wc.waitForServiceToStop('rPath Tools Install Service')
 
     # set the registry keys
     commandValue = ["job=0", "update=%s" % updateBaseDir]
