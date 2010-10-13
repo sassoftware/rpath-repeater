@@ -137,6 +137,9 @@ class WmiHandler(bfp.BaseHandler):
 class WMITaskHandler(bfp.BaseTaskHandler):
     InterfaceName = "WMI"
 
+    # \SYSTEM\CurrentControlSet\Control\ComputerName\ActiveComputerName ComputerName
+    #
+
     def _getUuids(self, wmiClient):
         rc, localUUID = wmiClient.getRegistryKey(r'SOFTWARE\rPath\Inventory',
                                                  'local_uuid')
@@ -215,16 +218,22 @@ class RegisterTask(WMITaskHandler):
         self.sendStatus(C.MSG_CREDENTIALS_VALIDATION,
             "Contacting host %s validate credentials" % (data.p.host, ))
 
-        # FIXME: Validate creds by accessng a key that only admin should be able
-        #        to get to.
-        #rc, _ = wc.getRegistryKey(SOME_PATH,SOME_KEY)
+        # Validate credentials
+        rc, _ = wc.getRegistryKey(r'HARDWARE\DESCRIPTION\System\BIOS', 'BaseBoardManufacturer')
+        if rc:
+            self.sendStatus(C.ERR_AUTHENTICATION,
+                            'Credentials provided do not have permission to '
+                            'make WMI calls')
+        # Check to see if rTIS is installed
+        rc, _ = wc.queryService('rPath Tools Install Service')
+        if rc:
+            self.sendStatus(C.MSG_GENERIC, 'Installing rPath Tools')
+            windowsUpdate.doBootstrap(wc)
 
-        self.sendStatus(C.MSG_GENERIC, 'Generating UUIDs')
 
         # Generate a UUID for the system.
+        self.sendStatus(C.MSG_GENERIC, 'Generating UUIDs')
         generated_uuid = str(uuid.uuid4())
-
-        # Generate local UUID based on system data
         local_uuid = self._getLocalUUID(wc, generated_uuid)
 
         self._setUUIDs(wc, generated_uuid, local_uuid)
