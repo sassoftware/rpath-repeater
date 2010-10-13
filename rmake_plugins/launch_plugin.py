@@ -79,6 +79,9 @@ class LaunchHandler(handler.JobHandler):
             jobState = models.JobState.objects.get(name=models.JobState.COMPLETED)
             job = models.Job.objects.get(job_uuid=self.job.job_uuid)
             job.job_state = jobState
+            job.status_code = self.job.status.code
+            job.status_text = self.job.status.text
+            job.status_detail = self.job.status.detail
             job.save()
         return 'done'
 
