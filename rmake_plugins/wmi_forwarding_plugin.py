@@ -164,7 +164,7 @@ class WMITaskHandler(bfp.BaseTaskHandler):
         if rc:
             return []
 
-        return [ XML.Text("hostname", computername) ]
+        return [ XML.Text("hostname", computername.strip()) ]
 
     @classmethod
     def _getUuids(cls, wmiClient):
