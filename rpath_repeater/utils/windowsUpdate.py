@@ -188,7 +188,7 @@ def doBootstrap(wc):
     finally:
         wc.unmount()
 
-def doUpdate(wc, sources):
+def doUpdate(wc, sources, jobid):
     client = getConaryClient()
 
     wc.waitForServiceToStop('rPath Tools Install Service')
@@ -246,8 +246,8 @@ def doUpdate(wc, sources):
                                              compressed=False)
 
     # Set the update dir
-    updateDir = tempfile.mkdtemp('', 'update', rtisDir)
-    updateBaseDir = os.path.basename(updateDir)
+    updateBaseDir = 'update-%s' % jobid
+    updateDir = os.path.join(rtisDir, updateBaseDir)
 
     # write the files and installation instructions
     E = ElementMaker()

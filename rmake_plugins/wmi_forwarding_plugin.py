@@ -248,7 +248,7 @@ class RegisterTask(WMITaskHandler):
 
         self._setUUIDs(wc, generated_uuid, local_uuid)
 
-        computername = self._getComputerName(wc):
+        computername = self._getComputerName(wc)
 
         uuids = [ XML.Text('local_uuid', local_uuid),
                   XML.Text('generated_uuid', generated_uuid),
@@ -294,7 +294,7 @@ class UpdateTask(WMITaskHandler):
         try:
             wc = windowsUpdate.wmiClient( data.p.host, data.p.domain,
                                           data.p.username, data.p.password)
-            windowsUpdate.doUpdate(wc, data.sources)
+            windowsUpdate.doUpdate(wc, data.sources, self.eventUuid)
             children = self._getUuids(wc)
             children.append(self._getComputerName(wc))
             children.append(self._getSoftwareVersions(wc))
