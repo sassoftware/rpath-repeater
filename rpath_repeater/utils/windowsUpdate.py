@@ -148,16 +148,18 @@ def getConaryClient():
     cfg.dbPath = ':memory:'
 
     # HACK, FIX ME!
+    from socket import gethostname
+    hostname = gethostname()
     cfg.configLine('repositoryMap windemo.eng.rpath.com '
-        'http://rbatrunk.eng.rpath.com/repos/windemo/')
+        'http://%s/repos/windemo/' % hostname)
     cfg.configLine('repositoryMap windemo-reqs.eng.rpath.com '
-        'http://rbatrunk.eng.rpath.com/repos/windemo-reqs/')
+        'http://%s/repos/windemo-reqs/' % hostname)
     cfg.configLine('repositoryMap windows.rpath.com '
         'https://windows.eng.rpath.com/conary/')
     cfg.configLine('repositoryMap omni-components.eng.rpath.com '
-        'http://rbatrunk.eng.rpath.com/repos/omni-components/')
+        'http://%s/repos/omni-components/' % hostname)
     cfg.configLine('repositoryMap murfdemo.eng.rpath.com '
-        'http://rbatrunk.eng.rpath.com/repos/murfdemo/')
+        'http://%s/repos/murfdemo/' % hostname)
     cfg.configLine('installLabelPath windows.rpath.com@rpath:windows-common')
     return conaryclient.ConaryClient(cfg = cfg)
 
