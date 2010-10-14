@@ -17,6 +17,7 @@ import time
 import popen2
 import tempfile
 import itertools
+import statvfs
 
 from lxml import etree
 from lxml.builder import ElementMaker
@@ -27,6 +28,7 @@ from conary import conaryclient
 from conary import versions
 from conary.conaryclient import modelupdate, systemmodel, cmdline
 
+from rpath_repeater.utils import base_forwarding_plugin as bfp
 #log.setVerbosity(log.INFO)
 
 def runModel(client, cache, modelText):
@@ -193,9 +195,9 @@ def doUpdate(wc, sources, jobid):
 
     wc.waitForServiceToStop('rPath Tools Install Service')
     # fetch old manifest
-    rc, oldManifest = wc.getRegistryKey(r"SOFTWARE\rPath\conary",
-                                        "system_manifest")
-    assert(not rc)
+    #rc, oldManifest = wc.getRegistryKey(r"SOFTWARE\rPath\conary",
+    #                                    "system_manifest")
+    #assert(not rc)
 
     # fetch old sys model
     rc, oldModel = wc.getRegistryKey(r"SOFTWARE\rPath\conary",
@@ -308,10 +310,19 @@ def doUpdate(wc, sources, jobid):
                   '%s' % oldManifestName)
         pkgStr = pkgStr + pkgTemplate % values + ',\n'
 
-        # write contents
+        # verify free space on the target drive
         packageDir = os.path.join(updateDir,
                                   t.troveInfo.capsule.msi.productCode())
         os.makedirs(packageDir)
+        stat = os.statvfs(packageDir)
+        fsSize = stat[statvfs.F_BFREE] * stat[statvfs.F_BSIZE]
+	cSize = c.get().fileobj.size
+	if (fsSize < cSize * 3):
+                raise bfp.GenericError(r'Not enough space on the drive to install %s'
+                                       % t.troveInfo.capsule.msi.name())
+
+        import epdb; epdb.st()
+        # write the contents
         contentsPath = os.path.join(packageDir,f[1])
         open(contentsPath,'w').write(c.f.read())
 
