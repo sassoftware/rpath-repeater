@@ -137,15 +137,21 @@ class WmiHandler(bfp.BaseHandler):
 class WMITaskHandler(bfp.BaseTaskHandler):
     InterfaceName = "WMI"
 
-    # \SYSTEM\CurrentControlSet\Control\ComputerName\ActiveComputerName ComputerName
-    #
+    def _getComputerName(self, wmiClient):
+        rc, computername = wmiClient.getRegistryKey(
+            r'\SYSTEM\CurrentControlSet\Control\ComputerName\ActiveComputerName', 'ComputerName')
+        if rc:
+            return []
+
+        T = XML.Text
+        return T("hostname", computername)
 
     def _getUuids(self, wmiClient):
         rc, localUUID = wmiClient.getRegistryKey(r'SOFTWARE\rPath\Inventory',
                                                  'local_uuid')
-        rc, generatedUUID = wmiClient.getRegistryKey(r'SOFTWARE\rPath\Inventory',
-                                                     'generated_uuid')
-        if not rc:
+        rc, generatedUUID = wmiClient.getRegistryKey(
+            r'SOFTWARE\rPath\Inventory', 'generated_uuid')
+        if rc:
             return []
 
         T = XML.Text
@@ -224,11 +230,16 @@ class RegisterTask(WMITaskHandler):
             self.sendStatus(C.ERR_AUTHENTICATION,
                             'Credentials provided do not have permission to '
                             'make WMI calls')
+            return
         # Check to see if rTIS is installed
         rc, _ = wc.queryService('rPath Tools Install Service')
         if rc:
             self.sendStatus(C.MSG_GENERIC, 'Installing rPath Tools')
-            windowsUpdate.doBootstrap(wc)
+            if not windowsUpdate.doBootstrap(wc):
+                self.sendStatus(C.ERR_AUTHENTICATION,
+                    'Credentials provided do not have permission to '
+                            'install rPath Tools')
+            return
 
         # Generate a UUID for the system.
         self.sendStatus(C.MSG_GENERIC, 'Generating UUIDs')
@@ -237,8 +248,11 @@ class RegisterTask(WMITaskHandler):
 
         self._setUUIDs(wc, generated_uuid, local_uuid)
 
+        computername = self._getComputerName(wc):
+
         uuids = [ XML.Text('local_uuid', local_uuid),
-                  XML.Text('generated_uuid', generated_uuid), ]
+                  XML.Text('generated_uuid', generated_uuid),
+                  XML.Text('hostname', computername), ]
 
         el = XML.Element('system', *uuids)
         data.response = XML.toString(el)
@@ -262,6 +276,7 @@ class PollingTask(WMITaskHandler):
             wc = windowsUpdate.wmiClient( data.p.host, data.p.domain,
                                           data.p.username, data.p.password)
             children = self._getUuids(wc)
+            children.append(self._getComputerName(wc))
             children.append(self._getSoftwareVersions(wc))
         finally:
             wc.unmount()
@@ -281,6 +296,7 @@ class UpdateTask(WMITaskHandler):
                                           data.p.username, data.p.password)
             windowsUpdate.doUpdate(wc, data.sources)
             children = self._getUuids(wc)
+            children.append(self._getComputerName(wc))
             children.append(self._getSoftwareVersions(wc))
         finally:
             wc.unmount()
