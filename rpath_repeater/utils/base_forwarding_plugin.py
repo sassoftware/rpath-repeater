@@ -91,6 +91,12 @@ class BaseHandler(handler.JobHandler):
         self.resultsLocation = self.data.pop('resultsLocation', {})
         self.eventUuid = self.data.pop('eventUuid', None)
 
+    def newTask(self, *args, **kwargs):
+        "Create a new task, and update the job with the task's status changes"
+        task = handler.JobHandler.newTask(self, *args, **kwargs)
+        self.watchTask(task, self.jobUpdateCallback)
+        return task
+
     def postResults(self, elt=None):
         host = self.resultsLocation.get('host', 'localhost')
         port = self.resultsLocation.get('port', 80)
@@ -164,6 +170,14 @@ class BaseHandler(handler.JobHandler):
             if worker.supports(needed):
                 addresses.update(worker.addresses)
         return addresses
+
+    def jobUpdateCallback(self, task):
+        status = task.status.thaw()
+        if status.final:
+            # We don't have to do anything, _handleTaskCallback will do that
+            # for us
+            return
+        self.setStatus(status)
 
     def _handleTask(self, task):
         """
