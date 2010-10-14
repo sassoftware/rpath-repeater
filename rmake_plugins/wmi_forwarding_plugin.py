@@ -148,6 +148,7 @@ class WMITaskHandler(bfp.BaseTaskHandler):
         children = self._getUuids(wc)
         children.extend(self._getComputerName(wc))
         children.append(self._getSoftwareVersions(wc))
+        return children
 
     @classmethod
     def _validateCredentials(cls, wc):
