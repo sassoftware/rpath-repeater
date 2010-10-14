@@ -246,7 +246,7 @@ def doUpdate(wc, sources, jobid):
                                              compressed=False)
 
     # Set the update dir
-    updateBaseDir = 'update-%s' % jobid
+    updateBaseDir = 'job-%s' % jobid
     updateDir = os.path.join(rtisDir, updateBaseDir)
 
     # write the files and installation instructions
@@ -311,7 +311,7 @@ def doUpdate(wc, sources, jobid):
         # write contents
         packageDir = os.path.join(updateDir,
                                   t.troveInfo.capsule.msi.productCode())
-        os.mkdir(packageDir)
+        os.makedirs(packageDir)
         contentsPath = os.path.join(packageDir,f[1])
         open(contentsPath,'w').write(c.f.read())
 

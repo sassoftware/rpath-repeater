@@ -139,7 +139,7 @@ class WMITaskHandler(bfp.BaseTaskHandler):
 
     def _getComputerName(self, wmiClient):
         rc, computername = wmiClient.getRegistryKey(
-            r'\SYSTEM\CurrentControlSet\Control\ComputerName\ActiveComputerName', 'ComputerName')
+            r'SYSTEM\CurrentControlSet\Control\ComputerName\ActiveComputerName', 'ComputerName')
         if rc:
             return []
 
@@ -294,7 +294,8 @@ class UpdateTask(WMITaskHandler):
         try:
             wc = windowsUpdate.wmiClient( data.p.host, data.p.domain,
                                           data.p.username, data.p.password)
-            windowsUpdate.doUpdate(wc, data.sources, self.eventUuid)
+            windowsUpdate.doUpdate(wc, data.sources,
+                str(self.task.job_uuid))
             children = self._getUuids(wc)
             children.append(self._getComputerName(wc))
             children.append(self._getSoftwareVersions(wc))
