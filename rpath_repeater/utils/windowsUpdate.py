@@ -126,8 +126,7 @@ class wmiClient(object):
         return self._wmiCall(wmicmd)
 
     def runCmd(self, cmd):
-        # WRITE ME
-        wmicmd = "%s registry runcmd '%s'" % (self.baseCmd, cmd)
+        wmicmd = "%s process create '%s'" % (self.baseCmd, cmd)
         return self._wmiCall(wmicmd)
 
     def checkProcess(self, pid):
@@ -175,14 +174,19 @@ def doBootstrap(wc):
                                             compressed=False)
     contents = contents[0]
     # copy it to the target machine
-    contentsPath = os.path.join(rtisDir,f[1])
-    winContentsPath = 'C:\\Windows\\RTIS\\' + f[1]
-    winLogPath = 'C:\\Windows\\RTIS\\' + 'rPath_Tools_Install.log'
-    open(contentsPath,'w').write(contents.f.read())
-    rc, _ = wc.runCmd(r'msiexec.exe /i %s /quiet /l*vx %s' %
-                      (winContentsPath, winLogPath))
+    try:
+        rootDir, rc = wc.mount()
+        assert(not rc)
+        contentsPath = os.path.join(rootDir, 'Windows/Temp', f[1])
+        winContentsPath = 'C:\\Windows\\Temp\\' + f[1]
+        winLogPath = 'C:\\Windows\\Temp\\rPath_Tools_Install.log'
+        open(contentsPath,'w').write(contents.f.read())
+        rc, _ = wc.runCmd(r'msiexec.exe /i %s /quiet /l*vx %s' %
+                          (winContentsPath, winLogPath))
 
-    wc.waitForServiceToStop('rPath Tools Install Service')
+        wc.waitForServiceToStop('rPath Tools Install Service')
+    finally:
+        wc.unmount()
 
 def doUpdate(wc, sources):
     client = getConaryClient()
@@ -207,10 +211,10 @@ def doUpdate(wc, sources):
     assert(not rc)
 
     # Set the rtis root dir
-    rtisDir = os.path.join(rootDir,'Windows/RTIS')
-    rtisWinDir = 'C:\\Windows\\RTIS'
+    rtisDir = os.path.join(rootDir, r'Program Files/rPath/Updates')
+    rtisWinDir = 'C:\\Program Files\\rPath\\Updates'
     if not os.path.exists(rtisDir):
-        os.mkdir(rtisDir)
+        os.makedirs(rtisDir)
 
     rc, _ = wc.setRegistryKey(
         r"SYSTEM\CurrentControlSet\Services\rPath Tools Install Service\Parameters",
