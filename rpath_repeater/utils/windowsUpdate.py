@@ -321,7 +321,6 @@ def doUpdate(wc, sources, jobid):
                 raise bfp.GenericError(r'Not enough space on the drive to install %s'
                                        % t.troveInfo.capsule.msi.name())
 
-        import epdb; epdb.st()
         # write the contents
         contentsPath = os.path.join(packageDir,f[1])
         open(contentsPath,'w').write(c.f.read())
