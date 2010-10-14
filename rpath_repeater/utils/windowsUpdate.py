@@ -208,7 +208,7 @@ def doUpdate(wc, sources, jobid):
                                      "system_model")
     assert(not rc)
 
-    oldManifest = oldManifest.split('\n')
+    #oldManifest = oldManifest.split('\n')
     #oldTrvTups = [cmdline.parseTroveSpec(t) for t in oldManifest if t]
     oldModel = [l for l in oldModel.split('\n') if l]
 
