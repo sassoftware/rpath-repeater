@@ -36,6 +36,17 @@ BASE_TASK_REGISTER = PREFIX + '.register'
 from rpath_repeater.codes import Codes as C
 from rpath_repeater.utils import nodeinfo
 
+class BaseException(Exception):
+    def __init__(self, error=None):
+        self.error = error
+        Exception.__init__(self)
+
+class AuthenticationError(BaseException):
+    "Authentication error"
+
+class GenericError(BaseException):
+    "Error"
+
 class BaseForwardingPlugin(plug_dispatcher.DispatcherPlugin,
                            plug_worker.WorkerPlugin):
     pass
@@ -200,6 +211,19 @@ class BaseTaskHandler(plug_worker.TaskHandler):
         except nodeinfo.ProbeHostError, e:
             self.sendStatus(C.ERR_NOT_FOUND, "%s not found on %s:%d: %s" % (
                 self.InterfaceName, data.p.host, data.p.port, str(e)))
+        except AuthenticationError, e:
+            if e.error:
+                errmsg = e.error
+            else:
+                _t = 'Credentials provided do not have permission to make %s calls on %s'
+                errmsg = _t % (self.InterfaceName, data.p.host)
+            self.sendStatus(C.ERR_AUTHENTICATION, errmsg)
+        except BaseException, e:
+            if e.error:
+                errmsg = e.error
+            else:
+                errmsg = "Error"
+            self.sendStatus(C.ERR_GENERIC, errmsg)
         except:
             typ, value, tb = sys.exc_info()
             out = StringIO.StringIO()

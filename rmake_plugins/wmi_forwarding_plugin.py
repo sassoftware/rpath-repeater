@@ -137,16 +137,36 @@ class WmiHandler(bfp.BaseHandler):
 class WMITaskHandler(bfp.BaseTaskHandler):
     InterfaceName = "WMI"
 
-    def _getComputerName(self, wmiClient):
+    @classmethod
+    def _getWmiClient(cls, data):
+        wc = windowsUpdate.wmiClient(data.p.host, data.p.domain,
+                                     data.p.username, data.p.password)
+        cls._validateCredentials(wc)
+        return wc
+
+    def _getWmiSystemData(self, wc):
+        children = self._getUuids(wc)
+        children.extend(self._getComputerName(wc))
+        children.append(self._getSoftwareVersions(wc))
+
+    @classmethod
+    def _validateCredentials(cls, wc):
+        # Validate credentials
+        rc, _ = wc.getRegistryKey(r'HARDWARE\DESCRIPTION\System\BIOS', 'BaseBoardManufacturer')
+        if rc:
+            raise bfp.AuthenticationError()
+
+    @classmethod
+    def _getComputerName(cls, wmiClient):
         rc, computername = wmiClient.getRegistryKey(
             r'SYSTEM\CurrentControlSet\Control\ComputerName\ActiveComputerName', 'ComputerName')
         if rc:
             return []
 
-        T = XML.Text
-        return T("hostname", computername)
+        return [ XML.Text("hostname", computername) ]
 
-    def _getUuids(self, wmiClient):
+    @classmethod
+    def _getUuids(cls, wmiClient):
         rc, localUUID = wmiClient.getRegistryKey(r'SOFTWARE\rPath\Inventory',
                                                  'local_uuid')
         rc, generatedUUID = wmiClient.getRegistryKey(
@@ -158,35 +178,41 @@ class WMITaskHandler(bfp.BaseTaskHandler):
         return [T("local_uuid", localUUID),
                 T("generated_uuid", generatedUUID)]
 
-    def _getSoftwareVersions(self, wmiClient):
+    @classmethod
+    def _getSoftwareVersions(cls, wmiClient):
         rc, siList = wmiClient.getRegistryKey(r"SOFTWARE\rPath\conary",
                                               "polling_manifest")
         siList = [ x.strip() for x in siList.split('\n') ]
         # Start creating the XML document
-        troves = [ self._trove(tspec) for tspec in siList if tspec ]
+        troves = [ cls._trove(tspec) for tspec in siList if tspec ]
         return XML.Element("installed_software", *troves)
 
-    def _getLocalUUID(self, wc, generated_uuid):
-        def getKey(keyPath, key):
-            rc, results = wc.getRegistryKey(keyPath, key)
-            if rc:
-                self.sendStatus(C.ERR_GENERIC, r'Error accessing key %s\%s: %s'
-                    % (keyPath, key, results))
-            return rc, results
+    @classmethod
+    def _getRegistryKey(cls, wc, keyPath, key):
+        rc, results = wc.getRegistryKey(keyPath, key)
+        if rc:
+            raise bfp.GenericError(r'Error accessing key %s\%s: %s' %
+                (keyPath, key, results))
+        return results
 
+    @classmethod
+    def _setRegistryKey(cls, wc, keyPath, key, value):
+        rc, results = wc.setRegistryKey(keyPath, key, value)
+        if rc:
+            raise bfp.GenericError(r'Failed to set key %s\%s: %s' %
+                    (keyPath, key, results))
+        return results
+
+    @classmethod
+    def _getLocalUUID(cls, wc, generated_uuid):
         # Get some data from the target machine so that we can generate a
         # local uuid
         # FIXME: Should use SMBIOS interface once available to get real
         #        information.
         keyPath = r'HARDWARE\DESCRIPTION\System\BIOS'
-        rc, baseBoard = getKey(keyPath, 'BaseBoardManufacturer')
-        if rc: return
-
-        rc, biosMajorRelease = getKey(keyPath, 'BiosMajorRelease')
-        if rc: return
-
-        rc, biosMinorRelease = getKey(keyPath, 'BiosMinorRelease')
-        if rc: return
+        baseBoard = cls._getRegistryKey(wc, keyPath, 'BaseBoardManufacturer')
+        biosMajorRelease = cls._getRegistryKey(wc, keyPath, 'BiosMajorRelease')
+        biosMinorRelease = cls._getRegistryKey(wc, keyPath, 'BiosMinorRelease')
 
         sha1 = digestlib.sha1()
         sha1.update(baseBoard)
@@ -198,48 +224,28 @@ class WMITaskHandler(bfp.BaseTaskHandler):
         return local_uuid
 
     def _setUUIDs(self, wc, generated_uuid, local_uuid):
-        def setKey(keyPath, key, value):
-            rc, results = wc.setRegistryKey(keyPath, key, value)
-            if rc:
-                self.sendStatus(C.ERR_GENERIC, r'Failed to set key %s\%s: %s' %
-                    (keyPath, key, results))
-            return rc, results
-
         keyPath = r'SOFTWARE\rPath\Inventory'
-        rc, results = setKey(keyPath, 'generated_uuid', generated_uuid)
-        if rc: return
-
-        rc, results = setKey(keyPath, 'local_uuid', local_uuid)
-        if rc: return
-
+        self._setRegistryKey(wc, keyPath, 'generated_uuid', generated_uuid)
+        self._setRegistryKey(keyPath, 'local_uuid', local_uuid)
         self.sendStatus(C.MSG_GENERIC, 'Stored UUIDs on Windows system')
-
 
 class RegisterTask(WMITaskHandler):
     def _run(self, data):
         # fetch a registry key that has admin only access
-        wc = windowsUpdate.wmiClient(data.p.host, data.p.domain,
-                                     data.p.username, data.p.password)
+        wc = self._getWmiClient(data)
 
         self.sendStatus(C.MSG_CREDENTIALS_VALIDATION,
             "Contacting host %s validate credentials" % (data.p.host, ))
 
-        # Validate credentials
-        rc, _ = wc.getRegistryKey(r'HARDWARE\DESCRIPTION\System\BIOS', 'BaseBoardManufacturer')
-        if rc:
-            self.sendStatus(C.ERR_AUTHENTICATION,
-                            'Credentials provided do not have permission to '
-                            'make WMI calls')
-            return
         # Check to see if rTIS is installed
         rc, _ = wc.queryService('rPath Tools Install Service')
         if rc:
             self.sendStatus(C.MSG_GENERIC, 'Installing rPath Tools')
             if not windowsUpdate.doBootstrap(wc):
-                self.sendStatus(C.ERR_AUTHENTICATION,
+                raise bfp.AuthenticationError(
                     'Credentials provided do not have permission to '
                             'install rPath Tools')
-            return
+            wc.unmount()
 
         # Generate a UUID for the system.
         self.sendStatus(C.MSG_GENERIC, 'Generating UUIDs')
@@ -248,13 +254,11 @@ class RegisterTask(WMITaskHandler):
 
         self._setUUIDs(wc, generated_uuid, local_uuid)
 
-        computername = self._getComputerName(wc)
+        children = [ XML.Text('local_uuid', local_uuid),
+                  XML.Text('generated_uuid', generated_uuid) ]
+        children.extend(self._getComputerName(wc))
 
-        uuids = [ XML.Text('local_uuid', local_uuid),
-                  XML.Text('generated_uuid', generated_uuid),
-                  XML.Text('hostname', computername), ]
-
-        el = XML.Element('system', *uuids)
+        el = XML.Element('system', *children)
         data.response = XML.toString(el)
         self.setData(data)
 
@@ -272,14 +276,8 @@ class PollingTask(WMITaskHandler):
         self.sendStatus(C.MSG_START, "Contacting host %s on port %d to Poll it for info"
             % (data.p.host, data.p.port))
 
-        try:
-            wc = windowsUpdate.wmiClient( data.p.host, data.p.domain,
-                                          data.p.username, data.p.password)
-            children = self._getUuids(wc)
-            children.append(self._getComputerName(wc))
-            children.append(self._getSoftwareVersions(wc))
-        finally:
-            wc.unmount()
+        wc = self._getWmiClient(data)
+        children = self._getWmiSystemData(wc)
 
         el = XML.Element("system", *children)
 
@@ -291,17 +289,14 @@ class UpdateTask(WMITaskHandler):
     def _run(self, data):
         self.sendStatus(C.MSG_START, "Contacting host %s on port %d to update it" % (
             data.p.host, data.p.port))
+        wc = self._getWmiClient(data)
         try:
-            wc = windowsUpdate.wmiClient( data.p.host, data.p.domain,
-                                          data.p.username, data.p.password)
             windowsUpdate.doUpdate(wc, data.sources,
                 str(self.task.job_uuid))
-            children = self._getUuids(wc)
-            children.append(self._getComputerName(wc))
-            children.append(self._getSoftwareVersions(wc))
         finally:
             wc.unmount()
 
+        children = self._getWmiSystemData(wc)
         el = XML.Element("system", *children)
 
         data.response = XML.toString(el)
