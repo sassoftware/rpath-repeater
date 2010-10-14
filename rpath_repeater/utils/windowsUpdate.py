@@ -166,6 +166,7 @@ def getConaryClient():
 
 
 def doBootstrap(wc):
+
     client = getConaryClient()
     # fetch the rTIS MSI
     nvf = client.repos.findTrove(None, ('rtis',
@@ -185,10 +186,13 @@ def doBootstrap(wc):
         open(contentsPath,'w').write(contents.f.read())
         rc, _ = wc.runCmd(r'msiexec.exe /i %s /quiet /l*vx %s' %
                           (winContentsPath, winLogPath))
-
+        if rc:
+            return False
         wc.waitForServiceToStop('rPath Tools Install Service')
     finally:
         wc.unmount()
+    return True
+
 
 def doUpdate(wc, sources, jobid):
     client = getConaryClient()

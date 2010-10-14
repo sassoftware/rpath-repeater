@@ -168,10 +168,10 @@ class WMITaskHandler(bfp.BaseTaskHandler):
 
     @classmethod
     def _getUuids(cls, wmiClient):
-        rc, localUUID = wmiClient.getRegistryKey(r'SOFTWARE\rPath\Inventory',
+        rc, localUUID = wmiClient.getRegistryKey(r'SOFTWARE\rPath\inventory',
                                                  'local_uuid')
         rc, generatedUUID = wmiClient.getRegistryKey(
-            r'SOFTWARE\rPath\Inventory', 'generated_uuid')
+            r'SOFTWARE\rPath\inventory', 'generated_uuid')
         if rc:
             return []
 
@@ -225,7 +225,7 @@ class WMITaskHandler(bfp.BaseTaskHandler):
         return local_uuid
 
     def _setUUIDs(self, wc, generated_uuid, local_uuid):
-        keyPath = r'SOFTWARE\rPath\Inventory'
+        keyPath = r'SOFTWARE\rPath\inventory'
         self._setRegistryKey(wc, keyPath, 'generated_uuid', generated_uuid)
         self._setRegistryKey(wc, keyPath, 'local_uuid', local_uuid)
         self.sendStatus(C.MSG_GENERIC, 'Stored UUIDs on Windows system')
