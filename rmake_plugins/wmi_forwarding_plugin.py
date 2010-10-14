@@ -176,8 +176,8 @@ class WMITaskHandler(bfp.BaseTaskHandler):
             return []
 
         T = XML.Text
-        return [T("local_uuid", localUUID),
-                T("generated_uuid", generatedUUID)]
+        return [T("local_uuid", localUUID.strip()),
+                T("generated_uuid", generatedUUID.strip())]
 
     @classmethod
     def _getSoftwareVersions(cls, wmiClient):
