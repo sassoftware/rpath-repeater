@@ -226,7 +226,7 @@ class WMITaskHandler(bfp.BaseTaskHandler):
     def _setUUIDs(self, wc, generated_uuid, local_uuid):
         keyPath = r'SOFTWARE\rPath\Inventory'
         self._setRegistryKey(wc, keyPath, 'generated_uuid', generated_uuid)
-        self._setRegistryKey(keyPath, 'local_uuid', local_uuid)
+        self._setRegistryKey(wc, keyPath, 'local_uuid', local_uuid)
         self.sendStatus(C.MSG_GENERIC, 'Stored UUIDs on Windows system')
 
 class RegisterTask(WMITaskHandler):
