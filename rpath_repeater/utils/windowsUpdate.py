@@ -222,10 +222,12 @@ def doUpdate(wc, sources, jobid):
     if not os.path.exists(rtisDir):
         os.makedirs(rtisDir)
 
-    rc, _ = wc.setRegistryKey(
-        r"SYSTEM\CurrentControlSet\Services\rPath Tools Install Service\Parameters",
-        'Root', rtisWinDir)
-    assert(not rc)
+    # FIXME: This is hardcoded for the moment until we work out wmiClient 
+    # limitations
+    #rc, _ = wc.setRegistryKey(
+    #    r"SYSTEM\CurrentControlSet\Services\rPath Tools Install Service\Parameters",
+    #    'Root', rtisWinDir)
+    #assert(not rc)
 
     # determine the new packages to install
     cache = modelupdate.SystemModelTroveCache(
