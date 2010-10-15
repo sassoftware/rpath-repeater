@@ -236,7 +236,7 @@ class RegisterTask(WMITaskHandler):
         wc = self._getWmiClient(data)
 
         self.sendStatus(C.MSG_CREDENTIALS_VALIDATION,
-            "Contacting host %s validate credentials" % (data.p.host, ))
+            "Contacting host %s to validate credentials" % (data.p.host, ))
 
         # Check to see if rTIS is installed
         rc, _ = wc.queryService('rPath Tools Install Service')
