@@ -297,6 +297,7 @@ class UpdateTask(WMITaskHandler):
         finally:
             wc.unmount()
 
+        self.sendStatus(C.MSG_GENERIC, 'Update Complete. Gathering results.')
         children = self._getWmiSystemData(wc)
         el = XML.Element("system", *children)
 

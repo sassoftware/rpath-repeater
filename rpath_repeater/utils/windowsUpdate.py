@@ -169,7 +169,7 @@ def doBootstrap(wc):
 
     client = getConaryClient()
     # fetch the rTIS MSI
-    nvf = client.repos.findTrove(None, ('rtis',
+    nvf = client.repos.findTrove(None, ('rTIS:msi',
             '/windows.rpath.com@rpath:windows-common',None))
     trv = client.repos.getTrove(*nvf[0])
     f = (list(trv.iterFileList(capsules=True)))[0]
