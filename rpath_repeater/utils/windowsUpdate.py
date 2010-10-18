@@ -18,6 +18,7 @@ import popen2
 import tempfile
 import itertools
 import statvfs
+import subprocess
 
 from lxml import etree
 from lxml.builder import ElementMaker
@@ -131,11 +132,22 @@ class wmiClient(object):
         return self._wmiCall(wmicmd)
 
     def mount(self):
-        if not self._rootMounted:
-            self._rootMounted = True
+        if not self._rootDir:
             self._rootDir = tempfile.mkdtemp()
-            return self._rootDir, os.system(self.mountCmd + self._rootDir)
+            rc = self._doMount()
+            if rc != 0:
+                os.rmdir(self._rootDir)
+                self._rootDir = None
+            return self._rootDir, rc
 
+    def _doMount(self):
+        cmd = self.mountCmd + [ self._rootDir ]
+        stdout = stderr = file("/dev/null", "w")
+        # stdout = stderr = subprocess.PIPE
+        p = subprocess.Popen(cmd, stdout=stdout, stderr=stderr,
+            env=self.mountEnv)
+        rc = p.wait()
+        return rc
 
     def unmount(self):
         # unmount and delete the root file system

@@ -3,6 +3,9 @@
 import testsuite
 testsuite.setup()
 
+import os
+from conary.lib import util
+
 from rmake_plugins import wmi_forwarding_plugin
 
 from testtaskhandler import TestBase
@@ -34,6 +37,21 @@ class WmiTest(TestBase):
             'ComputerName')
         pollingManifest = ('registry', 'getkey', 'SOFTWARE\\rPath\\conary',
             'polling_manifest')
+        systemModel = ('registry', 'getkey', 'SOFTWARE\\rPath\\conary',
+            'system_model')
+
+    class MultiChoice(object):
+        def __init__(self, choices):
+            self._counter = 0
+            self.choices = choices
+
+        def get(self):
+            if self._counter >= len(self.choices):
+                raise Exception("Mock more values!!!")
+            val = self.choices[self._counter]
+            self._counter += 1
+            return val
+
 
     _defaultData = {
         K.baseBoardManufacturer: "Intel corporation\n",
@@ -46,12 +64,17 @@ class WmiTest(TestBase):
         K.localUuid: "6947ee3b-4776-e11b-5d98-5b8284d4f810\n",
         K.generatedUuid: "  feeddeadbeef\n\n",
         K.pollingManifest: """
-            group-foo=/conary.rpath.com@rpl:2/123.45:1-2-3
-            group-bar=/conary.rpath.com@rpl:2/923.45:9-2-3
-"""
+            group-foo=/conary.rpath.com@rpl:2/123.45:1-2-3[is: x86]
+            group-bar=/conary.rpath.com@rpl:2/923.45:9-2-3[is: x86_64]
+""",
+        K.systemModel: """
+            install 'group-foo=conary.rpath.com@rpl:2[is: x86]'
+            install 'group-bar=conary.rpath.com@rpl:2[is: x86_64]'
+""",
     }
 
     class WmiClient(wmi_forwarding_plugin.WMITaskHandler.WmiClientFactory):
+        QuerySleepInterval = 0.1
         _data = {}
         def _wmiCall(self, cmd):
             cmd = WmiTest.parseCommandLine(cmd)
@@ -59,9 +82,19 @@ class WmiTest(TestBase):
             val = self._data.get(key)
             if val is None:
                 raise Exception("mock me!", key)
+            if isinstance(val, WmiTest.MultiChoice):
+                val = val.get()
             if not isinstance(val, tuple):
                 return 0, val
             return val
+
+        def _doMount(self):
+            return 0
+
+        def _doUnmount(self):
+            util.rmtree(self._rootDir)
+            os.mkdir(self._rootDir)
+            return 0
 
     class CommandLine(object):
         def __init__(self, options, args):
@@ -149,9 +182,9 @@ class WmiTest(TestBase):
         <label>conary.rpath.com@rpl:2</label>
         <revision>1-2-3</revision>
         <ordering>123.45</ordering>
-        <flavor/>
+        <flavor>is: x86</flavor>
       </version>
-      <flavor/>
+      <flavor>is: x86</flavor>
     </trove>
     <trove>
       <name>group-bar</name>
@@ -160,9 +193,9 @@ class WmiTest(TestBase):
         <label>conary.rpath.com@rpl:2</label>
         <revision>9-2-3</revision>
         <ordering>923.45</ordering>
-        <flavor/>
+        <flavor>is: x86_64</flavor>
       </version>
-      <flavor/>
+      <flavor>is: x86_64</flavor>
     </trove>
   </installed_software>
 </system>""")
@@ -173,14 +206,20 @@ class WmiTest(TestBase):
             self.client.shutdown_wmi, params)
 
     def testUpdate(self):
-        raise testsuite.SkipTestException("Need to mock conary and test counters")
+        self._data[self.K.getStatusTuple] = self.MultiChoice([
+            "some stuff", 'Service Not Active\n', "some more stuff"])
         params = self._wmiParams()
-        self.client.update_wmi(params)
+        sources = [ "group-top1=/conary.rpath.com@rpl:2/1-1-1",
+            "group-top2=/conary.rpath.com@rpl:2/2-2-2" ]
+        self.client.update_wmi(params, sources=sources)
+        lastTask = self.results.update[-1]
+        raise testsuite.SkipTestException("Need to mock conaryclient")
+        self.failIf(lastTask.status.detail, lastTask.status.detail)
         self.failUnlessEqual(
             [ (x.status.code, x.status.text) for x in self.results.update ],
             [
             ])
-        taskData = self.results.update[-1].task_data.thaw()
+        taskData = lastTask.task_data.thaw()
         self.assertXMLEquals(taskData.object.response, """
 """)
 
