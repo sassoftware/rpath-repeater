@@ -103,11 +103,9 @@ class CimHandler(bfp.BaseHandler):
         return
 
     @classmethod
-    def _getArgs(cls, taskType, params, methodArguments):
+    def _getArgs(cls, taskType, params, methodArguments, zoneAddresses):
         if taskType in [ CIM_TASK_REGISTER ]:
-            # XXX FIXME we need to extract zone addresses in initCall
-            nodes = [x + ':8443' for x in self._getZoneAddresses()]
-            return RactivateData(params, nodes,
+            return RactivateData(params, zoneAddresses,
                 methodArguments.get('requiredNetwork'))
         if taskType in [ CIM_TASK_SHUTDOWN, CIM_TASK_POLLING ]:
             return CimData(params)
@@ -118,7 +116,8 @@ class CimHandler(bfp.BaseHandler):
 
     def _method(self, taskType):
          self.setStatus(C.MSG_NEW_TASK, "Creating task")
-         args = self._getArgs(taskType, self.cimParams, self.methodArguments)
+         args = self._getArgs(taskType, self.cimParams, self.methodArguments,
+            self.zoneAddresses)
          task = self.newTask(taskType, taskType, args, zone=self.zone)
          return self._handleTask(task)
 
@@ -141,6 +140,7 @@ class CimHandler(bfp.BaseHandler):
 
 class CIMTaskHandler(bfp.BaseTaskHandler):
     InterfaceName = "CIM"
+    WBEMServerFactory = wbemlib.WBEMServer
 
     def getWbemConnection(self, data):
         x509Dict = {}
@@ -154,10 +154,12 @@ class CIMTaskHandler(bfp.BaseTaskHandler):
 
         # Do the probing early, since WBEMServer does not do proper timeouts
         # May raise ProbeHostError, which we catch in run()
-        self._serverCert = nodeinfo.probe_host_ssl(data.p.host, data.p.port,
-            **x509Dict)
-        server = wbemlib.WBEMServer("https://" + data.p.host, x509=x509Dict)
+        self._serverCert = self._probeHost(data.p.host, data.p.port, x509Dict)
+        server = self.WBEMServerFactory("https://" + data.p.host, x509=x509Dict)
         return server
+
+    def _probeHost(self, host, port, x509Dict):
+        return nodeinfo.probe_host_ssl(data.p.host, data.p.port, **x509Dict)
 
     def _getServerCert(self):
         return [ XML.Text("ssl_server_certificate", self._serverCert) ]
@@ -192,7 +194,7 @@ class CIMTaskHandler(bfp.BaseTaskHandler):
 
     def _trove(self, si):
         troveSpec = "%s=%s" % (si['name'], si['VersionString'])
-        return bfp.BaseTaskHandler._trove(self, troveSpec)
+        return bfp.BaseTaskHandler._trove(troveSpec)
 
 class RegisterTask(CIMTaskHandler):
     def _run(self, data):

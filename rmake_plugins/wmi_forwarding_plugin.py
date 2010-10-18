@@ -101,7 +101,7 @@ class WmiHandler(bfp.BaseHandler):
         return
 
     @classmethod
-    def _getArgs(cls, taskType, params, methodArguments):
+    def _getArgs(cls, taskType, params, methodArguments, zoneAddresses):
         if taskType in [ WMI_TASK_REGISTER, WMI_TASK_SHUTDOWN,
                 WMI_TASK_POLLING ]:
             return WmiData(params)
@@ -112,7 +112,8 @@ class WmiHandler(bfp.BaseHandler):
 
     def _method(self, taskType):
         self.setStatus(C.MSG_NEW_TASK, "Creating task")
-        args = self._getArgs(taskType, self.wmiParams, self.methodArguments)
+        args = self._getArgs(taskType, self.wmiParams, self.methodArguments,
+            self.zoneAddresses)
         task = self.newTask(taskType, taskType, args, zone=self.zone)
         return self._handleTask(task)
 

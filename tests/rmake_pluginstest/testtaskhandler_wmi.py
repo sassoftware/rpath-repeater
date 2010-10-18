@@ -123,7 +123,7 @@ class WmiTest(TestBase):
         wmiClientClass._data.update(self._defaultData)
         # Here we allow individual tests to override some of the data
         self._data = wmiClientClass._data
-        return dict(WmiClientFactory=self.WmiClient,
+        return dict(WmiClientFactory=wmiClientClass,
             _createGeneratedUuid=lambda x: 'feeddeadbeef')
 
     def setUp(self):

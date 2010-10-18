@@ -61,7 +61,9 @@ class Client(client.RepeaterClient):
         taskParams = self.handlerClass.initParams(params)
         # XXX
         methodArguments = params.get('methodArguments')
-        args = self.handlerClass._getArgs(key, taskParams, methodArguments)
+        zoneAddresses = [ 'localhost:8443', 'remote:8443', ]
+        args = self.handlerClass._getArgs(key, taskParams, methodArguments,
+            zoneAddresses)
 
         task = RmakeTask(taskUuid, jobUuid, key, key, FrozenObject.fromObject(args))
         taskHandlerClass = self.taskDispatcher[key]
