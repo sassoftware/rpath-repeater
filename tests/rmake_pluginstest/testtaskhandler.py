@@ -5,7 +5,7 @@ from testrunner import testcase
 from rpath_repeater import client
 
 from rmake3.lib import uuid
-from rmake3.core.types import RmakeTask, FrozenObject, JobStatus
+from rmake3.core.types import RmakeTask, FrozenObject
 
 class TestBase(testcase.TestCaseWithWorkDir):
     class TestTaskMixin(object):
