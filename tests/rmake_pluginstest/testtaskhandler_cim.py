@@ -3,9 +3,7 @@
 import testsuite
 testsuite.setup()
 
-import os
 import pywbem
-from conary.lib import util
 
 from rmake_plugins import cim_forwarding_plugin
 
@@ -122,10 +120,6 @@ class CimTest(TestBase):
             WBEMServerFactory=wbemServerClass,
             _probeHost=lambda x,host,port,x509: "server cert",
         )
-
-    def setUp(self):
-        TestBase.setUp(self)
-        pluginManager = None
 
     def _cimParams(self, **kwargs):
         defaults = dict(

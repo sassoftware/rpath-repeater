@@ -126,10 +126,6 @@ class WmiTest(TestBase):
         return dict(WmiClientFactory=wmiClientClass,
             _createGeneratedUuid=lambda x: 'feeddeadbeef')
 
-    def setUp(self):
-        TestBase.setUp(self)
-        pluginManager = None
-
     def _wmiParams(self, **kwargs):
         defaults = dict(
             host='1.2.3.4', port=8135,

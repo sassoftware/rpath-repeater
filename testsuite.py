@@ -4,7 +4,6 @@
 # Copyright (c) 2010 rPath, Inc.  All Rights Reserved.
 #
 
-import os
 import sys
 
 from testrunner import suite, testhandler
