@@ -65,6 +65,7 @@ def modelsToJobs(cache, client, oldModel, newModel):
 
 
 class wmiClient(object):
+    QuerySleepInterval = 5.0
     def __init__(self, target, domain, user, password):
         self.baseCmd = ['/usr/bin/wmic', '--host', target, '--user', user,
             '--password', password, '--domain', domain or target]
@@ -76,13 +77,6 @@ class wmiClient(object):
         self.mountEnv = dict(PASSWD=password)
 
         self._rootDir = None
-
-    def unmount(self):
-        # unmount and delete the root file system
-        if self._rootDir:
-            os.system('/bin/umount ' + self._rootDir)
-            os.rmdir(self._rootDir)
-            self._rootDir = None
 
     def _wmiCall(self, cmd):
         p = popen2.Popen3(cmd,True)
@@ -107,9 +101,11 @@ class wmiClient(object):
 
     def waitForServiceToStop(self, service):
         # query the service until is is no longer active
-        while (self.queryService('rPath Tools Install Service')[1]
-            != 'Service Not Active\n'):
-            time.sleep(5.0)
+        while 1:
+            ret = self.queryService('rPath Tools Install Service')[1]
+            if ret.strip() == 'Service Not Active':
+                return
+            time.sleep(self.QuerySleepInterval)
 
     def getRegistryKey(self, keyPath, key):
         wmicmd = self.baseCmd + ["registry", "getkey", keyPath, key]
@@ -140,6 +136,16 @@ class wmiClient(object):
             self._rootDir = tempfile.mkdtemp()
             return self._rootDir, os.system(self.mountCmd + self._rootDir)
 
+
+    def unmount(self):
+        # unmount and delete the root file system
+        if self._rootDir:
+            self._doUnmount()
+            os.rmdir(self._rootDir)
+            self._rootDir = None
+
+    def _doUnmount(self):
+        os.system('/bin/umount ' + self._rootDir)
 
 def getConaryClient():
     cfg = conarycfg.ConaryConfiguration()
@@ -199,7 +205,7 @@ def doUpdate(wc, sources, jobid):
 
     #oldManifest = oldManifest.split('\n')
     #oldTrvTups = [cmdline.parseTroveSpec(t) for t in oldManifest if t]
-    oldModel = [l for l in oldModel.split('\n') if l]
+    oldModel = [l.strip() for l in oldModel.split('\n') if l]
 
     # mount the windows filesystem
     rootDir, rc = wc.mount()

@@ -42,7 +42,8 @@ class CimForwardingPlugin(bfp.BaseForwardingPlugin):
     def dispatcher_pre_setup(self, dispatcher):
         handler.registerHandler(CimHandler)
 
-    def worker_get_task_types(self):
+    @classmethod
+    def worker_get_task_types(cls):
         return {
             CIM_TASK_REGISTER: RegisterTask,
             CIM_TASK_SHUTDOWN: ShutdownTask,
@@ -75,10 +76,14 @@ class CimHandler(bfp.BaseHandler):
                 elif key == 'port':
                     self.port = int(value)
 
+    @classmethod
+    def initParams(cls, data):
+        return CimParams(**data.pop('cimParams', {}))
+
     def cimCall(self):
         self.setStatus(C.MSG_START, "Initiating CIM call")
         self.initCall()
-        self.cimParams = CimParams(**self.data.pop('cimParams', {}))
+        self.cimParams = self.initParams(self.data)
         self.eventUuid = self.cimParams.eventUuid
 
         if not self.zone:
@@ -97,45 +102,41 @@ class CimHandler(bfp.BaseHandler):
         self.postFailure()
         return
 
+    @classmethod
+    def _getArgs(cls, taskType, params, methodArguments):
+        if taskType in [ CIM_TASK_REGISTER ]:
+            # XXX FIXME we need to extract zone addresses in initCall
+            nodes = [x + ':8443' for x in self._getZoneAddresses()]
+            return RactivateData(params, nodes,
+                methodArguments.get('requiredNetwork'))
+        if taskType in [ CIM_TASK_SHUTDOWN, CIM_TASK_POLLING ]:
+            return CimData(params)
+        if taskType in [ CIM_TASK_UPDATE ]:
+            sources = methodArguments['sources']
+            return UpdateData(params, sources)
+        raise Exception("Unhandled task type %s" % taskType)
+
+    def _method(self, taskType):
+         self.setStatus(C.MSG_NEW_TASK, "Creating task")
+         args = self._getArgs(taskType, self.cimParams, self.methodArguments)
+         task = self.newTask(taskType, taskType, args, zone=self.zone)
+         return self._handleTask(task)
+
     @bfp.exposed
     def register(self):
-        self.setStatus(C.MSG_NEW_TASK, "Creating task")
-
-        nodes = [x + ':8443' for x in self._getZoneAddresses()]
-        args = RactivateData(self.cimParams, nodes,
-                self.methodArguments.get('requiredNetwork'))
-        task = self.newTask(CIM_TASK_REGISTER, CIM_TASK_REGISTER, args,
-            zone=self.zone)
-        return self._handleTask(task)
+        return self._method(CIM_TASK_REGISTER)
 
     @bfp.exposed
     def shutdown(self):
-        self.setStatus(C.MSG_NEW_TASK, "Creating task")
-
-        args = CimData(self.cimParams)
-        task = self.newTask(CIM_TASK_SHUTDOWN, CIM_TASK_SHUTDOWN, args,
-            zone=self.zone)
-        return self._handleTask(task)
+        return self._method(CIM_TASK_SHUTDOWN)
 
     @bfp.exposed
-    def polling(self):
-        self.setStatus(C.MSG_NEW_TASK, "Creating task")
-
-        args = CimData(self.cimParams)
-        task = self.newTask(CIM_TASK_POLLING, CIM_TASK_POLLING, args,
-            zone=self.zone)
-        return self._handleTask(task)
+    def poll(self):
+        return self._method(CIM_TASK_POLLING)
 
     @bfp.exposed
     def update(self):
-        self.setStatus(C.MSG_NEW_TASK, "Creating task")
-
-        sources = self.methodArguments['sources']
-
-        args = UpdateData(self.cimParams, sources)
-        task = self.newTask(CIM_TASK_UPDATE, CIM_TASK_UPDATE, args,
-            zone=self.zone)
-        return self._handleTask(task)
+        return self._method(CIM_TASK_UPDATE)
 
 
 class CIMTaskHandler(bfp.BaseTaskHandler):

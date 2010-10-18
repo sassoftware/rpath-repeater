@@ -152,11 +152,11 @@ class RepeaterClient(object):
         return self.client.getWorkerList()
 
     def poll_cim(self, cimParams, resultsLocation=None, zone=None):
-        method = 'polling'
+        method = 'poll'
         return self._cimCallDispatcher(method, cimParams, resultsLocation, zone)
 
     def poll_wmi(self, wmiParams, resultsLocation=None, zone=None):
-        method = 'polling'
+        method = 'poll'
         return self._wmiCallDispatcher(method, wmiParams, resultsLocation, zone)
 
     def launchWaitForNetwork(self, cimParams, resultsLocation=None, zone=None,

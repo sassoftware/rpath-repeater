@@ -41,7 +41,8 @@ class WmiForwardingPlugin(bfp.BaseForwardingPlugin):
     def dispatcher_pre_setup(self, dispatcher):
         handler.registerHandler(WmiHandler)
 
-    def worker_get_task_types(self):
+    @classmethod
+    def worker_get_task_types(cls):
         return {
             WMI_TASK_REGISTER: RegisterTask,
             WMI_TASK_SHUTDOWN: ShutdownTask,
@@ -73,10 +74,14 @@ class WmiHandler(bfp.BaseHandler):
                 elif key == 'port':
                     self.port = int(value)
 
+    @classmethod
+    def initParams(cls, data):
+        return WmiParams(**data.pop('wmiParams', {}))
+
     def wmiCall(self):
         self.setStatus(C.MSG_START, "Initiating WMI call")
         self.initCall()
-        self.wmiParams = WmiParams(**self.data.pop('wmiParams', {}))
+        self.wmiParams = self.initParams(self.data)
         self.eventUuid = self.wmiParams.eventUuid
 
         if not self.zone:
@@ -95,52 +100,48 @@ class WmiHandler(bfp.BaseHandler):
         self.postFailure()
         return
 
+    @classmethod
+    def _getArgs(cls, taskType, params, methodArguments):
+        if taskType in [ WMI_TASK_REGISTER, WMI_TASK_SHUTDOWN,
+                WMI_TASK_POLLING ]:
+            return WmiData(params)
+        if taskType in [ WMI_TASK_UPDATE ]:
+            sources = methodArguments['sources']
+            return UpdateData(params, sources)
+        raise Exception("Unhandled task type %s" % taskType)
+
+    def _method(self, taskType):
+        self.setStatus(C.MSG_NEW_TASK, "Creating task")
+        args = self._getArgs(taskType, self.wmiParams, self.methodArguments)
+        task = self.newTask(taskType, taskType, args, zone=self.zone)
+        return self._handleTask(task)
+
     @bfp.exposed
     def register(self):
-        self.setStatus(C.MSG_NEW_TASK, "Creating task")
-
-        args = WmiData(self.wmiParams)
-        task = self.newTask(WMI_TASK_REGISTER, WMI_TASK_REGISTER, args,
-            zone=self.zone)
-        return self._handleTask(task)
+        return self._method(WMI_TASK_REGISTER)
 
     @bfp.exposed
     def shutdown(self):
-        self.setStatus(C.MSG_NEW_TASK, "Creating task")
-
-        args = WmiData(self.wmiParams)
-        task = self.newTask(WMI_TASK_SHUTDOWN, WMI_TASK_SHUTDOWN, args,
-            zone=self.zone)
-        return self._handleTask(task)
+        return self._method(WMI_TASK_SHUTDOWN)
 
     @bfp.exposed
     def polling(self):
-        self.setStatus(C.MSG_NEW_TASK, "Creating task")
-
-        args = WmiData(self.wmiParams)
-        task = self.newTask(WMI_TASK_POLLING, WMI_TASK_POLLING, args,
-            zone=self.zone)
-        return self._handleTask(task)
+        return self._method(WMI_TASK_POLLING)
 
     @bfp.exposed
     def update(self):
-        self.setStatus(C.MSG_NEW_TASK, "Creating task")
-
-        sources = self.methodArguments['sources']
-
-        args = UpdateData(self.wmiParams, sources)
-        task = self.newTask(WMI_TASK_UPDATE, WMI_TASK_UPDATE, args,
-            zone=self.zone)
-        return self._handleTask(task)
+        return self._method(WMI_TASK_UPDATE)
 
 
 class WMITaskHandler(bfp.BaseTaskHandler):
     InterfaceName = "WMI"
 
+    WmiClientFactory = windowsUpdate.wmiClient
+
     @classmethod
     def _getWmiClient(cls, data):
-        wc = windowsUpdate.wmiClient(data.p.host, data.p.domain,
-                                     data.p.username, data.p.password)
+        wc = cls.WmiClientFactory(data.p.host, data.p.domain,
+                                  data.p.username, data.p.password)
         cls._validateCredentials(wc)
         return wc
 
@@ -250,7 +251,8 @@ class RegisterTask(WMITaskHandler):
 
         # Generate a UUID for the system.
         self.sendStatus(C.MSG_GENERIC, 'Generating UUIDs')
-        generated_uuid = str(uuid.uuid4())
+
+        generated_uuid = self._createGeneratedUuid()
         local_uuid = self._getLocalUUID(wc, generated_uuid)
 
         self._setUUIDs(wc, generated_uuid, local_uuid)
@@ -265,6 +267,8 @@ class RegisterTask(WMITaskHandler):
 
         self.sendStatus(C.OK, "Registration Complete for %s" % data.p.host)
 
+    def _createGeneratedUuid(self):
+        return str(uuid.uuid4())
 
 class ShutdownTask(WMITaskHandler):
     def _run(self, data):
