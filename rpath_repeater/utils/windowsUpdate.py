@@ -149,7 +149,10 @@ def getConaryClient():
     cfg.dbPath = ':memory:'
 
     # FIXME: this only will work when the repeater is running on the RBA
-    cfg.readUrl("https://localhost/conaryrc")
+    from socket import gethostname
+    hostname = gethostname()
+    cfg.configLine('conaryProxy https://%s/' % hostname)
+
     return conaryclient.ConaryClient(cfg = cfg)
 
 
