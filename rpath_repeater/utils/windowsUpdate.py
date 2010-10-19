@@ -227,7 +227,10 @@ def doUpdate(wc, sources, jobid):
     newTrvTups = [cmdline.parseTroveSpec(name) for name in sources if name]
     newModel = [str('install %s=%s'%(p[0],p[1])) for p in newTrvTups]
 
-    # TODO: set flavors taken from newTroveTups in client.cfg here
+    # we set the flavor in our config based on the first source because
+    # there can be only one source for the moment
+    client.cfg.flavor.append(newTrvTups[0][2])
+
     oldTroves, newTroves = modelsToJobs(cache, client, oldModel, newModel)
     newMsiTroves = [x for x in newTroves if x[0].endswith(':msi')]
     oldMsiTroves = [x for x in oldTroves if x[0].endswith(':msi')]
