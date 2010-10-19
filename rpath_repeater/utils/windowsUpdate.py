@@ -153,9 +153,8 @@ def getConaryClient():
     from socket import gethostname
     hostname = gethostname()
     cfg.configLine('conaryProxy https://%s/' % hostname)
-
+    cfg.configLine('repositoryMap windows.rpath.com https://windows.eng.rpath.com/conary/')
     return conaryclient.ConaryClient(cfg = cfg)
-
 
 def doBootstrap(wc):
 
@@ -348,7 +347,7 @@ def doUpdate(wc, sources, jobid, statusCallback):
 
     # set the registry keys
     commandValue = ["job=0", "update=%s" % updateBaseDir]
-    key = r"SYSTEM\CurrentControlSet\Services\rPath Tools Install Service\Parameters",
+    key = r"SYSTEM\CurrentControlSet\Services\rPath Tools Install Service\Parameters"
     value = 'Commands'
     rc, tb = wc.setRegistryKey(key, value, commandValue)
     if rc:
