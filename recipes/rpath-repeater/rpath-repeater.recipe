@@ -7,6 +7,7 @@ class rPathRepeater(PackageRecipe):
     version = '0.1'
 
     buildRequires = [
+        'lxml:python',
         'make:runtime',
         'python:devel',
         'pywbem:python',

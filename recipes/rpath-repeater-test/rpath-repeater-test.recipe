@@ -10,6 +10,7 @@ class rPathRepeaterTest(TestPackageRecipe):
     testDir = '.'
 
     buildRequires = [
+        'lxml:python',
         'make:runtime',
         'python:devel',
         'pywbem:python',
