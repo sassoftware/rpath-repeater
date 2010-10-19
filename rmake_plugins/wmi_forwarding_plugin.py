@@ -126,7 +126,7 @@ class WmiHandler(bfp.BaseHandler):
         return self._method(WMI_TASK_SHUTDOWN)
 
     @bfp.exposed
-    def polling(self):
+    def poll(self):
         return self._method(WMI_TASK_POLLING)
 
     @bfp.exposed
