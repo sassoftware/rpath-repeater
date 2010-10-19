@@ -14,6 +14,7 @@ class rPathRepeaterTest(TestPackageRecipe):
         'python:devel',
         'pywbem:python',
         'rmake3:python',
+        'rpath-repeater:lib',
         'rpath-repeater:python',
 
         # testsuites
