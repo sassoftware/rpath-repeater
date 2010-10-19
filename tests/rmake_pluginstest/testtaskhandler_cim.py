@@ -5,7 +5,7 @@ testsuite.setup()
 
 import pywbem
 
-from rmake_plugins import cim_forwarding_plugin
+import cim_forwarding_plugin
 
 from testtaskhandler import TestBase
 

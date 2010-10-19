@@ -6,7 +6,7 @@ testsuite.setup()
 import os
 from conary.lib import util
 
-from rmake_plugins import wmi_forwarding_plugin
+import wmi_forwarding_plugin
 
 from testtaskhandler import TestBase
 
