@@ -243,6 +243,9 @@ def doUpdate(wc, sources, jobid, statusCallback):
     oldMsiTroves = [x for x in oldTroves if x[0].endswith(':msi')]
     oldMsiDict = dict(zip([x[0] for x in oldMsiTroves],[x[1:] for x
                                                         in oldMsiTroves]))
+    if not newMsiTroves:
+        statusCallback(C.MSG_GENERIC, 'No packages need to be upgrade.')
+        return
 
     statusCallback(C.MSG_GENERIC, 'Fetching new packages from the repository')
     # fetch the new packages
