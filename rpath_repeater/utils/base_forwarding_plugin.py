@@ -44,6 +44,15 @@ class BaseException(Exception):
 class AuthenticationError(BaseException):
     "Authentication error"
 
+class RegistryAccessError(BaseException):
+    "Registry Access error"
+
+class CIFSMountError(BaseException):
+    "CIFS Mount error"
+
+class WindowsServiceError(BaseException):
+    "Windows Service error"
+
 class GenericError(BaseException):
     "Error"
 

@@ -293,7 +293,7 @@ class UpdateTask(WMITaskHandler):
         wc = self._getWmiClient(data)
         try:
             windowsUpdate.doUpdate(wc, data.sources,
-                str(self.task.job_uuid))
+                str(self.task.job_uuid), self.sendStatus)
         finally:
             wc.unmount()
 

@@ -28,6 +28,7 @@ from conary import conaryclient
 from conary import versions
 from conary.conaryclient import modelupdate, systemmodel, cmdline
 
+from rpath_repeater.codes import Codes as C
 from rpath_repeater.utils import base_forwarding_plugin as bfp
 #log.setVerbosity(log.INFO)
 
@@ -170,7 +171,8 @@ def doBootstrap(wc):
     # copy it to the target machine
     try:
         rootDir, rc = wc.mount()
-        assert(not rc)
+        if rc:
+            raise bfp.CIFSMountError('Cannot mount remote filesystem')
         contentsPath = os.path.join(rootDir, 'Windows/Temp', f[1])
         winContentsPath = 'C:\\Windows\\Temp\\' + f[1]
         winLogPath = 'C:\\Windows\\Temp\\rPath_Tools_Install.log'
@@ -185,27 +187,30 @@ def doBootstrap(wc):
     return True
 
 
-def doUpdate(wc, sources, jobid):
+def doUpdate(wc, sources, jobid, statusCallback):
     client = getConaryClient()
 
+    statusCallback(C.MSG_GENERIC, 'Waiting for previous job to complete')
     wc.waitForServiceToStop('rPath Tools Install Service')
-    # fetch old manifest
-    #rc, oldManifest = wc.getRegistryKey(r"SOFTWARE\rPath\conary",
-    #                                    "system_manifest")
-    #assert(not rc)
 
+    statusCallback(C.MSG_GENERIC, 'Retreiving the current system state')
     # fetch old sys model
-    rc, oldModel = wc.getRegistryKey(r"SOFTWARE\rPath\conary",
-                                     "system_model")
-    assert(not rc)
+    key, value = r"SOFTWARE\rPath\conary", "system_model"
+    rc, oldModel = wc.getRegistryKey(key,value)
+    if rc:
+        raise bfp.RegistryAccessError(
+            'Cannot access registry key %s value %s.\n%s' %
+            (key,value,oldModel))
 
     #oldManifest = oldManifest.split('\n')
     #oldTrvTups = [cmdline.parseTroveSpec(t) for t in oldManifest if t]
     oldModel = [l for l in oldModel.split('\n') if l]
 
+    statusCallback(C.MSG_GENERIC, 'Mounting the filesystem')
     # mount the windows filesystem
     rootDir, rc = wc.mount()
-    assert(not rc)
+    if rc:
+        raise bfp.CIFSMountError('Cannot mount remote filesystem')
 
     # Set the rtis root dir
     rtisDir = os.path.join(rootDir, r'Program Files/rPath/Updates')
@@ -213,7 +218,7 @@ def doUpdate(wc, sources, jobid):
     if not os.path.exists(rtisDir):
         os.makedirs(rtisDir)
 
-    # FIXME: This is hardcoded for the moment until we work out wmiClient 
+    # FIXME: This is hardcoded for the moment until we work out wmiClient
     # limitations
     #rc, _ = wc.setRegistryKey(
     #    r"SYSTEM\CurrentControlSet\Services\rPath Tools Install Service\Parameters",
@@ -221,6 +226,8 @@ def doUpdate(wc, sources, jobid):
     #assert(not rc)
 
     # determine the new packages to install
+    statusCallback(C.MSG_GENERIC,
+                   'Determining the packages that need to be upgraded')
     cache = modelupdate.SystemModelTroveCache(
         client.getDatabase(), client.getRepos())
 
@@ -237,6 +244,7 @@ def doUpdate(wc, sources, jobid):
     oldMsiDict = dict(zip([x[0] for x in oldMsiTroves],[x[1:] for x
                                                         in oldMsiTroves]))
 
+    statusCallback(C.MSG_GENERIC, 'Fetching new packages from the repository')
     # fetch the new packages
     trvs = client.repos.getTroves(newMsiTroves, withFiles=True)
     filesToGet = []
@@ -251,6 +259,7 @@ def doUpdate(wc, sources, jobid):
     updateBaseDir = 'job-%s' % jobid
     updateDir = os.path.join(rtisDir, updateBaseDir)
 
+    statusCallback(C.MSG_GENERIC, 'Writing packages and install instructions')
     # write the files and installation instructions
     E = ElementMaker()
     UPDATE = E.update
@@ -331,22 +340,32 @@ def doUpdate(wc, sources, jobid):
     open(os.path.join(updateDir,'servicing.xml'),'w').write(
             etree.tostring(xmlDoc,pretty_print=True))
 
+    statusCallback(C.MSG_GENERIC,
+                   'Wait for the package installation(s) to finish')
+
     # set the registry keys
     commandValue = ["job=0", "update=%s" % updateBaseDir]
-    rc, _ = wc.setRegistryKey(
-        r"SYSTEM\CurrentControlSet\Services\rPath Tools Install Service\Parameters",
-        'Commands', commandValue)
-    assert(not rc)
+    key = r"SYSTEM\CurrentControlSet\Services\rPath Tools Install Service\Parameters",
+    value = 'Commands'
+    rc, tb = wc.setRegistryKey(key, value, commandValue)
+    if rc:
+        raise bfp.RegistryAccessError(
+            'Cannot write to registry key %s value %s.\n%s' %
+            (key,value,tb))
 
     # start the service
     rc, _ = wc.startService("rPath Tools Install Service")
-    assert(not rc)
+    if rc:
+        raise bfp.WindowsServiceError(
+            'Cannot start rPath Tools Install Service')
 
     # wait until completed
     wc.waitForServiceToStop('rPath Tools Install Service')
 
     # TODO: Check for Errors
 
+    statusCallback(C.MSG_GENERIC,
+                   'Updating state information in the registry')
     # write the new system_model
     rc, _ = wc.setRegistryKey(r"SOFTWARE\rPath\conary",
                               "system_model", newModel)
