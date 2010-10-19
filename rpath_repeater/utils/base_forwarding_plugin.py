@@ -99,6 +99,7 @@ class BaseHandler(handler.JobHandler):
         self.methodArguments = self.data.pop('methodArguments', {})
         self.resultsLocation = self.data.pop('resultsLocation', {})
         self.eventUuid = self.data.pop('eventUuid', None)
+        self.zoneAddresses = [x + ':8443' for x in self._getZoneAddresses()]
 
     def newTask(self, *args, **kwargs):
         "Create a new task, and update the job with the task's status changes"

@@ -114,6 +114,7 @@ class WBEMServer(object):
     '''
 
     namespace = 'root/cimv2'
+    WBEMConnectionFactory = WBEMConnection
 
     def __init__(self, host, debug=False, **kwargs):
         self.host = host
@@ -123,7 +124,7 @@ class WBEMServer(object):
         # which it passes the callback, then (if successful) close the socket
         # and re-open it using HTTPSConnection. This is dangerous (aside from
         # inefficient)
-        self.conn = WBEMConnection(host, **kwargs)
+        self.conn = self.WBEMConnectionFactory(host, **kwargs)
         self.conn.default_namespace = self.namespace
         self.conn.debug = self.debug
         self.returnCodes = {}

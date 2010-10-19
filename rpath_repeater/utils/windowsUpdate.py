@@ -18,6 +18,7 @@ import popen2
 import tempfile
 import itertools
 import statvfs
+import subprocess
 
 from lxml import etree
 from lxml.builder import ElementMaker
@@ -66,23 +67,18 @@ def modelsToJobs(cache, client, oldModel, newModel):
 
 
 class wmiClient(object):
+    QuerySleepInterval = 5.0
     def __init__(self, target, domain, user, password):
-        self.baseCmd = ('/usr/bin/wmic --host %(host)s --user %(user)s '
-            '--password %(password)s --domain %(domain)s' % {'host': target,
-            'user': user, 'password':password, 'domain': (domain or target)})
+        self.baseCmd = ['/usr/bin/wmic', '--host', target, '--user', user,
+            '--password', password, '--domain', domain or target]
 
-        self.mountCmd = ("/bin/mount -t cifs -o user=%s,password=%s '//%s/c$' "
-            % (user,password,target))
+        # Older mount.cifs don't seem to support passing the user via an
+        # environment variable
+        self.mountCmd = [ "/bin/mount", "-t", "cifs", "-o", "user=%s" % user,
+            "//%s/c$" % target ]
+        self.mountEnv = dict(PASSWD=password)
 
         self._rootDir = None
-        self._rootMounted = False
-
-    def unmount(self):
-        # unmount and delete the root file system
-        if self._rootDir and self._rootMounted:
-            os.system('/bin/umount ' + self._rootDir)
-            os.rmdir(self._rootDir)
-            self._rootMounted = False
 
     def _wmiCall(self, cmd):
         p = popen2.Popen3(cmd,True)
@@ -93,7 +89,7 @@ class wmiClient(object):
         return rc, p.fromchild.read()
 
     def _wmiServiceRequest( self, action, service):
-        wmicmd = "%s service %s '%s' " % (self.baseCmd, action, service)
+        wmicmd = self.baseCmd + ['service', action, service]
         return self._wmiCall(wmicmd)
 
     def startService(self, service):
@@ -107,42 +103,62 @@ class wmiClient(object):
 
     def waitForServiceToStop(self, service):
         # query the service until is is no longer active
-        while (self.queryService('rPath Tools Install Service')[1]
-            != 'Service Not Active\n'):
-            time.sleep(5.0)
+        while 1:
+            ret = self.queryService('rPath Tools Install Service')[1]
+            if ret.strip() == 'Service Not Active':
+                return
+            time.sleep(self.QuerySleepInterval)
 
     def getRegistryKey(self, keyPath, key):
-        wmicmd = "%s registry getkey '%s' '%s'" % (self.baseCmd, keyPath, key)
+        wmicmd = self.baseCmd + ["registry", "getkey", keyPath, key]
         return self._wmiCall(wmicmd)
 
     def setRegistryKey(self, keyPath, key, valueList):
         if not isinstance(valueList, list):
             valueList = [valueList]
-        valueStr =  ' '.join("'%s'" % x for x in valueList)
-        wmicmd = "%s registry setkey '%s' '%s' %s" % (self.baseCmd, keyPath,
-                                                      key, valueStr)
+        wmicmd = self.baseCmd + ["registry", "setkey", keyPath, key] + valueList
         return self._wmiCall(wmicmd)
 
     def createRegistryKey(self, keyPath, key):
-        wmicmd = "%s registry createkey '%s' '%s'" % (
-            self.baseCmd, keyPath, key)
+        wmicmd = self.baseCmd + ["registry", "createkey", keyPath, key]
         return self._wmiCall(wmicmd)
 
     def runCmd(self, cmd):
-        wmicmd = "%s process create '%s'" % (self.baseCmd, cmd)
+        wmicmd = self.baseCmd + ["process", "create", cmd]
         return self._wmiCall(wmicmd)
 
     def checkProcess(self, pid):
         # WRITE ME
-        wmicmd = "%s registry checkprocess '%s'" % (self.baseCmd, pid)
+        wmicmd = self.baseCmd + ["process", "status", pid]
         return self._wmiCall(wmicmd)
 
     def mount(self):
-        if not self._rootMounted:
-            self._rootMounted = True
+        if not self._rootDir:
             self._rootDir = tempfile.mkdtemp()
-            return self._rootDir, os.system(self.mountCmd + self._rootDir)
+            rc = self._doMount()
+            if rc != 0:
+                os.rmdir(self._rootDir)
+                self._rootDir = None
+            return self._rootDir, rc
 
+    def _doMount(self):
+        cmd = self.mountCmd + [ self._rootDir ]
+        stdout = stderr = file("/dev/null", "w")
+        # stdout = stderr = subprocess.PIPE
+        p = subprocess.Popen(cmd, stdout=stdout, stderr=stderr,
+            env=self.mountEnv)
+        rc = p.wait()
+        return rc
+
+    def unmount(self):
+        # unmount and delete the root file system
+        if self._rootDir:
+            self._doUnmount()
+            os.rmdir(self._rootDir)
+            self._rootDir = None
+
+    def _doUnmount(self):
+        os.system('/bin/umount ' + self._rootDir)
 
 def getConaryClient():
     cfg = conarycfg.ConaryConfiguration()
@@ -203,7 +219,7 @@ def doUpdate(wc, sources, jobid, statusCallback):
 
     #oldManifest = oldManifest.split('\n')
     #oldTrvTups = [cmdline.parseTroveSpec(t) for t in oldManifest if t]
-    oldModel = [l for l in oldModel.split('\n') if l]
+    oldModel = [l.strip() for l in oldModel.split('\n') if l]
 
     statusCallback(C.MSG_GENERIC, 'Mounting the filesystem')
     # mount the windows filesystem
