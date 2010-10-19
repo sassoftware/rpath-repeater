@@ -1,0 +1,35 @@
+#
+# Copyright (c) 2010 rPath, Inc.
+#
+
+loadSuperClass('testpackage=testbits.rb.rpath.com@rpl:1')
+class rPathRepeaterTest(TestPackageRecipe):
+    name = 'rpath-repeater-test'
+    version = '0.1'
+
+    buildRequires = [
+        'make:runtime',
+        'python:devel',
+        'pywbem:python',
+        'rmake3:python',
+        'rpath-repeater:python',
+
+        # testsuites
+        'conary-test:lib',
+        'testutils:python',
+        'testutils:runtime',
+    ]
+
+    pythonPath = [
+        '%(libdir)s/conary-test',
+    ]
+
+    codeDirs = {
+        'rpath-repeater' : '%(libdir)s/python2.4/site-packages/rpath_repeater',
+        'rpath-repeater-plugins' : '%(libdir)s/rmake3',
+    }
+
+
+    def setup(r):
+        r.addMercurialSnapshot()
+        r.test()
