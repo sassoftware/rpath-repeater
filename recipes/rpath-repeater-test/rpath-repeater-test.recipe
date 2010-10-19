@@ -7,6 +7,8 @@ class rPathRepeaterTest(TestPackageRecipe):
     name = 'rpath-repeater-test'
     version = '0.1'
 
+    testDir = '.'
+
     buildRequires = [
         'make:runtime',
         'python:devel',
