@@ -22,6 +22,7 @@ class rPathRepeaterTest(TestPackageRecipe):
 
     pythonPath = [
         '%(libdir)s/conary-test',
+        '%(libdir)s/rmake3',
     ]
 
     codeDirs = {
