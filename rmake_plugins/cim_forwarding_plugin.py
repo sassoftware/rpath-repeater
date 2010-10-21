@@ -159,7 +159,7 @@ class CIMTaskHandler(bfp.BaseTaskHandler):
         return server
 
     def _probeHost(self, host, port, x509Dict):
-        return nodeinfo.probe_host_ssl(self.data.p.host, self.data.p.port, **x509Dict)
+        return nodeinfo.probe_host_ssl(host, port, **x509Dict)
 
     def _getServerCert(self):
         return [ XML.Text("ssl_server_certificate", self._serverCert) ]
