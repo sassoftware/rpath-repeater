@@ -28,6 +28,7 @@ from conary import conarycfg
 from conary import conaryclient
 from conary import versions
 from conary.conaryclient import modelupdate, systemmodel, cmdline
+from conary.deps import deps
 
 from rpath_repeater.codes import Codes as C
 from rpath_repeater.utils import base_forwarding_plugin as bfp
@@ -42,9 +43,9 @@ def runModel(client, cache, modelText):
     client._updateFromTroveSetGraph(updJob, ts, cache)
     return updJob.getJobs()
 
-def modelsToJobs(cache, client, oldModel, newModel):
+def modelsToJobs(cache, client, oldJobSets, newModel):
     newTroves = []
-    for jobSet in runModel(client, cache, oldModel):
+    for jobSet in oldJobSets:
         newTroves += [ (x[0], x[2][0], x[2][1]) for x in jobSet ]
 
     trvs = cache.getTroves(newTroves)
@@ -62,8 +63,10 @@ def modelsToJobs(cache, client, oldModel, newModel):
                   if x[1][0] is not None ]
     newTroves = [ (x[0], x[2][0], x[2][1]) for x in itertools.chain(*finalJobs)
                   if x[2][0] is not None ]
+    removeTroves = [ (x[0], x[1][0], x[1][1]) for x in
+                     itertools.chain(*finalJobs) if x[2][0] is None ]
 
-    return oldTroves, newTroves
+    return oldTroves, newTroves, removeTroves
 
 
 class wmiClient(object):
@@ -160,10 +163,11 @@ class wmiClient(object):
     def _doUnmount(self):
         os.system('/bin/umount ' + self._rootDir)
 
-def getConaryClient():
+def getConaryClient(flavors = []):
     cfg = conarycfg.ConaryConfiguration()
     cfg.initializeFlavors()
     cfg.dbPath = ':memory:'
+    cfg.flavor.extend(flavors)
 
     # FIXME: this only will work when the repeater is running on the RBA
     from socket import gethostname
@@ -203,8 +207,6 @@ def doBootstrap(wc):
 
 
 def doUpdate(wc, sources, jobid, statusCallback):
-    client = getConaryClient()
-
     statusCallback(C.MSG_GENERIC, 'Waiting for previous job to complete')
     wc.waitForServiceToStop('rPath Tools Install Service')
 
@@ -216,10 +218,18 @@ def doUpdate(wc, sources, jobid, statusCallback):
         raise bfp.RegistryAccessError(
             'Cannot access registry key %s value %s.\n%s' %
             (key,value,oldModel))
-
-    #oldManifest = oldManifest.split('\n')
-    #oldTrvTups = [cmdline.parseTroveSpec(t) for t in oldManifest if t]
     oldModel = [l.strip() for l in oldModel.split('\n') if l]
+
+    # fetch old msi manifest
+    key, value = r"SOFTWARE\rPath\conary", "manifest"
+    rc, currManifest = wc.getRegistryKey(key,value)
+    if rc:
+        raise bfp.RegistryAccessError(
+            'Cannot access registry key %s value %s.\n%s' %
+            (key,value,oldModel))
+    currManifest = currManifest.split('\n')
+    currManifestTups = [cmdline.parseTroveSpec(t) for t in currManifest if t]
+    currManifestDict = dict([(t.name, t) for t in currManifestTups ])
 
     statusCallback(C.MSG_GENERIC, 'Mounting the filesystem')
     # mount the windows filesystem
@@ -229,156 +239,212 @@ def doUpdate(wc, sources, jobid, statusCallback):
 
     # Set the rtis root dir
     rtisDir = os.path.join(rootDir, r'Program Files/rPath/Updates')
-    rtisWinDir = 'C:\\Program Files\\rPath\\Updates'
     if not os.path.exists(rtisDir):
         os.makedirs(rtisDir)
 
     # FIXME: This is hardcoded for the moment until we work out wmiClient
     # limitations
+    #rtisWinDir = 'C:\\Program Files\\rPath\\Updates'
     #rc, _ = wc.setRegistryKey(
     #    r"SYSTEM\CurrentControlSet\Services\rPath Tools Install Service\Parameters",
     #    'Root', rtisWinDir)
     #assert(not rc)
 
-    # determine the new packages to install
     statusCallback(C.MSG_GENERIC,
                    'Determining the packages that need to be upgraded')
-    cache = modelupdate.SystemModelTroveCache(
-        client.getDatabase(), client.getRepos())
-
     newTrvTups = [cmdline.parseTroveSpec(name) for name in sources if name]
     newModel = [str('install %s=%s'%(p[0],p[1])) for p in newTrvTups]
 
-    # we set the flavor in our config based on the first source because
-    # there can be only one source for the moment
-    client.cfg.flavor.append(newTrvTups[0][2])
+    client = getConaryClient(flavors = [newTrvTups[0][2]])
+    cache = modelupdate.SystemModelTroveCache(client.getDatabase(),
+                                              client.getRepos())
+    # use msi manifest to "correct" the state defined by the old model if needed
+    additionalInstalls = []
+    oldJobSets = runModel(client, cache, oldModel)
+    for job in oldJobSets:
+        for t in job:
+            currTrv = currManifestDict.pop(t[0], None)
+            if currTrv:
+                # we might have a different version in the manifest
+                v = versions.ThawVersion(currTrv.version)
+                f = deps.parseFlavor(currTrv.flavor)
+                if v != t[2][0] or f != t[2][1]:
+                    # this package is different than the intent of the model
+                    additionalInstalls.append(str('install %s=%s' %
+                                                  (t[0],str(v))))
 
-    oldTroves, newTroves = modelsToJobs(cache, client, oldModel, newModel)
+    # add additional packages that we have install but are not expressed by
+    # the model
+    for ts in currManifestDict.values():
+        additionalInstalls.append('install %s=%s' %
+            (ts.name, str(versions.ThawVersion(ts.version))))
+
+    if additionalInstalls:
+        oldModel.extend(additionalInstalls)
+        oldJobSets = runModel(client, cache, oldModel)
+
+    # determine what new packages to install
+    oldTroves, newTroves, removeTroves = modelsToJobs(cache, client,
+                                                      oldJobSets, newModel)
     newMsiTroves = [x for x in newTroves if x[0].endswith(':msi')]
     oldMsiTroves = [x for x in oldTroves if x[0].endswith(':msi')]
-    oldMsiDict = dict(zip([x[0] for x in oldMsiTroves],[x[1:] for x
-                                                        in oldMsiTroves]))
-    if not newMsiTroves:
-        statusCallback(C.MSG_GENERIC, 'No packages need to be upgrade.')
-        return
+    removeMsiTroves = [x for x in removeTroves if x[0].endswith(':msi')]
 
-    statusCallback(C.MSG_GENERIC, 'Fetching new packages from the repository')
-    # fetch the new packages
-    trvs = client.repos.getTroves(newMsiTroves, withFiles=True)
-    filesToGet = []
-    for t in trvs:
-        filesToGet.append((list(t.iterFileList(capsules=True))[0], t))
+    if newMsiTroves or removeMsiTroves:
+        statusCallback(C.MSG_GENERIC,
+                       'Fetching new packages from the repository')
+        # fetch the old troves
+        oldTrvs = client.repos.getTroves(oldMsiTroves, withFiles=False)
+        oldMsiDict = dict(zip([x.name() for x in oldTrvs], oldTrvs))
 
-    contents = client.repos.getFileContents([(f[0][2],f[0][3])
-                                             for f in filesToGet],
-                                             compressed=False)
+        # fetch the new packages
+        trvs = client.repos.getTroves(newMsiTroves, withFiles=True)
+        filesToGet = []
+        for t in trvs:
+            filesToGet.append((list(t.iterFileList(capsules=True))[0], t))
+        contents = client.repos.getFileContents([(f[0][2],f[0][3])
+                                                 for f in filesToGet],
+                                                compressed=False)
 
-    # Set the update dir
-    updateBaseDir = 'job-%s' % jobid
-    updateDir = os.path.join(rtisDir, updateBaseDir)
+        removeTrvs = client.repos.getTroves(removeMsiTroves, withFiles=False)
 
-    statusCallback(C.MSG_GENERIC, 'Writing packages and install instructions')
-    # write the files and installation instructions
-    E = ElementMaker()
-    UPDATE = E.update
-    SEQUENCE = E.sequence
-    LOGFILE = E.logFile
-    UPDATE_JOBS = E.updateJobs
-    UPDATE_JOB = E.updateJob
-    PACKAGES = E.packages
-    PACKAGE = E.package
-    TYPE = E.type
-    OPERATION = E.operation
-    PRODUCT_CODE = E.productCode
-    PRODUCT_NAME = E.productName
-    PRODUCT_VERSION = E.productVersion
-    FILE = E.file
-    MANIFEST = E.manifestEntry
-    PREV_MANIFEST = E.previousManifestEntry
+        # Set the update dir
+        updateBaseDir = 'job-%s' % jobid
+        updateDir = os.path.join(rtisDir, updateBaseDir)
 
-    xmlDocStr = '''UPDATE(
-        LOGFILE('install.log'),
-        UPDATE_JOBS(
+        statusCallback(C.MSG_GENERIC, 'Writing packages and install instructions')
+        # write the files and installation instructions
+        E = ElementMaker()
+        UPDATE = E.update
+        SEQUENCE = E.sequence
+        LOGFILE = E.logFile
+        UPDATE_JOBS = E.updateJobs
+        UPDATE_JOB = E.updateJob
+        PACKAGES = E.packages
+        PACKAGE = E.package
+        TYPE = E.type
+        OPERATION = E.operation
+        PRODUCT_CODE = E.productCode
+        PRODUCT_NAME = E.productName
+        PRODUCT_VERSION = E.productVersion
+        FILE = E.file
+        MANIFEST = E.manifestEntry
+        PREV_MANIFEST = E.previousManifestEntry
 
-            UPDATE_JOB(
-                SEQUENCE('0'),
-                PACKAGES(
-                    %s
+        xmlDocStr = '''UPDATE(
+            LOGFILE('install.log'),
+            UPDATE_JOBS(
+
+                UPDATE_JOB(
+                    SEQUENCE('0'),
+                    PACKAGES(
+                        %s
+                        )
                     )
                 )
-            )
-        )'''
+            )'''
 
-    pkgTemplate = '''PACKAGE(
-        TYPE('msi'),
-        SEQUENCE('%s'),
-        LOGFILE('install.log'),
-        OPERATION('install'),
-        PRODUCT_CODE("%s"),
-        PRODUCT_NAME("%s"),
-        PRODUCT_VERSION("%s"),
-        FILE("%s"),
-        MANIFEST("%s"),
-        PREV_MANIFEST("%s")
-        )'''
-    pkgStr = ''
-    for s, ((f, t),c) in enumerate(zip(filesToGet,contents)):
-        if t.name() in oldMsiDict:
-            o = oldMsiDict[t.name()]
-            oldManifestName = '%s=%s[%s]' % (t.name(),str(o[0]),str(o[1]))
-        else:
-            oldManifestName = ''
-        values = (str(s),
-                  t.troveInfo.capsule.msi.productCode(),
-                  t.troveInfo.capsule.msi.name(),
-                  t.troveInfo.capsule.msi.version(),
-                  f[1],
-                  '%s=%s[%s]' % (t.name(),str(t.version()),str(t.flavor())),
-                  '%s' % oldManifestName)
-        pkgStr = pkgStr + pkgTemplate % values + ',\n'
+        pkgTemplate = '''PACKAGE(
+            TYPE('msi'),
+            SEQUENCE('%s'),
+            LOGFILE('install.log'),
+            OPERATION('install'),
+            PRODUCT_CODE("%s"),
+            PRODUCT_NAME("%s"),
+            PRODUCT_VERSION("%s"),
+            FILE("%s"),
+            MANIFEST("%s"),
+            PREV_MANIFEST("%s")
+            )'''
+        removeTemplate = '''PACKAGE(
+            TYPE('msi'),
+            SEQUENCE('%s'),
+            LOGFILE('uninstall.log'),
+            OPERATION('uninstall'),
+            PRODUCT_CODE("%s"),
+            PRODUCT_NAME("%s"),
+            PRODUCT_VERSION("%s"),
+            MANIFEST("%s"),
+            )'''
+        pkgStr = ''
+        seqNum = 0
+        for ((f, t),c) in zip(filesToGet,contents):
+            if t.name() in oldMsiDict:
+                ot = oldMsiDict[t.name()]
+                # skip the upgrade if we have the same msi
+                if ot.troveInfo.capsule.msi.productCode() == \
+                        t.troveInfo.capsule.msi.productCode():
+                    continue
+                oldManifestName = '%s=%s[%s]' % (ot.name(),
+                                                 ot.version().freeze(),
+                                                 str(ot.flavor()))
+            else:
+                oldManifestName = ''
+            values = (str(seqNum),
+                      t.troveInfo.capsule.msi.productCode(),
+                      t.troveInfo.capsule.msi.name(),
+                      t.troveInfo.capsule.msi.version(),
+                      f[1],
+                      '%s=%s[%s]' % (t.name(), t.version().freeze(),
+                                     str(t.flavor())),
+                      '%s' % oldManifestName)
+            pkgStr = pkgStr + pkgTemplate % values + ',\n'
 
-        # verify free space on the target drive
-        packageDir = os.path.join(updateDir,
-                                  t.troveInfo.capsule.msi.productCode())
-        os.makedirs(packageDir)
-        stat = os.statvfs(packageDir)
-        fsSize = stat[statvfs.F_BFREE] * stat[statvfs.F_BSIZE]
-	cSize = c.get().fileobj.size
-	if (fsSize < cSize * 3):
-                raise bfp.GenericError(r'Not enough space on the drive to install %s'
-                                       % t.troveInfo.capsule.msi.name())
+            # verify free space on the target drive
+            packageDir = os.path.join(updateDir,
+                                      t.troveInfo.capsule.msi.productCode())
+            os.makedirs(packageDir)
+            stat = os.statvfs(packageDir)
+            fsSize = stat[statvfs.F_BFREE] * stat[statvfs.F_BSIZE]
+            cSize = c.get().fileobj.size
+            if (fsSize < cSize * 3):
+                    raise bfp.GenericError(
+                        r'Not enough space on the drive to install %s'
+                        % t.troveInfo.capsule.msi.name())
 
-        # write the contents
-        contentsPath = os.path.join(packageDir,f[1])
-        open(contentsPath,'w').write(c.f.read())
+            # write the contents
+            contentsPath = os.path.join(packageDir,f[1])
+            open(contentsPath,'w').write(c.f.read())
 
-    # write servicing.xml
-    xmlDocStr = xmlDocStr % pkgStr
-    xmlDoc = eval(xmlDocStr)
-    open(os.path.join(updateDir,'servicing.xml'),'w').write(
-            etree.tostring(xmlDoc,pretty_print=True))
+            seqNum = seqNum + 1
 
-    statusCallback(C.MSG_GENERIC,
-                   'Wait for the package installation(s) to finish')
+        # write remove instructions
+        for s, t in enumerate(removeTrvs):
+            values = (str(s + seqNum),
+                      t.troveInfo.capsule.msi.productCode(),
+                      t.troveInfo.capsule.msi.name(),
+                      t.troveInfo.capsule.msi.version(),
+                      '%s=%s[%s]' % (t.name(), t.version().freeze(),
+                                     str(t.flavor())),)
+            pkgStr = pkgStr + removeTemplate % values + ',\n'
 
-    # set the registry keys
-    commandValue = ["job=0", "update=%s" % updateBaseDir]
-    key = r"SYSTEM\CurrentControlSet\Services\rPath Tools Install Service\Parameters"
-    value = 'Commands'
-    rc, tb = wc.setRegistryKey(key, value, commandValue)
-    if rc:
-        raise bfp.RegistryAccessError(
-            'Cannot write to registry key %s value %s.\n%s' %
-            (key,value,tb))
+        # write servicing.xml
+        xmlDocStr = xmlDocStr % pkgStr
+        xmlDoc = eval(xmlDocStr)
+        open(os.path.join(updateDir,'servicing.xml'),'w').write(
+                etree.tostring(xmlDoc,pretty_print=True))
 
-    # start the service
-    rc, _ = wc.startService("rPath Tools Install Service")
-    if rc:
-        raise bfp.WindowsServiceError(
-            'Cannot start rPath Tools Install Service')
+        statusCallback(C.MSG_GENERIC,
+                       'Waiting for the package installation(s) to finish')
 
-    # wait until completed
-    wc.waitForServiceToStop('rPath Tools Install Service')
+        # set the registry keys
+        commandValue = ["job=0", "update=%s" % updateBaseDir]
+        key = r"SYSTEM\CurrentControlSet\Services\rPath Tools Install Service\Parameters"
+        value = 'Commands'
+        rc, tb = wc.setRegistryKey(key, value, commandValue)
+        if rc:
+            raise bfp.RegistryAccessError(
+                'Cannot write to registry key %s value %s.\n%s' %
+                (key,value,tb))
+
+        # start the service
+        rc, _ = wc.startService("rPath Tools Install Service")
+        if rc:
+            raise bfp.WindowsServiceError(
+                'Cannot start rPath Tools Install Service')
+
+        # wait until completed
+        wc.waitForServiceToStop('rPath Tools Install Service')
 
     # TODO: Check for Errors
 
