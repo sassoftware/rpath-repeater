@@ -33,6 +33,8 @@ from mint.db import database
 from mint.rest.db import authmgr
 from mint.django_rest.rbuilder.inventory import models
 
+from catalogService.rest.api import clouds
+
 PREFIX = 'com.rpath.sputnik'
 LAUNCH_JOB = PREFIX + '.launchplugin'
 LAUNCH_TASK_WAIT_FOR_NETWORK = PREFIX + '.waitForNetwork'
@@ -121,7 +123,7 @@ class WaitForNetworkTask(plug_worker.TaskHandler):
     totalRunTime = 300
 
     def loadTargetDriverClasses(self):
-        for driverName in [ 'ec2', 'vmware', 'vws', 'xenent' ]:
+        for driverName in clouds.SUPPORTED_MODULES:
             driverClass = __import__('catalogService.rest.drivers.%s' % (driverName),
                                       {}, {}, ['driver']).driver
             yield driverClass
