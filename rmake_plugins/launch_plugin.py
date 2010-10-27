@@ -42,7 +42,7 @@ LAUNCH_TASK_WAIT_FOR_NETWORK = PREFIX + '.waitForNetwork'
 from rpath_repeater.codes import Codes as C
 
 CimParams = types.slottype('CimParams',
-    'host port clientCert clientKey eventUuid instanceId targetName targetType')
+    'host port clientCert clientKey eventUuid instanceId targetName targetType launchWaitTime')
 LaunchData = types.slottype('LaunchData', 'p response')
 
 class LaunchPlugin(plug_dispatcher.DispatcherPlugin, plug_worker.WorkerPlugin):
@@ -120,8 +120,6 @@ class LaunchHandler(handler.JobHandler):
 class WaitForNetworkTask(plug_worker.TaskHandler):
     TemporaryDir = "/dev/shm"
 
-    totalRunTime = 300
-
     def loadTargetDriverClasses(self):
         for driverName in clouds.SUPPORTED_MODULES:
             driverClass = __import__('catalogService.rest.drivers.%s' % (driverName),
@@ -146,6 +144,7 @@ class WaitForNetworkTask(plug_worker.TaskHandler):
     def _run(self, data):        
         instanceId = data.p.instanceId
         targetType = data.p.targetType
+        launchWaitTime = data.p.launchWaitTime
         cfg = config.MintConfig()
         cfg.read(config.RBUILDER_CONFIG)
 
@@ -181,7 +180,7 @@ class WaitForNetworkTask(plug_worker.TaskHandler):
         setDnsName = False
         sleptTime = 0
 
-        while sleptTime < self.totalRunTime:
+        while sleptTime < launchWaitTime:
             system = mgr.getSystemByTargetSystemId(instanceId)
             networks = system.networks.all()
             if networks:

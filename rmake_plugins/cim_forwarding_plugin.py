@@ -31,7 +31,7 @@ CIM_TASK_POLLING = CIM_JOB + '.poll'
 CIM_TASK_UPDATE = CIM_JOB + '.update'
 
 CimParams = types.slottype('CimParams',
-    'host port clientCert clientKey eventUuid instanceId targetName targetType')
+    'host port clientCert clientKey eventUuid instanceId targetName targetType launchWaitTime')
 # These are just the starting point attributes
 CimData = types.slottype('CimData', 'p response')
 RactivateData = types.slottype('RactivateData',
