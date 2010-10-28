@@ -270,7 +270,7 @@ class UpdateTask(CIMTaskHandler):
             data.p.host, data.p.port))
 
         server = self.getWbemConnection(data)
-        self._applySoftwareUpdate(server, data.sources, data.nodes)
+        self._applySoftwareUpdate(server, data.sources, sorted(data.nodes))
         children = self._getUuids(server)
         children.extend(self._getServerCert())
         children.append(self._getSoftwareVersions(server))
