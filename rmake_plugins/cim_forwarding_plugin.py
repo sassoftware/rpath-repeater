@@ -36,7 +36,7 @@ CimParams = types.slottype('CimParams',
 CimData = types.slottype('CimData', 'p response')
 RactivateData = types.slottype('RactivateData',
         'p nodes requiredNetwork response')
-UpdateData = types.slottype('UpdateData', 'p sources response')
+UpdateData = types.slottype('UpdateData', 'p nodes sources response')
 
 class CimForwardingPlugin(bfp.BaseForwardingPlugin):
     def dispatcher_pre_setup(self, dispatcher):
@@ -111,7 +111,7 @@ class CimHandler(bfp.BaseHandler):
             return CimData(params)
         if taskType in [ CIM_TASK_UPDATE ]:
             sources = methodArguments['sources']
-            return UpdateData(params, sources)
+            return UpdateData(params, zoneAddresses, sources)
         raise Exception("Unhandled task type %s" % taskType)
 
     def _method(self, taskType):
@@ -270,7 +270,7 @@ class UpdateTask(CIMTaskHandler):
             data.p.host, data.p.port))
 
         server = self.getWbemConnection(data)
-        self._applySoftwareUpdate(server, data.sources)
+        self._applySoftwareUpdate(server, data.sources, data.nodes)
         children = self._getUuids(server)
         children.extend(self._getServerCert())
         children.append(self._getSoftwareVersions(server))
@@ -281,7 +281,7 @@ class UpdateTask(CIMTaskHandler):
         self.setData(data)
         self.sendStatus(C.OK, "Host %s has been updated" % data.p.host)
 
-    def _applySoftwareUpdate(self, server, sources):
+    def _applySoftwareUpdate(self, server, sources, nodes):
         cimUpdater = cimupdater.CIMUpdater(server)
-        cimUpdater.applyUpdate(sources)
+        cimUpdater.applyUpdate(sources, nodes=nodes)
         return None
