@@ -9,6 +9,7 @@ class rPathRepeater(PackageRecipe):
     buildRequires = [
         'lxml:python',
         'make:runtime',
+        'pyOpenSSL:python',
         'python:devel',
         'pywbem:python',
         'rmake3:python',
