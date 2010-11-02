@@ -164,14 +164,16 @@ class CIMUpdater(object):
         job = self.updateCheckAsync()
         return self.pollJobForCompletion(job, timeout = timeout)
 
-    def applyUpdateAsync(self, sources):
+    def applyUpdateAsync(self, sources, nodes):
         result = self.server.VAMI_SoftwareInstallationService.\
-                             InstallFromNetworkLocations(Sources=sources,
-                                    InstallOptions=[pywbem.Uint16(2),])
+                             InstallFromNetworkLocations(
+                                ManagementNodeAddresses=nodes,
+                                Sources=sources,
+                                InstallOptions=[pywbem.Uint16(2),])
         return result[1]['job']
 
-    def applyUpdate(self, sources, timeout = DEFAULT_TIMEOUT):
-        job = self.applyUpdateAsync(sources)
+    def applyUpdate(self, sources, timeout = DEFAULT_TIMEOUT, nodes=None):
+        job = self.applyUpdateAsync(sources, nodes)
         job = self.pollJobForCompletion(job, timeout = timeout)
         if not self.isJobSuccessful(job):
             error = self.server.getError(job)

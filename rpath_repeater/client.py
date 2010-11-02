@@ -42,7 +42,8 @@ class RepeaterClient(object):
         Information required in order to talk to a WBEM endpoint
         """
         __slots__ = [ 'host', 'port', 'clientCert', 'clientKey', 
-            'eventUuid', 'instanceId', 'targetName', 'targetType' ]
+            'eventUuid', 'instanceId', 'targetName', 'targetType',
+            'launchWaitTime']
         # XXX instanceId, targetName, targetType have nothing to do with
         # CimParams, they should be in a different data structure
 
