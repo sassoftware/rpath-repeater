@@ -210,7 +210,7 @@ def doUpdate(wc, sources, jobid, statusCallback):
     statusCallback(C.MSG_GENERIC, 'Waiting for previous job to complete')
     wc.waitForServiceToStop('rPath Tools Install Service')
 
-    statusCallback(C.MSG_GENERIC, 'Retreiving the current system state')
+    statusCallback(C.MSG_GENERIC, 'Retrieving the current system state')
     # fetch old sys model
     key, value = r"SOFTWARE\rPath\conary", "system_model"
     rc, oldModel = wc.getRegistryKey(key,value)
