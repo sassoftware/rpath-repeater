@@ -150,6 +150,7 @@ class WMITaskHandler(bfp.BaseTaskHandler):
         children = self._getUuids(wc)
         children.extend(self._getComputerName(wc))
         children.append(self._getSoftwareVersions(wc))
+        children.append(self._getNetworkInfo(wc))
         return children
 
     @classmethod
@@ -189,6 +190,39 @@ class WMITaskHandler(bfp.BaseTaskHandler):
         # Start creating the XML document
         troves = [ cls._trove(tspec) for tspec in siList if tspec ]
         return XML.Element("installed_software", *troves)
+
+    @classmethod
+    def _getNetworkInfo(cls, wmiClient):
+        rc, netInfo = wmiClient.queryNetwork()
+        nets = [ x.strip().split(',') for x in netInfo.split('\n') ]
+
+        nodes = []
+        for n in nets:
+            device_name, ipaddr, netmask, enabled, hostname, domain = n
+            if enabled != 'true':
+                continue
+            ip_address = ipv6_address = None
+            if ":" in ipaddr:
+                ipv6_address = ipaddr
+            else:
+                ip_address = ipaddr
+                ints = [int(x) for x in netmask.split('.') if int(x)]
+                netmask = 0
+                for i in ints:
+                    while i:
+                        netmask = netmask + (i & 1)
+                        i = i >> 1
+            dns_name = "%s.%s" % (hostname, domain)
+            required = str((ip_address==wmiClient.target) or \
+                (dns_name==wmiClient.target)).lower()
+            if ipv6_address:
+                nodes.append(XML.Element("network", device_name, ipv6_address,
+                                         netmask, dns_name, required))
+            else:
+                nodes.append(XML.Element("network", device_name, ipv6_address,
+                                         netmask, dns_name, required))
+
+            return XML.Element("networks",*nodes)
 
     @classmethod
     def _getRegistryKey(cls, wc, keyPath, key):

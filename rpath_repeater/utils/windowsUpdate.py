@@ -72,6 +72,10 @@ def modelsToJobs(cache, client, oldJobSets, newModel):
 class wmiClient(object):
     QuerySleepInterval = 5.0
     def __init__(self, target, domain, user, password):
+        self.target = target
+        self.domain = domain
+        self.user = user
+        self.password = password
         self.baseCmd = ['/usr/bin/wmic', '--host', target, '--user', user,
             '--password', password, '--domain', domain or target]
 
@@ -95,6 +99,10 @@ class wmiClient(object):
         wmicmd = self.baseCmd + ['service', action, service]
         return self._wmiCall(wmicmd)
 
+    def _wmiQueryRequest( self, action, service):
+        wmicmd = self.baseCmd + ['query', action]
+        return self._wmiCall(wmicmd)
+
     def startService(self, service):
         return self._wmiServiceRequest('start', service)
 
@@ -103,6 +111,9 @@ class wmiClient(object):
 
     def queryService(self, service):
         return self._wmiServiceRequest('getstatus', service)
+
+    def queryNetwork(self):
+        return self._wmiQueryRequest('network')
 
     def waitForServiceToStop(self, service):
         # query the service until is is no longer active
