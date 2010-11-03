@@ -99,7 +99,7 @@ class wmiClient(object):
         wmicmd = self.baseCmd + ['service', action, service]
         return self._wmiCall(wmicmd)
 
-    def _wmiQueryRequest( self, action, service):
+    def _wmiQueryRequest( self, action):
         wmicmd = self.baseCmd + ['query', action]
         return self._wmiCall(wmicmd)
 
