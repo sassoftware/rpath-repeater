@@ -297,14 +297,19 @@ class ConfigurationTask(CIMTaskHandler):
                 data.p.host, data.p.port))
 
         server = self.getWbemConnection(data)
-        self._applyConfigurationChange(server, data.argument)
+        succeeded = self._applyConfigurationChange(server, data.argument)
         children = self._getUuids(server)
 
         el = XML.Element("system", *children)
 
         data.response = XML.toString(el)
         self.setData(data)
-        self.sendStatus(C.OK, "Host %s configuration applied" % data.p.host)
+
+        if succeeded:
+            self.sendStatus(C.OK, "Host %s configuration applied" % data.p.host)
+        else:
+            self.sendStatus(C.ERR_GENERIC,
+                "Host %s configuration failed to apply")
 
     def _applyConfigurationChange(self, server, configuration):
         import pywbem
@@ -314,4 +319,7 @@ class ConfigurationTask(CIMTaskHandler):
         instance.properties['Value'] = pywbem.CIMProperty('Value',
             configuration, type="string")
         server.RPATH_Configuration.ModifyInstance(instance)
-        return None
+
+        ret = server.conn.callMethod(instance.path, 'ApplyToMSE')
+        retval = ret[0]
+        return (retval == 0)

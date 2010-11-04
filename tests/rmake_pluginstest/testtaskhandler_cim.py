@@ -96,6 +96,7 @@ class CimTest(TestBase):
         extrinsic=dict(
             RemoteRegistration = (0, dict(errorSummary="", errorDetails="")),
             Shutdown = (0, dict()),
+            ApplyToMSE = (64, dict()),
         ),
     )
 
