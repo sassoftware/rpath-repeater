@@ -256,26 +256,6 @@ class WMITaskHandler(bfp.BaseTaskHandler):
                     (keyPath, key, results))
         return results
 
-    @classmethod
-    def _getLocalUUID(cls, wc, generated_uuid):
-        # Get some data from the target machine so that we can generate a
-        # local uuid
-        # FIXME: Should use SMBIOS interface once available to get real
-        #        information.
-        keyPath = r'HARDWARE\DESCRIPTION\System\BIOS'
-        baseBoard = cls._getRegistryKey(wc, keyPath, 'BaseBoardManufacturer')
-        biosMajorRelease = cls._getRegistryKey(wc, keyPath, 'BiosMajorRelease')
-        biosMinorRelease = cls._getRegistryKey(wc, keyPath, 'BiosMinorRelease')
-
-        sha1 = digestlib.sha1()
-        sha1.update(baseBoard)
-        sha1.update(biosMajorRelease)
-        sha1.update(biosMinorRelease)
-        sha1.update(generated_uuid)
-        bytes = sha1.digest()[:16]
-        local_uuid = str(uuid.UUID(bytes=bytes))
-        return local_uuid
-
     def _setUUIDs(self, wc, generated_uuid, local_uuid):
         keyPath = r'SOFTWARE\rPath\inventory'
         self._setRegistryKey(wc, keyPath, 'generated_uuid', generated_uuid)
@@ -304,7 +284,7 @@ class RegisterTask(WMITaskHandler):
         self.sendStatus(C.MSG_GENERIC, 'Generating UUIDs')
 
         generated_uuid = self._createGeneratedUuid()
-        local_uuid = self._getLocalUUID(wc, generated_uuid)
+        rc, local_uuid = wc.queryUUID()
 
         self._setUUIDs(wc, generated_uuid, local_uuid)
 

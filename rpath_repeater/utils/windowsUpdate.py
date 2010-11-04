@@ -115,6 +115,9 @@ class wmiClient(object):
     def queryNetwork(self):
         return self._wmiQueryRequest('network')
 
+    def queryUUID(self):
+        return self._wmiQueryRequest('uuid')
+
     def waitForServiceToStop(self, service):
         # query the service until is is no longer active
         while 1:
