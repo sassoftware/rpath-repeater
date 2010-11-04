@@ -194,13 +194,15 @@ class WMITaskHandler(bfp.BaseTaskHandler):
     @classmethod
     def _getNetworkInfo(cls, wmiClient):
         rc, netInfo = wmiClient.queryNetwork()
-        nets = [ x.strip().split(',') for x in netInfo.split('\n') ]
+        nets = [x.strip().split(',') for x in netInfo.split('\n') if x]
 
         nodes = []
         for n in nets:
+            n = [x.strip() for x in n]
             device_name, ipaddr, netmask, enabled, hostname, domain = n
             if enabled != 'true':
                 continue
+            hostname = hostname.lower()
             ip_address = ipv6_address = None
             if ":" in ipaddr:
                 ipv6_address = ipaddr
@@ -215,12 +217,22 @@ class WMITaskHandler(bfp.BaseTaskHandler):
             dns_name = "%s.%s" % (hostname, domain)
             required = str((ip_address==wmiClient.target) or \
                 (dns_name==wmiClient.target)).lower()
+
+            T = XML.Text
             if ipv6_address:
-                nodes.append(XML.Element("network", device_name, ipv6_address,
-                                         netmask, dns_name, required))
+                nodes.append(XML.Element("network",
+                                         T("device_name", device_name),
+                                         T("ipv6_address", ipv6_address),
+                                         T("netmask", netmask),
+                                         T("dns_name", dns_name),
+                                         T("required", required)))
             else:
-                nodes.append(XML.Element("network", device_name, ipv6_address,
-                                         netmask, dns_name, required))
+                nodes.append(XML.Element("network",
+                                         T("device_name", device_name),
+                                         T("ip_address", ip_address),
+                                         T("netmask", netmask),
+                                         T("dns_name", dns_name),
+                                         T("required", required)))
 
             return XML.Element("networks",*nodes)
 

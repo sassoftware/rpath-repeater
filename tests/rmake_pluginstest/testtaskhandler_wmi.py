@@ -39,6 +39,7 @@ class WmiTest(TestBase):
             'polling_manifest')
         systemModel = ('registry', 'getkey', 'SOFTWARE\\rPath\\conary',
             'system_model')
+        queryNetwork = ('query', 'network')
 
     class MultiChoice(object):
         def __init__(self, choices):
@@ -71,6 +72,7 @@ class WmiTest(TestBase):
             install 'group-foo=conary.rpath.com@rpl:2[is: x86]'
             install 'group-bar=conary.rpath.com@rpl:2[is: x86_64]'
 """,
+        K.queryNetwork: "65539, 172.16.175.218, 255.255.240.0, true, ENG-E1DA0E00778, eng.rpath.com"
     }
 
     class WmiClient(wmi_forwarding_plugin.WMITaskHandler.WmiClientFactory):
@@ -194,6 +196,15 @@ class WmiTest(TestBase):
       <flavor>is: x86_64</flavor>
     </trove>
   </installed_software>
+  <networks>
+    <network>
+      <device_name>65539</device_name>
+      <ip_address>172.16.175.218</ip_address>
+      <netmask>20</netmask>
+      <dns_name>eng-e1da0e00778.eng.rpath.com</dns_name>
+      <required>false</required>
+    </network>
+  </networks>
 </system>""")
 
     def testShutdown(self):
