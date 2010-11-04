@@ -29,6 +29,7 @@ CIM_TASK_REGISTER = CIM_JOB + '.register'
 CIM_TASK_SHUTDOWN = CIM_JOB + '.shutdown'
 CIM_TASK_POLLING = CIM_JOB + '.poll'
 CIM_TASK_UPDATE = CIM_JOB + '.update'
+CIM_TASK_CONFIGURATION = CIM_JOB + '.configuration'
 
 CimParams = types.slottype('CimParams',
     'host port clientCert clientKey eventUuid instanceId targetName targetType launchWaitTime')
@@ -36,7 +37,6 @@ CimParams = types.slottype('CimParams',
 CimData = types.slottype('CimData', 'p response')
 RactivateData = types.slottype('RactivateData',
         'p nodes requiredNetwork response')
-UpdateData = types.slottype('UpdateData', 'p nodes sources response')
 
 class CimForwardingPlugin(bfp.BaseForwardingPlugin):
     def dispatcher_pre_setup(self, dispatcher):
@@ -50,6 +50,7 @@ class CimForwardingPlugin(bfp.BaseForwardingPlugin):
             CIM_TASK_POLLING: PollingTask,
             CIM_TASK_UPDATE: UpdateTask,
             CIM_TASK_SHUTDOWN: ShutdownTask,
+            CIM_TASK_CONFIGURATION: ConfigurationTask,
         }
 
 
@@ -111,7 +112,10 @@ class CimHandler(bfp.BaseHandler):
             return CimData(params)
         if taskType in [ CIM_TASK_UPDATE ]:
             sources = methodArguments['sources']
-            return UpdateData(params, zoneAddresses, sources)
+            return bfp.GenericData(params, zoneAddresses, sources)
+        if taskType in [ CIM_TASK_CONFIGURATION ]:
+            configuration = methodArguments['configuration']
+            return bfp.GenericData(params, zoneAddresses, configuration)
         raise Exception("Unhandled task type %s" % taskType)
 
     def _method(self, taskType):
@@ -270,7 +274,7 @@ class UpdateTask(CIMTaskHandler):
             data.p.host, data.p.port))
 
         server = self.getWbemConnection(data)
-        self._applySoftwareUpdate(server, data.sources, sorted(data.nodes))
+        self._applySoftwareUpdate(server, data.argument, sorted(data.nodes))
         children = self._getUuids(server)
         children.extend(self._getServerCert())
         children.append(self._getSoftwareVersions(server))
@@ -284,4 +288,30 @@ class UpdateTask(CIMTaskHandler):
     def _applySoftwareUpdate(self, server, sources, nodes):
         cimUpdater = cimupdater.CIMUpdater(server)
         cimUpdater.applyUpdate(sources, nodes=nodes)
+        return None
+
+class ConfigurationTask(CIMTaskHandler):
+    def _run(self, data):
+        self.sendStatus(C.MSG_START,
+            "Contacting host %s on port %d to trigger configuration change" % (
+                data.p.host, data.p.port))
+
+        server = self.getWbemConnection(data)
+        self._applyConfigurationChange(server, data.argument)
+        children = self._getUuids(server)
+
+        el = XML.Element("system", *children)
+
+        data.response = XML.toString(el)
+        self.setData(data)
+        self.sendStatus(C.OK, "Host %s configuration applied" % data.p.host)
+
+    def _applyConfigurationChange(self, server, configuration):
+        import pywbem
+        op = pywbem.CIMInstanceName('RPATH_Configuration',
+            keybindings=dict(SettingID='/var/lib/rpath-iconf/values.xml'))
+        instance = server.RPATH_Configuration.GetInstance(op)
+        instance.properties['Value'] = pywbem.CIMProperty('Value',
+            configuration, type="string")
+        server.RPATH_Configuration.ModifyInstance(instance)
         return None

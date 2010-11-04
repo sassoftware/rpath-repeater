@@ -36,6 +36,8 @@ BASE_TASK_REGISTER = PREFIX + '.register'
 from rpath_repeater.codes import Codes as C
 from rpath_repeater.utils import nodeinfo
 
+GenericData = types.slottype('GenericData', 'p nodes argument response')
+
 class BaseException(Exception):
     def __init__(self, error=None):
         self.error = error

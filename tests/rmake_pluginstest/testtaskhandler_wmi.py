@@ -230,4 +230,9 @@ class WmiTest(TestBase):
         self.assertXMLEquals(taskData.object.response, """
 """)
 
+    def testConfiguration(self):
+        params = self._wmiParams()
+        self.failUnlessRaises(NotImplementedError,
+            self.client.configuration_wmi, params)
+
 testsuite.main()

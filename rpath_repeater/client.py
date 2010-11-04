@@ -143,6 +143,17 @@ class RepeaterClient(object):
         return self._wmiCallDispatcher(method, wmiParams, resultsLocation, zone,
             sources=sources)
 
+    def configuration_cim(self, cimParams, resultsLocation=None, zone=None, configuration=None):
+        method = 'configuration'
+        return self._cimCallDispatcher(method, cimParams, resultsLocation, zone,
+            configuration=configuration)
+
+    def configuration_wmi(self, wmiParams, resultsLocation=None, zone=None, configuration=None):
+        method = 'configuration'
+        raise NotImplementedError(method)
+        return self._wmiCallDispatcher(method, wmiParams, resultsLocation, zone,
+            configuration=configuration)
+
     def retireNode(self, node, zone, port = None):
         """ This is a temporary large hammer for handling the retirement
             of a management node.

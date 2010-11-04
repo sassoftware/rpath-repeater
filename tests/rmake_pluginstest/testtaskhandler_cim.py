@@ -27,6 +27,8 @@ class CimTest(TestBase):
         SoftwareIdentity = CIMInstanceName('RPATH_SoftwareIdentity')
         OperatingSystem = CIMInstanceName('Linux_SoftwareIdentity',
             keybindings=dict(name="mysystem.example.com"))
+        Configuration = CIMInstanceName('RPATH_Configuration',
+            keybindings=dict(SettingID='/var/lib/rpath-iconf/values.xml'))
 
     _defaultData = dict(
         intrinsic=dict(
@@ -76,6 +78,20 @@ class CimTest(TestBase):
                     OP.OperatingSystem,
                 ],
             ),
+            GetInstance = dict(
+                RPATH_Configuration = [
+                    CIMInstance(OP.Configuration,
+                        properties=dict(Value="<oldvalue/>"),
+                        path=OP.Configuration),
+                ],
+            ),
+            ModifyInstance = dict(
+                RPATH_Configuration = [
+                    CIMInstance(OP.Configuration,
+                        properties=dict(Value="<newvalue/>"),
+                        path=OP.Configuration),
+                ],
+            ),
         ),
         extrinsic=dict(
             RemoteRegistration = (0, dict(errorSummary="", errorDetails="")),
@@ -86,15 +102,27 @@ class CimTest(TestBase):
     class WBEMServer(cim_forwarding_plugin.CIMTaskHandler.WBEMServerFactory):
         class WBEMConnectionFactory(cim_forwarding_plugin.CIMTaskHandler.WBEMServerFactory.WBEMConnectionFactory):
             _data = {}
+
+            def _getAccessor(self, params):
+                accessors =  ['ClassName', 'InstanceName', 'ModifiedInstance']
+                for accessor in accessors:
+                    obj = params.get(accessor, None)
+                    if obj is not None:
+                        return obj
+                raise Exception("Mock me harder!")
+
             def imethodcall(self, methodname, namespace, **params):
                 mmock = self._data['intrinsic'].get(methodname, None)
                 if mmock is None:
                     raise Exception("Mock me: %s" % methodname)
-                cn = params['ClassName']
-                val = mmock.get(cn.classname, None)
+                obj = self._getAccessor(params)
+                classname = obj.classname
+                if not isinstance(classname, basestring):
+                    classname = classname.classname
+                val = mmock.get(classname, None)
                 if val is None:
                     raise Exception("Mock me: %s %s" % (methodname,
-                        cn.classname))
+                        classname))
                 return ('IMETHODRESPONSE', dict(NAME=methodname), val)
             def methodcall(self, methodname, localobject, **params):
                 mmock = self._data['extrinsic'].get(methodname, None)
@@ -209,6 +237,21 @@ class CimTest(TestBase):
             ])
         taskData = lastTask.task_data.thaw()
         self.assertXMLEquals(taskData.object.response, """
+""")
+
+    def testConfiguration(self):
+        params = self._cimParams()
+        configuration = "<configuration/>"
+        self.client.configuration_cim(params, configuration=configuration)
+        lastTask = self.results.configuration[-1]
+        self.failIf(lastTask.status.detail, lastTask.status.detail)
+        self.failUnlessEqual(
+            [ (x.status.code, x.status.text) for x in self.results.update ],
+            [
+            ])
+        taskData = lastTask.task_data.thaw()
+        self.assertXMLEquals(taskData.object.response, """
+<system><local_uuid>6947ee3b-4776-e11b-5d98-5b8284d4f810</local_uuid><generated_uuid>feeddeadbeef</generated_uuid></system>
 """)
 
 testsuite.main()

@@ -29,12 +29,12 @@ WMI_TASK_REGISTER = WMI_JOB + '.register'
 WMI_TASK_SHUTDOWN = WMI_JOB + '.shutdown'
 WMI_TASK_POLLING = WMI_JOB + '.poll'
 WMI_TASK_UPDATE = WMI_JOB + '.update'
+WMI_TASK_CONFIGURATION = WMI_JOB + '.configuration'
 
 WmiParams = types.slottype('WmiParams',
     'host port username password domain eventUuid')
 # These are just the starting point attributes
 WmiData = types.slottype('WmiData', 'p response')
-UpdateData = types.slottype('UpdateData', 'p sources response')
 
 class WmiForwardingPlugin(bfp.BaseForwardingPlugin):
 
@@ -49,6 +49,7 @@ class WmiForwardingPlugin(bfp.BaseForwardingPlugin):
             WMI_TASK_POLLING: PollingTask,
             WMI_TASK_UPDATE: UpdateTask,
             WMI_TASK_SHUTDOWN: ShutdownTask,
+            WMI_TASK_CONFIGURATION: ConfigurationTask,
         }
 
 
@@ -107,7 +108,10 @@ class WmiHandler(bfp.BaseHandler):
             return WmiData(params)
         if taskType in [ WMI_TASK_UPDATE ]:
             sources = methodArguments['sources']
-            return UpdateData(params, sources)
+            return bfp.GenericData(params, zoneAddresses, sources)
+        if taskType in [ WMI_TASK_CONFIGURATION ]:
+            configuration = methodArguments['configuration']
+            return bfp.GenericData(params, zoneAddresses, configuration)
         raise Exception("Unhandled task type %s" % taskType)
 
     def _method(self, taskType):
@@ -343,7 +347,7 @@ class UpdateTask(WMITaskHandler):
             data.p.host, data.p.port))
         wc = self._getWmiClient(data)
         try:
-            windowsUpdate.doUpdate(wc, data.sources,
+            windowsUpdate.doUpdate(wc, data.argument,
                 str(self.task.job_uuid), self.sendStatus)
         finally:
             wc.unmount()
@@ -355,3 +359,8 @@ class UpdateTask(WMITaskHandler):
         data.response = XML.toString(el)
         self.setData(data)
         self.sendStatus(C.OK, "Host %s has been updated" % data.p.host)
+
+class ConfigurationTask(WMITaskHandler):
+    def _run(self, data):
+        self.sendStatus(C.ERR_METHOD_NOT_ALLOWED,
+            "Configuration changes of Windows System %s is not supported" % (data.p.host))
