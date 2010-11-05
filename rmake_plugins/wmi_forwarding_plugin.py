@@ -59,6 +59,8 @@ class WmiHandler(bfp.BaseHandler):
     jobType = WMI_JOB
     firstState = 'wmiCall'
 
+    RegistrationTaskNS = WMI_TASK_REGISTER
+
     def setup (self):
         bfp.BaseHandler.setup(self)
 

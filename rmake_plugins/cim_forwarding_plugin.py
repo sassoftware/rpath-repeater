@@ -61,6 +61,8 @@ class CimHandler(bfp.BaseHandler):
     jobType = CIM_JOB
     firstState = 'cimCall'
 
+    RegistrationTaskNS = CIM_TASK_REGISTER
+
     def setup (self):
         bfp.BaseHandler.setup(self)
 

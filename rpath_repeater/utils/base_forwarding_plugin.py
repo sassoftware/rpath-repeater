@@ -30,8 +30,6 @@ from rmake3.core import plug_dispatcher
 from rmake3.worker import plug_worker
 
 PREFIX = 'com.rpath.sputnik'
-BASE_JOB = PREFIX + '.baseplugin'
-BASE_TASK_REGISTER = PREFIX + '.register'
 
 from rpath_repeater.codes import Codes as C
 from rpath_repeater.utils import nodeinfo
@@ -81,6 +79,7 @@ class Options(object):
 
 class BaseHandler(handler.JobHandler):
     X_Event_Uuid_Header = 'X-rBuilder-Event-UUID'
+    RegistrationTaskNS = None
 
     class __metaclass__(type):
         def __new__(cls, name, bases, attrs):
@@ -174,7 +173,7 @@ class BaseHandler(handler.JobHandler):
     def _getZoneAddresses(self):
         """Return set of IP addresses of all nodes in this zone."""
         needed = set([
-            types.TaskCapability(BASE_TASK_REGISTER),
+            types.TaskCapability(self.RegistrationTaskNS),
             types.ZoneCapability(self.zone),
             ])
         addresses = set()
