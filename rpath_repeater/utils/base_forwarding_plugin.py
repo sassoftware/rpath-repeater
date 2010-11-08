@@ -186,7 +186,7 @@ class BaseHandler(handler.JobHandler):
                         socket.inet_pton(socket.AF_INET, address)
                     except socket.error:
                         continue
-                    addresses.update(address)
+                    addresses.update([address,])
         return addresses
 
     def jobUpdateCallback(self, task):
