@@ -13,6 +13,7 @@
 #
 
 import StringIO
+import socket
 import sys
 import tempfile
 from xml.dom import minidom
@@ -179,7 +180,13 @@ class BaseHandler(handler.JobHandler):
         addresses = set()
         for worker in self.dispatcher.workers.values():
             if worker.supports(needed):
-                addresses.update(worker.addresses)
+                # Only save the ipv4 address
+                for address in worker.addresses:
+                    try:
+                        socket.inet_pton(socket.AF_INET, address)
+                    except socket.error:
+                        continue
+                    addresses.update(address)
         return addresses
 
     def jobUpdateCallback(self, task):
