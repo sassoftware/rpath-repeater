@@ -27,7 +27,7 @@ from lxml.builder import ElementMaker
 from conary import conarycfg
 from conary import conaryclient
 from conary import versions
-from conary.conaryclient import modelupdate, systemmodel, cmdline
+from conary.conaryclient import modelupdate, cml, cmdline
 from conary.deps import deps
 
 from rpath_repeater.codes import Codes as C
@@ -35,7 +35,7 @@ from rpath_repeater.utils import base_forwarding_plugin as bfp
 #log.setVerbosity(log.INFO)
 
 def runModel(client, cache, modelText):
-    model = systemmodel.SystemModelText(client.cfg)
+    model = cml.CML(client.cfg)
     model.parse(modelText)
 
     updJob = client.newUpdateJob()
