@@ -39,7 +39,7 @@ def runModel(client, cache, modelText):
     model.parse(modelText)
 
     updJob = client.newUpdateJob()
-    ts = client.systemModelGraph(model)
+    ts = client.cmlGraph(model)
     client._updateFromTroveSetGraph(updJob, ts, cache)
     return updJob.getJobs()
 
@@ -270,7 +270,7 @@ def doUpdate(wc, sources, jobid, statusCallback):
     newModel = [str('install %s=%s'%(p[0],p[1])) for p in newTrvTups]
 
     client = getConaryClient(flavors = [newTrvTups[0][2]])
-    cache = modelupdate.SystemModelTroveCache(client.getDatabase(),
+    cache = modelupdate.CMLTroveCache(client.getDatabase(),
                                               client.getRepos())
     # use msi manifest to "correct" the state defined by the old model if needed
     additionalInstalls = []
