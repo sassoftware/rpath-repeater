@@ -78,6 +78,7 @@ class RestForwardingPlugin(plug_dispatcher.DispatcherPlugin,
 class RepeaterMessageHandler(message.MessageHandler):
     namespace = NS
     XHeader = 'X-rPath-Management-Zone'
+    XRepeaterHeader = 'X-rPath-Repeater'
 
     def __init__(self, host, workers):
         self.host = host
@@ -112,6 +113,11 @@ class RepeaterMessageHandler(message.MessageHandler):
         managementZone = self.getManagementZone(neighbor)
         if managementZone is not None:
             headers.addRawHeader(self.XHeader, managementZone)
+        # This header flags a request as _not_ being originated from localhost
+        # Some of the management interfaces require localhost access, but
+        # everything forwarded through the repeater looks like it's
+        # originating from localhost, unless this header is present
+        headers.addRawHeader(self.XRepeaterHeader, 'remote')
         # XXX this is where multi-valued headers go down the drain
         headers = dict((k.lower(), v[-1])
             for (k, v) in headers.getAllRawHeaders())
