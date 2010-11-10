@@ -205,9 +205,7 @@ class WMITaskHandler(bfp.BaseTaskHandler):
         nodes = []
         for n in nets:
             n = [x.strip() for x in n]
-            device_name, ipaddr, netmask, enabled, hostname, domain = n
-            if enabled != 'true':
-                continue
+            device_name, ipaddr, netmask, hostname, domain = n
             hostname = hostname.lower()
             ip_address = ipv6_address = None
             if ":" in ipaddr:
