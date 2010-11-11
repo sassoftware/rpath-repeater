@@ -139,6 +139,10 @@ class WmiHandler(bfp.BaseHandler):
     def update(self):
         return self._method(WMI_TASK_UPDATE)
 
+    @bfp.exposed
+    def configuration(self):
+        return self._method(WMI_TASK_CONFIGURATION)
+
 
 class WMITaskHandler(bfp.BaseTaskHandler):
     InterfaceName = "WMI"
