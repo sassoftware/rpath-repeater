@@ -143,6 +143,10 @@ class CimHandler(bfp.BaseHandler):
     def update(self):
         return self._method(CIM_TASK_UPDATE)
 
+    @bfp.exposed
+    def configuration(self):
+        return self._method(CIM_TASK_CONFIGURATION)
+
 
 class CIMTaskHandler(bfp.BaseTaskHandler):
     InterfaceName = "CIM"
