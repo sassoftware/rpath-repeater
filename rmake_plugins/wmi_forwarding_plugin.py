@@ -271,8 +271,8 @@ class RegisterTask(WMITaskHandler):
             "Contacting host %s to validate credentials" % (data.p.host, ))
 
         # Check to see if rTIS is installed
-        rc, _ = wc.queryService('rPath Tools Install Service')
-        if rc:
+        rc, status = wc.queryService('rPath Tools Install Service')
+        if rc or not status:
             self.sendStatus(C.MSG_GENERIC, 'Installing rPath Tools')
             if not windowsUpdate.doBootstrap(wc):
                 raise bfp.AuthenticationError(
