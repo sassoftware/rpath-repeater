@@ -60,12 +60,28 @@ class NodeReportingPlugin(plug_dispatcher.DispatcherPlugin):
         if worker.zoneNames:
             # We only support one zone per management node
             children.append(E('zone', T('name', worker.zoneNames[0])))
+        ipv4, ipv6 = self._splitAddressTypes(worker.addresses)
         networks = [ E("network",
             T("ip_address", x), T("dns_name", x), T("device_name", "eth0"))
-            for x in sorted(worker.addresses) ]
+            for x in sorted(ipv4) ]
+        networks.extend(E("network",
+            T("ipv6_address", x), T("dns_name", x), T("device_name", "eth0"))
+            for x in sorted(ipv6))
         children.append(E("networks", *networks))
         node = E("management_node", *children)
         return node
+
+    @classmethod
+    def _splitAddressTypes(cls, addresses):
+        "Separate ipv4 and ipv6 addresses"
+        ipv4 = set()
+        ipv6 = set()
+        for addr in addresses:
+            if ':' in addr:
+                ipv6.add(addr)
+            else:
+                ipv4.add(addr)
+        return ipv4, ipv6
 
     def postResults(self, data):
         path = "/api/inventory/management_nodes"
