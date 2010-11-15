@@ -12,7 +12,6 @@
 # full details.
 #
 
-import base64
 import logging
 
 from twisted.internet import error as internet_error
