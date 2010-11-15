@@ -17,6 +17,7 @@ import logging
 from twisted.internet import error as internet_error
 from twisted.internet import reactor
 from rmake3.core import plug_dispatcher
+from rmake3.lib import netlink
 from rpath_repeater.utils import base_forwarding_plugin as bfp
 
 log = logging.getLogger(__name__)
@@ -25,6 +26,7 @@ class NodeReportingPlugin(plug_dispatcher.DispatcherPlugin):
     HEARTBEAT = 60
     def dispatcher_post_setup(self, dispatcher):
         self.setUpHeartbeat(dispatcher)
+        self.getLocalAddressses(dispatcher)
 
     def setUpHeartbeat(self, dispatcher):
         reactor.callLater(self.HEARTBEAT, self.setUpHeartbeat, dispatcher)
@@ -35,6 +37,11 @@ class NodeReportingPlugin(plug_dispatcher.DispatcherPlugin):
 
     def dispatcher_worker_down(self, dispatcher, worker):
         self.syncWorkers(dispatcher)
+
+    def getLocalAddressses(self, dispatcher):
+        rtnl = netlink.RoutingNetlink()
+        self.localAddresses = set(x[1] for x in rtnl.getAllAddresses())
+        return self.localAddresses
 
     def syncWorkers(self, dispatcher):
         children = []
@@ -61,6 +68,7 @@ class NodeReportingPlugin(plug_dispatcher.DispatcherPlugin):
             # We only support one zone per management node
             children.append(E('zone', T('name', worker.zoneNames[0])))
         ipv4, ipv6 = self._splitAddressTypes(worker.addresses)
+        isLocal = str(bool(self.localAddresses.intersection(worker.addresses))).lower()
         networks = [ E("network",
             T("ip_address", x), T("dns_name", x), T("device_name", "eth0"))
             for x in sorted(ipv4) ]
@@ -68,6 +76,7 @@ class NodeReportingPlugin(plug_dispatcher.DispatcherPlugin):
             T("ipv6_address", x), T("dns_name", x), T("device_name", "eth0"))
             for x in sorted(ipv6))
         children.append(E("networks", *networks))
+        children.append(T("local", isLocal))
         node = E("management_node", *children)
         return node
 
