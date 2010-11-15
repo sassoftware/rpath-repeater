@@ -57,6 +57,9 @@ class NodeReportingPlugin(plug_dispatcher.DispatcherPlugin):
         T = bfp.XML.Text
         children = []
         children.append(T("node_jid", worker.jid.full()))
+        if worker.zoneNames:
+            # We only support one zone per management node
+            children.append(E('zone', T('name', worker.zoneNames[0])))
         networks = [ E("network",
             T("ip_address", x), T("dns_name", x), T("device_name", "eth0"))
             for x in sorted(worker.addresses) ]
