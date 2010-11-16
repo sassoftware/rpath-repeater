@@ -209,9 +209,9 @@ class WaitForNetworkTask(plug_worker.TaskHandler):
             sleptTime += 5
 
         if setDnsName:
-            mgr.scheduleSystemRegistrationEvent(system)
-            response = ("dns name for %s updated to %s.  Scheduled "
-                "registration event" % (instanceId, dnsName))
+            mgr.scheduleSystemDetectMgmtInterfaceEvent(system)
+            response = ("dns name for %s updated to %s.  Scheduled Management "
+                "interface detection event" % (instanceId, dnsName))
             data.response = response
             self.setData(data)
             self.sendStatus(C.OK, response)
