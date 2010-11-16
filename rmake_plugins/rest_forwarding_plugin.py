@@ -15,6 +15,8 @@
 import base64
 import logging
 
+from conary.lib import cfg as cny_cfg
+from conary.lib import cfgtypes
 from rmake3.lib import chutney
 from rmake3.lib.jabberlink import message
 from rmake3.lib.jabberlink.handlers import link
@@ -33,6 +35,18 @@ from twisted.internet import reactor
 NS = 'http://rpath.com/permanent/xmpp/repeater-1.0'
 log = logging.getLogger(__name__)
 
+
+class RestForwardingConfig(cny_cfg.ConfigFile):
+    # Launcher
+    key                     = (cfgtypes.CfgString, None)
+    cert                    = (cfgtypes.CfgString, None)
+    httpPort                = (cfgtypes.CfgInt, None)
+    httpsPort               = (cfgtypes.CfgInt, None)
+
+    # Dispatcher
+    repeaterTarget          = (cfgtypes.CfgString, None)
+
+
 class RestForwardingPlugin(plug_dispatcher.DispatcherPlugin,
     plug_worker.LauncherPlugin):
 
@@ -40,44 +54,29 @@ class RestForwardingPlugin(plug_dispatcher.DispatcherPlugin,
         """ The Sputnik end of the rMake topology """
         endpoint = EndPoint(launcher.bus)
 
-        # get configuration options
-        if self.__class__.__name__ in launcher.cfg.pluginOption:
-            options = launcher.cfg.pluginOption[self.__class__.__name__]
-            for option in options:
-                key, value = option.split()
-                if key == 'key':
-                    self.sslkey = value
-
-                elif key == 'cert':
-                    self.sslcert = value
-
-                elif key == 'httpPort':
-                    reactor.listenTCP(int(value),
-                        server.Site(resource.IResource(endpoint)))
-
-                elif key == 'httpsPort':
-                    reactor.listenSSL(int(value),
-                        server.Site(resource.IResource(endpoint)),
-                        ssl.DefaultOpenSSLContextFactory(self.sslkey,
-                            self.sslcert))
+        cfg = self.populateConfigFromOptions(RestForwardingConfig())
+        if cfg.httpPort:
+            reactor.listenTCP(cfg.httpPort,
+                    server.Site(resource.IResource(endpoint)))
+        if cfg.httpsPort:
+            reactor.listenSSL(cfg.httpsPort,
+                    server.Site(resource.IResource(endpoint)),
+                    ssl.DefaultOpenSSLContextFactory(cfg.key, cfg.cert))
 
     def dispatcher_post_setup(self, dispatcher):
         """ The rBuilder end of the rMake topology """
 
-        # get configuration options
-        if self.__class__.__name__ in dispatcher.cfg.pluginOption:
-            options = dispatcher.cfg.pluginOption[self.__class__.__name__]
-            for option in options:
-                key, value = option.split()
-
-                if key == 'repeaterTarget':
-                    dispatcher.bus.link.addMessageHandler(
-                        RepeaterMessageHandler(value, dispatcher.workers))
+        cfg = self.populateConfigFromOptions(RestForwardingConfig())
+        if cfg.repeaterTarget:
+            dispatcher.bus.link.addMessageHandler(
+                    RepeaterMessageHandler(cfg.repeaterTarget,
+                        dispatcher.workers))
 
 
 class RepeaterMessageHandler(message.MessageHandler):
     namespace = NS
     XHeader = 'X-rPath-Management-Zone'
+    XRepeaterHeader = 'X-rPath-Repeater'
 
     def __init__(self, host, workers):
         self.host = host
@@ -112,6 +111,11 @@ class RepeaterMessageHandler(message.MessageHandler):
         managementZone = self.getManagementZone(neighbor)
         if managementZone is not None:
             headers.addRawHeader(self.XHeader, managementZone)
+        # This header flags a request as _not_ being originated from localhost
+        # Some of the management interfaces require localhost access, but
+        # everything forwarded through the repeater looks like it's
+        # originating from localhost, unless this header is present
+        headers.addRawHeader(self.XRepeaterHeader, 'remote')
         # XXX this is where multi-valued headers go down the drain
         headers = dict((k.lower(), v[-1])
             for (k, v) in headers.getAllRawHeaders())

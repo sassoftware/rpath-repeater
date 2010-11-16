@@ -64,19 +64,6 @@ class WmiHandler(bfp.BaseHandler):
     def setup (self):
         bfp.BaseHandler.setup(self)
 
-        cfg = self.dispatcher.cfg
-
-        # get configuration options
-        if self.__class__.__name__ in cfg.pluginOption:
-            options = cfg.pluginOption[self.__class__.__name__]
-            for option in options:
-                key, value = option.split()
-
-                if key == 'timeout':
-                    self.timeout = int(value)
-                elif key == 'port':
-                    self.port = int(value)
-
     @classmethod
     def initParams(cls, data):
         return WmiParams(**data.pop('wmiParams', {}))
@@ -138,6 +125,10 @@ class WmiHandler(bfp.BaseHandler):
     @bfp.exposed
     def update(self):
         return self._method(WMI_TASK_UPDATE)
+
+    @bfp.exposed
+    def configuration(self):
+        return self._method(WMI_TASK_CONFIGURATION)
 
 
 class WMITaskHandler(bfp.BaseTaskHandler):
@@ -205,9 +196,7 @@ class WMITaskHandler(bfp.BaseTaskHandler):
         nodes = []
         for n in nets:
             n = [x.strip() for x in n]
-            device_name, ipaddr, netmask, enabled, hostname, domain = n
-            if enabled != 'true':
-                continue
+            device_name, ipaddr, netmask, hostname, domain = n
             hostname = hostname.lower()
             ip_address = ipv6_address = None
             if ":" in ipaddr:
@@ -273,8 +262,8 @@ class RegisterTask(WMITaskHandler):
             "Contacting host %s to validate credentials" % (data.p.host, ))
 
         # Check to see if rTIS is installed
-        rc, _ = wc.queryService('rPath Tools Install Service')
-        if rc:
+        rc, status = wc.queryService('rPath Tools Install Service')
+        if rc or not status:
             self.sendStatus(C.MSG_GENERIC, 'Installing rPath Tools')
             if not windowsUpdate.doBootstrap(wc):
                 raise bfp.AuthenticationError(

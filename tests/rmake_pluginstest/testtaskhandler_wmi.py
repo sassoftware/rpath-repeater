@@ -73,7 +73,7 @@ class WmiTest(TestBase):
             install 'group-foo=conary.rpath.com@rpl:2[is: x86]'
             install 'group-bar=conary.rpath.com@rpl:2[is: x86_64]'
 """,
-        K.queryNetwork: "65539, 172.16.175.218, 255.255.240.0, true, ENG-E1DA0E00778, eng.rpath.com",
+        K.queryNetwork: "65539, 172.16.175.218, 255.255.240.0, ENG-E1DA0E00778, eng.rpath.com",
         K.queryUUID: "6947ee3b-4776-e11b-5d98-5b8284d4f810"
     }
 

@@ -55,8 +55,6 @@ class CimForwardingPlugin(bfp.BaseForwardingPlugin):
 
 
 class CimHandler(bfp.BaseHandler):
-    timeout = 7200
-    port = 5989
 
     jobType = CIM_JOB
     firstState = 'cimCall'
@@ -65,19 +63,6 @@ class CimHandler(bfp.BaseHandler):
 
     def setup (self):
         bfp.BaseHandler.setup(self)
-
-        cfg = self.dispatcher.cfg
-
-        # get configuration options
-        if self.__class__.__name__ in cfg.pluginOption:
-            options = cfg.pluginOption[self.__class__.__name__]
-            for option in options:
-                key, value = option.split()
-
-                if key == 'timeout':
-                    self.timeout = int(value)
-                elif key == 'port':
-                    self.port = int(value)
 
     @classmethod
     def initParams(cls, data):
@@ -142,6 +127,10 @@ class CimHandler(bfp.BaseHandler):
     @bfp.exposed
     def update(self):
         return self._method(CIM_TASK_UPDATE)
+
+    @bfp.exposed
+    def configuration(self):
+        return self._method(CIM_TASK_CONFIGURATION)
 
 
 class CIMTaskHandler(bfp.BaseTaskHandler):
