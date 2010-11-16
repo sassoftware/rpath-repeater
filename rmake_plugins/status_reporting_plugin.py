@@ -23,7 +23,7 @@ from rpath_repeater.utils import base_forwarding_plugin as bfp
 log = logging.getLogger(__name__)
 
 class NodeReportingPlugin(plug_dispatcher.DispatcherPlugin):
-    HEARTBEAT = 60
+    HEARTBEAT = 600
     def dispatcher_post_setup(self, dispatcher):
         self.setUpHeartbeat(dispatcher)
         self.getLocalAddressses(dispatcher)
