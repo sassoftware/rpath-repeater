@@ -97,9 +97,22 @@ class wmiClient(object):
 
     def _wmiServiceRequest( self, action, service):
         wmicmd = self.baseCmd + ['service', action, service]
-        return self._wmiCall(wmicmd)
+        rc, rtxt = self._wmiCall(wmicmd)
+        if rc:
+            raise bfp.WindowsServiceError(C.WmiCodes.errorMessage(rc, rtxt,
+                               message='Failure to access windows service %s' % service,
+                               params={'action':action }))
+        return rc, rtxt
 
     def _wmiQueryRequest( self, action):
+        wmicmd = self.baseCmd + ['query', action]
+        rc, rtxt = self._wmiCall(wmicmd)
+        if rc:
+            raise bfp.WMIError(C.WmiCodes.errorMessage(rc, rtxt,
+                               message='Failure to query target via WMI interface',
+                               params={'action':action }))
+        return rc, rtxt
+
         wmicmd = self.baseCmd + ['query', action]
         return self._wmiCall(wmicmd)
 
@@ -121,20 +134,35 @@ class wmiClient(object):
     def waitForServiceToStop(self, service):
         # query the service until is is no longer active
         while 1:
-            ret = self.queryService('rPath Tools Install Service')[1]
+            rc, ret = self.queryService('rPath Tools Install Service')
             if ret.strip() == 'Service Not Active':
                 return
             time.sleep(self.QuerySleepInterval)
 
-    def getRegistryKey(self, keyPath, key):
-        wmicmd = self.baseCmd + ["registry", "getkey", keyPath, key]
-        return self._wmiCall(wmicmd)
+    def getRegistryKey(self, key, value):
+        wmicmd = self.baseCmd + ["registry", "getkey", key, value]
+        rc, results = self._wmiCall(wmicmd)
+        if rc:
+            raise bfp.RegistryAccess(C.WmiCodes.errorMessage(rc, results,
+                 params={'registry_key': key,
+                         'registry_value': value,
+                         'operation': 'read',
+                         }))
 
-    def setRegistryKey(self, keyPath, key, valueList):
-        if not isinstance(valueList, list):
-            valueList = [valueList]
-        wmicmd = self.baseCmd + ["registry", "setkey", keyPath, key] + valueList
-        return self._wmiCall(wmicmd)
+        return rc, results
+
+    def setRegistryKey(self, key, value, data):
+        if not isinstance(data, list):
+            data = [data]
+        wmicmd = self.baseCmd + ["registry", "setkey", key, value] + data
+        rc, results = self._wmiCall(wmicmd)
+        if rc:
+            raise bfp.RegistryAccess(C.WmiCodes.errorMessage(rc, results,
+                 params={'registry_key': key,
+                         'registry_value': value,
+                         'operation': 'write',
+                         }))
+        return rc, results
 
     def createRegistryKey(self, keyPath, key):
         wmicmd = self.baseCmd + ["registry", "createkey", keyPath, key]
@@ -142,7 +170,11 @@ class wmiClient(object):
 
     def runCmd(self, cmd):
         wmicmd = self.baseCmd + ["process", "create", cmd]
-        return self._wmiCall(wmicmd)
+        rc, rtxt = self._wmiCall(wmicmd)
+        if rc:
+            raise bfp.WMIError(C.WmiCodes.errorMessage(rc, rtxt,
+                               message='Failed to remotely execute command on target',
+                               params={'command':cmd }))
 
     def checkProcess(self, pid):
         # WRITE ME
@@ -156,7 +188,8 @@ class wmiClient(object):
             if rc != 0:
                 os.rmdir(self._rootDir)
                 self._rootDir = None
-            return self._rootDir, rc
+                raise bfp.CIFSMountError('Cannot mount remote filesystem')
+            return rc, self._rootDir
 
     def _doMount(self):
         cmd = self.mountCmd + [ self._rootDir ]
@@ -168,11 +201,14 @@ class wmiClient(object):
         return rc
 
     def unmount(self):
-        # unmount and delete the root file system
-        if self._rootDir:
-            self._doUnmount()
-            os.rmdir(self._rootDir)
-            self._rootDir = None
+        try:
+            # unmount and delete the root file system
+            if self._rootDir:
+                self._rootDir = None
+                self._doUnmount()
+                os.rmdir(self._rootDir)
+        except:
+            pass
 
     def _doUnmount(self):
         os.system('/bin/umount ' + self._rootDir)
@@ -191,8 +227,8 @@ def getConaryClient(flavors = []):
     return conaryclient.ConaryClient(cfg = cfg)
 
 def doBootstrap(wc):
-
     client = getConaryClient()
+
     # fetch the rTIS MSI
     nvf = client.repos.findTrove(None, ('rTIS:msi',
             '/windows.rpath.com@rpath:windows-common',None))
@@ -201,22 +237,18 @@ def doBootstrap(wc):
     contents = client.repos.getFileContents(((f[2],f[3]),),
                                             compressed=False)
     contents = contents[0]
+
     # copy it to the target machine
-    try:
-        rootDir, rc = wc.mount()
-        if rc:
-            raise bfp.CIFSMountError('Cannot mount remote filesystem')
-        contentsPath = os.path.join(rootDir, 'Windows/Temp', f[1])
-        winContentsPath = 'C:\\Windows\\Temp\\' + f[1]
-        winLogPath = 'C:\\Windows\\Temp\\rPath_Tools_Install.log'
-        open(contentsPath,'w').write(contents.f.read())
-        rc, _ = wc.runCmd(r'msiexec.exe /i %s /quiet /l*vx %s' %
-                          (winContentsPath, winLogPath))
-        if rc:
-            return False
-        wc.waitForServiceToStop('rPath Tools Install Service')
-    finally:
-        wc.unmount()
+    rc, rootDir = wc.mount()
+    contentsPath = os.path.join(rootDir, 'Windows/Temp', f[1])
+    winContentsPath = 'C:\\Windows\\Temp\\' + f[1]
+    winLogPath = 'C:\\Windows\\Temp\\rPath_Tools_Install.log'
+    open(contentsPath,'w').write(contents.f.read())
+    cmd = r'msiexec.exe /i %s /quiet /l*vx %s' % \
+        (winContentsPath, winLogPath)
+    rc, rtxt = wc.runCmd(cmd)
+    wc.waitForServiceToStop('rPath Tools Install Service')
+
     return True
 
 
@@ -228,41 +260,28 @@ def doUpdate(wc, sources, jobid, statusCallback):
     # fetch old sys model
     key, value = r"SOFTWARE\rPath\conary", "system_model"
     rc, oldModel = wc.getRegistryKey(key,value)
-    if rc:
-        raise bfp.RegistryAccessError(
-            'Cannot access registry key %s value %s.\n%s' %
-            (key,value,oldModel))
     oldModel = [l.strip() for l in oldModel.split('\n') if l]
 
     # fetch old msi manifest
     key, value = r"SOFTWARE\rPath\conary", "manifest"
     rc, currManifest = wc.getRegistryKey(key,value)
-    if rc:
-        raise bfp.RegistryAccessError(
-            'Cannot access registry key %s value %s.\n%s' %
-            (key,value,oldModel))
     currManifest = currManifest.split('\n')
     currManifestTups = [cmdline.parseTroveSpec(t) for t in currManifest if t]
     currManifestDict = dict([(t.name, t) for t in currManifestTups ])
 
     statusCallback(C.MSG_GENERIC, 'Mounting the filesystem')
     # mount the windows filesystem
-    rootDir, rc = wc.mount()
-    if rc:
-        raise bfp.CIFSMountError('Cannot mount remote filesystem')
+    rc, rootDir = wc.mount()
 
     # Set the rtis root dir
     rtisDir = os.path.join(rootDir, r'Program Files/rPath/Updates')
     if not os.path.exists(rtisDir):
         os.makedirs(rtisDir)
 
-    # FIXME: This is hardcoded for the moment until we work out wmiClient
-    # limitations
-    #rtisWinDir = 'C:\\Program Files\\rPath\\Updates'
-    #rc, _ = wc.setRegistryKey(
-    #    r"SYSTEM\CurrentControlSet\Services\rPath Tools Install Service\Parameters",
-    #    'Root', rtisWinDir)
-    #assert(not rc)
+    rtisWinDir = 'C:\\Program Files\\rPath\\Updates'
+    rc, _ = wc.setRegistryKey(
+        r"SYSTEM\CurrentControlSet\Services\rPath Tools Install Service\Parameters",
+        'Root', rtisWinDir)
 
     statusCallback(C.MSG_GENERIC,
                    'Determining the packages that need to be upgraded')
@@ -446,16 +465,9 @@ def doUpdate(wc, sources, jobid, statusCallback):
         key = r"SYSTEM\CurrentControlSet\Services\rPath Tools Install Service\Parameters"
         value = 'Commands'
         rc, tb = wc.setRegistryKey(key, value, commandValue)
-        if rc:
-            raise bfp.RegistryAccessError(
-                'Cannot write to registry key %s value %s.\n%s' %
-                (key,value,tb))
 
         # start the service
         rc, _ = wc.startService("rPath Tools Install Service")
-        if rc:
-            raise bfp.WindowsServiceError(
-                'Cannot start rPath Tools Install Service')
 
         # wait until completed
         wc.waitForServiceToStop('rPath Tools Install Service')
@@ -477,7 +489,4 @@ def doUpdate(wc, sources, jobid, statusCallback):
         pollManifest.append(s)
     rc, _ = wc.setRegistryKey(r"SOFTWARE\rPath\conary",
                               "polling_manifest", pollManifest)
-
-    # we're now done with the windows fs
-    wc.unmount()
 

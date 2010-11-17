@@ -12,8 +12,6 @@
 # full details.
 #
 
-from conary.lib import digestlib
-
 from rmake3.lib import uuid
 from rmake3.core import types
 from rmake3.core import handler
@@ -166,44 +164,38 @@ class WMITaskHandler(bfp.BaseTaskHandler):
     @classmethod
     def _validateCredentials(cls, wc):
         # Validate credentials
-        rc, _ = wc.getRegistryKey(r'HARDWARE\DESCRIPTION\System\BIOS', 'BaseBoardManufacturer')
-        if rc:
-            raise bfp.AuthenticationError()
+        key = r'SYSTEM\CurrentControlSet\Control\ComputerName\ActiveComputerName'
+        value = 'ComputerName'
+        return wc.getRegistryKey(key, value)
 
     @classmethod
-    def _getComputerName(cls, wmiClient):
-        rc, computername = wmiClient.getRegistryKey(
-            r'SYSTEM\CurrentControlSet\Control\ComputerName\ActiveComputerName', 'ComputerName')
-        if rc:
-            return []
-
+    def _getComputerName(cls, wc):
+        key = r'SYSTEM\CurrentControlSet\Control\ComputerName\ActiveComputerName'
+        value = 'ComputerName'
+        rc, computername = wc.getRegistryKey(key, value)
         return [ XML.Text("hostname", computername.strip()) ]
 
     @classmethod
-    def _getUuids(cls, wmiClient):
-        rc, localUUID = wmiClient.getRegistryKey(r'SOFTWARE\rPath\inventory',
-                                                 'local_uuid')
-        rc, generatedUUID = wmiClient.getRegistryKey(
-            r'SOFTWARE\rPath\inventory', 'generated_uuid')
-        if rc:
-            return []
+    def _getUuids(cls, wc ):
+        rc, localUUID = wc.getRegistryKey(r'SOFTWARE\rPath\inventory',
+                                            'local_uuid')
+        rc, generatedUUID = wc.getRegistryKey(r'SOFTWARE\rPath\inventory', 'generated_uuid')
 
         T = XML.Text
         return [T("local_uuid", localUUID.strip()),
                 T("generated_uuid", generatedUUID.strip())]
 
     @classmethod
-    def _getSoftwareVersions(cls, wmiClient):
-        rc, siList = wmiClient.getRegistryKey(r"SOFTWARE\rPath\conary",
-                                              "polling_manifest")
-        siList = [ x.strip() for x in siList.split('\n') ]
+    def _getSoftwareVersions(cls, wc):
+        rc, siList = wc.getRegistryKey(r"SOFTWARE\rPath\conary", "polling_manifest")
+        siList = [x.strip() for x in siList.split('\n')]
         # Start creating the XML document
-        troves = [ cls._trove(tspec) for tspec in siList if tspec ]
+        troves = [cls._trove(tspec) for tspec in siList if tspec]
         return XML.Element("installed_software", *troves)
 
     @classmethod
-    def _getNetworkInfo(cls, wmiClient):
-        rc, netInfo = wmiClient.queryNetwork()
+    def _getNetworkInfo(cls, wc):
+        rc, netInfo = wc.queryNetwork()
         nets = [x.strip().split(',') for x in netInfo.split('\n') if x]
 
         nodes = []
@@ -223,8 +215,8 @@ class WMITaskHandler(bfp.BaseTaskHandler):
                         netmask = netmask + (i & 1)
                         i = i >> 1
             dns_name = "%s.%s" % (hostname, domain)
-            required = str((ip_address==wmiClient.target) or \
-                (dns_name==wmiClient.target)).lower()
+            required = str((ip_address==wc.target) or \
+                (dns_name==wc.target)).lower()
 
             T = XML.Text
             if ipv6_address:
@@ -244,48 +236,32 @@ class WMITaskHandler(bfp.BaseTaskHandler):
 
             return XML.Element("networks",*nodes)
 
-    @classmethod
-    def _getRegistryKey(cls, wc, keyPath, key):
-        rc, results = wc.getRegistryKey(keyPath, key)
-        if rc:
-            raise bfp.GenericError(r'Error accessing key %s\%s: %s' %
-                (keyPath, key, results))
-        return results
-
-    @classmethod
-    def _setRegistryKey(cls, wc, keyPath, key, value):
-        rc, results = wc.setRegistryKey(keyPath, key, value)
-        if rc:
-            raise bfp.GenericError(r'Failed to set key %s\%s: %s' %
-                    (keyPath, key, results))
-        return results
-
     def _setUUIDs(self, wc, generated_uuid, local_uuid):
         keyPath = r'SOFTWARE\rPath\inventory'
-        self._setRegistryKey(wc, keyPath, 'generated_uuid', generated_uuid)
-        self._setRegistryKey(wc, keyPath, 'local_uuid', local_uuid)
+        wc.setRegistryKey(keyPath, 'generated_uuid', generated_uuid)
+        wc.setRegistryKey(keyPath, 'local_uuid', local_uuid)
         self.sendStatus(C.MSG_GENERIC, 'Stored UUIDs on Windows system')
 
 class RegisterTask(WMITaskHandler):
     def _run(self, data):
-        # fetch a registry key that has admin only access
-        wc = self._getWmiClient(data)
-
         self.sendStatus(C.MSG_CREDENTIALS_VALIDATION,
             "Contacting host %s to validate credentials" % (data.p.host, ))
+
+        wc = self._getWmiClient(data)
+        self.wc = wc
 
         # Check to see if rTIS is installed
         rc, status = wc.queryService('rPath Tools Install Service')
         if rc or not status:
             self.sendStatus(C.MSG_GENERIC, 'Installing rPath Tools')
-            if not windowsUpdate.doBootstrap(wc):
-                raise bfp.AuthenticationError(
-                    'Credentials provided do not have permission to '
-                            'install rPath Tools')
-            wc.unmount()
+            try:
+                windowsUpdate.doBootstrap(wc)
+            finally:
+                wc.unmount()
 
         # Generate a UUID for the system.
-        self.sendStatus(C.MSG_GENERIC, 'Generating UUIDs')
+        self.sendStatus(C.MSG_GENERIC, 'Gathering and/or generating UUIDs')
+        generated_uuid = self._getOrCreateGeneratedUuid()
 
         generated_uuid = self._createGeneratedUuid()
         rc, local_uuid = wc.queryUUID()
@@ -302,7 +278,12 @@ class RegisterTask(WMITaskHandler):
 
         self.sendStatus(C.OK, "Registration Complete for %s" % data.p.host)
 
-    def _createGeneratedUuid(self):
+    def _getOrCreateGeneratedUuid(self):
+        key, value = r"SOFTWARE\rPath\inventory", "generated_uuid"
+        rc, gen_uuid = self.wc.getRegistryKey(key, value)
+        if not rc and gen_uuid:
+            return gen_uuid
+
         return str(uuid.uuid4())
 
 class ShutdownTask(WMITaskHandler):

@@ -32,3 +32,33 @@ class Codes(object):
     ERR_ZONE_MISSING = 420
     ERR_BAD_ARGS = 421
     ERR_GENERIC = 430
+
+class WmiCodes(object):
+    ERR_TIMEOUT = 1
+    ERR_FILE_NOT_FOUND = 2
+    ERR_ACCESS_DENIED = 5
+    ERR_BAD_CREDENTIALS = 109
+
+    errMsg = {
+        ERR_TIMEOUT: "Timeout waiting for a response",
+        ERR_FILE_NOT_FOUND: "The file or registry key/value pair cannot be found.",
+        ERR_ACCESS_DENIED: "The credentials provided do not have permission to access the requested resource.",
+        ERR_BAD_CREDENTIALS: "The username, password or domain is invalid"
+        }
+
+    @classmethod
+    def errorMessage(cls, errCode, returnText, message="", params={}):
+        if message:
+            m = message
+        else:
+            m = ""
+
+        m = m + cls.errMsg.get(errCode, "Undefined Error Code")
+        m = m + '\nWMIClient Error Code: ' + errCode
+        if params:
+            m = m + '\n\nAdditional Details:'
+        for p in params.items():
+            m = m + '\n%s = %s' % (str(p[0]), str(p[1]))
+        m = m + "\n\nInformation Returned from the client:\n" + returnText
+
+        return m

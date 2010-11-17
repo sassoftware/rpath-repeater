@@ -57,6 +57,9 @@ class WindowsServiceError(BaseException):
 class GenericError(BaseException):
     "Error"
 
+class WmiError(BaseException):
+    "Wmi Error"
+
 class BaseForwardingPlugin(plug_dispatcher.DispatcherPlugin,
                            plug_worker.WorkerPlugin):
     pass

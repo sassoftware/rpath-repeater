@@ -145,7 +145,7 @@ class WmiTest(TestBase):
             [ (x.status.code, x.status.text) for x in self.results.register ],
             [
                 (105, 'Contacting host 1.2.3.4 to validate credentials'),
-                (110, 'Generating UUIDs'),
+                (110, 'Gathering and/or generating UUIDs'),
                 (110, 'Stored UUIDs on Windows system'),
                 (200, 'Registration Complete for 1.2.3.4'),
             ])
