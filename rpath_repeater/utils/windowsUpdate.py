@@ -232,11 +232,9 @@ def getConaryClient(flavors = []):
     cfg.dbPath = ':memory:'
     cfg.flavor.extend(flavors)
 
-    # FIXME: this only will work when the repeater is running on the RBA
     from socket import gethostname
     hostname = gethostname()
-    cfg.configLine('conaryProxy https://%s/' % hostname)
-    cfg.configLine('repositoryMap windows.rpath.com https://windows.eng.rpath.com/conary/')
+    cfg.readUrl('http://%s/conaryrc' % hostname)
     return conaryclient.ConaryClient(cfg = cfg)
 
 def doBootstrap(wc):
