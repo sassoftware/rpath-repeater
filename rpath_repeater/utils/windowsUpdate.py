@@ -31,6 +31,7 @@ from conary.conaryclient import modelupdate, cml, cmdline
 from conary.deps import deps
 
 from rpath_repeater.codes import Codes as C
+from rpath_repeater.codes import WmiCodes as WC
 from rpath_repeater.utils import base_forwarding_plugin as bfp
 #log.setVerbosity(log.INFO)
 
@@ -102,7 +103,7 @@ class wmiClient(object):
         wmicmd = self.baseCmd + ['service', action, service]
         rc, rtxt = self._wmiCall(wmicmd)
         if rc:
-            raise bfp.WindowsServiceError(C.WmiCodes.errorMessage(rc, rtxt,
+            raise bfp.WindowsServiceError(WC.errorMessage(rc, rtxt,
                                message='Failure to access windows service %s' % service,
                                params={'action':action }))
         return rc, rtxt
@@ -111,7 +112,7 @@ class wmiClient(object):
         wmicmd = self.baseCmd + ['query', action]
         rc, rtxt = self._wmiCall(wmicmd)
         if rc:
-            raise bfp.WMIError(C.WmiCodes.errorMessage(rc, rtxt,
+            raise bfp.WMIError(WC.errorMessage(rc, rtxt,
                                message='Failure to query target via WMI interface',
                                params={'action':action }))
         return rc, rtxt
@@ -140,6 +141,7 @@ class wmiClient(object):
             key = r"SYSTEM\CurrentControlSet\Services\rPath Tools Install Service\Parameters"
             value = 'Running'
             rc, status = self.getRegistryKey(key, value, ignoreExceptions=True)
+            status = status.strip()
             if not rc and status == "stopped":
                 return
             elif not rc and status == "running":
@@ -156,7 +158,7 @@ class wmiClient(object):
         wmicmd = self.baseCmd + ["registry", "getkey", key, value]
         rc, results = self._wmiCall(wmicmd)
         if rc and not ignoreExceptions:
-            raise bfp.RegistryAccess(C.WmiCodes.errorMessage(rc, results,
+            raise bfp.RegistryAccessError(WC.errorMessage(rc, results,
                  params={'registry_key': key,
                          'registry_value': value,
                          'operation': 'read',
@@ -170,7 +172,7 @@ class wmiClient(object):
         wmicmd = self.baseCmd + ["registry", "setkey", key, value] + data
         rc, results = self._wmiCall(wmicmd)
         if rc:
-            raise bfp.RegistryAccess(C.WmiCodes.errorMessage(rc, results,
+            raise bfp.RegistryAccessError(WC.errorMessage(rc, results,
                  params={'registry_key': key,
                          'registry_value': value,
                          'operation': 'write',
@@ -185,9 +187,10 @@ class wmiClient(object):
         wmicmd = self.baseCmd + ["process", "create", cmd]
         rc, rtxt = self._wmiCall(wmicmd)
         if rc:
-            raise bfp.WMIError(C.WmiCodes.errorMessage(rc, rtxt,
+            raise bfp.WMIError(WC.errorMessage(rc, rtxt,
                                message='Failed to remotely execute command on target',
                                params={'command':cmd }))
+        return rc, rtxt
 
     def checkProcess(self, pid):
         # WRITE ME

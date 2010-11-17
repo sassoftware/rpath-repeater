@@ -264,7 +264,7 @@ class RegisterTask(WMITaskHandler):
         self.sendStatus(C.MSG_GENERIC, 'Gathering and/or generating UUIDs')
         generated_uuid = self._getOrCreateGeneratedUuid()
 
-        generated_uuid = self._createGeneratedUuid()
+        generated_uuid = self._getOrCreateGeneratedUuid()
         rc, local_uuid = wc.queryUUID()
 
         self._setUUIDs(wc, generated_uuid, local_uuid)

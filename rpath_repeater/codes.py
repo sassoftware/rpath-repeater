@@ -34,10 +34,10 @@ class Codes(object):
     ERR_GENERIC = 430
 
 class WmiCodes(object):
-    ERR_TIMEOUT = 1
-    ERR_FILE_NOT_FOUND = 2
-    ERR_ACCESS_DENIED = 5
-    ERR_BAD_CREDENTIALS = 109
+    ERR_TIMEOUT = 0x100
+    ERR_FILE_NOT_FOUND = 0x200
+    ERR_ACCESS_DENIED = 0x500
+    ERR_BAD_CREDENTIALS = 0x6D00
 
     errMsg = {
         ERR_TIMEOUT: "Timeout waiting for a response",
@@ -54,7 +54,7 @@ class WmiCodes(object):
             m = ""
 
         m = m + cls.errMsg.get(errCode, "Undefined Error Code")
-        m = m + '\nWMIClient Error Code: ' + errCode
+        m = m + '\n\nWMIClient Error Code: ' + str(errCode)
         if params:
             m = m + '\n\nAdditional Details:'
         for p in params.items():
