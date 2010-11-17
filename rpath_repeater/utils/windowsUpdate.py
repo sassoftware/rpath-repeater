@@ -451,10 +451,11 @@ def doUpdate(wc, sources, jobid, statusCallback):
             rmPkgList.append(pkgXml)
 
         updateJobs = []
-        updateJobs.append(E.updateJob(
-                E.sequence('0'),
-                E.packages(*(critPkgList))
-                ))
+        # FIXME: Temporarily disable critical update until rTIS gets support
+        #updateJobs.append(E.updateJob(
+        #        E.sequence('0'),
+        #        E.packages(*(critPkgList))
+        #        ))
         updateJobs.append(E.updateJob(
                 E.sequence('1'),
                 E.packages(*(stdPkgList + rmPkgList))
