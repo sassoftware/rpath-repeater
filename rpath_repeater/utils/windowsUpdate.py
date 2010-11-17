@@ -34,6 +34,8 @@ from rpath_repeater.codes import Codes as C
 from rpath_repeater.utils import base_forwarding_plugin as bfp
 #log.setVerbosity(log.INFO)
 
+CRITICAL_PACKAGES = set('rTIS:msi',)
+
 def runModel(client, cache, modelText):
     model = cml.CML(client.cfg)
     model.parse(modelText)
@@ -251,6 +253,60 @@ def doBootstrap(wc):
 
     return True
 
+def processPackages(files, contents, oldMsiDict, updateDir, critical=False):
+    seqNum = 0
+    pkgList = []
+    E = ElementMaker()
+
+    for ((f, t),c) in zip(files,contents):
+        if t.name() in oldMsiDict:
+            ot = oldMsiDict[t.name()]
+            # skip the upgrade if we have the same msi
+            if ot.troveInfo.capsule.msi.productCode() == \
+                    t.troveInfo.capsule.msi.productCode():
+                continue
+            oldManifestName = '%s=%s[%s]' % (ot.name(),
+                                             ot.version().freeze(),
+                                             str(ot.flavor()))
+        else:
+            oldManifestName = ''
+
+        # create the xml for this package
+        pkgXml = E.package(
+            E.type('msi'),
+            E.sequence(str(seqNum)),
+            E.logFile('install.log'),
+            E.operation('install'),
+            E.productCode(t.troveInfo.capsule.msi.productCode()),
+            E.productName(t.troveInfo.capsule.msi.name()),
+            E.productVersion(t.troveInfo.capsule.msi.version()),
+            E.file(f[1]),
+            E.manifest('%s=%s[%s]' % (t.name(), t.version().freeze(),
+                                      str(t.flavor()))),
+            E.prevManifest(oldManifestName),
+            )
+        if critical:
+            pkgXml.append(E.critical('1'))
+
+        seqNum = seqNum + 1
+        pkgList.append(pkgXml)
+
+        # verify free space on the target drive
+        packageDir = os.path.join(updateDir,
+                                  t.troveInfo.capsule.msi.productCode())
+        os.makedirs(packageDir)
+        stat = os.statvfs(packageDir)
+        fsSize = stat[statvfs.F_BFREE] * stat[statvfs.F_BSIZE]
+        cSize = c.get().fileobj.size
+        if (fsSize < cSize * 3):
+                raise bfp.GenericError(
+                    r'Not enough space on the drive to install %s'
+                    % t.troveInfo.capsule.msi.name())
+
+        # write the contents
+        contentsPath = os.path.join(packageDir,f[1])
+        open(contentsPath,'w').write(c.f.read())
+
 
 def doUpdate(wc, sources, jobid, statusCallback):
     statusCallback(C.MSG_GENERIC, 'Waiting for previous job to complete')
@@ -306,7 +362,7 @@ def doUpdate(wc, sources, jobid, statusCallback):
                     additionalInstalls.append(str('install %s=%s' %
                                                   (t[0],str(v))))
 
-    # add additional packages that we have install but are not expressed by
+    # add additional packages that we have installed but are not expressed by
     # the model
     for ts in currManifestDict.values():
         additionalInstalls.append('install %s=%s' %
@@ -319,143 +375,87 @@ def doUpdate(wc, sources, jobid, statusCallback):
     # determine what new packages to install
     oldTroves, newTroves, removeTroves = modelsToJobs(cache, client,
                                                       oldJobSets, newModel)
-    newMsiTroves = [x for x in newTroves if x[0].endswith(':msi')]
-    oldMsiTroves = [x for x in oldTroves if x[0].endswith(':msi')]
-    removeMsiTroves = [x for x in removeTroves if x[0].endswith(':msi')]
 
-    if newMsiTroves or removeMsiTroves:
+    stdPkgs = []
+    critPkgs = []
+    for m in [x for x in newTroves if x[0].endswith(':msi')]:
+        if m[0] in CRITICAL_PACKAGES:
+            critPkgs.append(m)
+        else:
+            stdPkgs.append(m)
+    oldPkgs = [x for x in oldTroves if x[0].endswith(':msi')]
+    removePkgs = [x for x in removeTroves if x[0].endswith(':msi')]
+
+    if stdPkgs or critPkgs or removePkgs:
         statusCallback(C.MSG_GENERIC,
                        'Fetching new packages from the repository')
         # fetch the old troves
-        oldTrvs = client.repos.getTroves(oldMsiTroves, withFiles=False)
+        oldTrvs = client.repos.getTroves(oldPkgs, withFiles=False)
         oldMsiDict = dict(zip([x.name() for x in oldTrvs], oldTrvs))
 
         # fetch the new packages
-        trvs = client.repos.getTroves(newMsiTroves, withFiles=True)
+        trvs = client.repos.getTroves(stdPkgs, withFiles=True)
         filesToGet = []
         for t in trvs:
             filesToGet.append((list(t.iterFileList(capsules=True))[0], t))
         contents = client.repos.getFileContents([(f[0][2],f[0][3])
                                                  for f in filesToGet],
                                                 compressed=False)
+        ctrvs = client.repos.getTroves(critPkgs, withFiles=True)
+        critFilesToGet = []
+        for t in ctrvs:
+            critFilesToGet.append((list(t.iterFileList(capsules=True))[0], t))
+        critContents = client.repos.getFileContents([(f[0][2],f[0][3])
+                                                     for f in critFilesToGet],
+                                                    compressed=False)
 
-        removeTrvs = client.repos.getTroves(removeMsiTroves, withFiles=False)
+        # fetch the packages to remove
+        removeTrvs = client.repos.getTroves(removePkgs, withFiles=False)
 
         # Set the update dir
         updateBaseDir = 'job-%s' % jobid
         updateDir = os.path.join(rtisDir, updateBaseDir)
 
         statusCallback(C.MSG_GENERIC, 'Writing packages and install instructions')
+
         # write the files and installation instructions
         E = ElementMaker()
-        UPDATE = E.update
-        SEQUENCE = E.sequence
-        LOGFILE = E.logFile
-        UPDATE_JOBS = E.updateJobs
-        UPDATE_JOB = E.updateJob
-        PACKAGES = E.packages
-        PACKAGE = E.package
-        TYPE = E.type
-        OPERATION = E.operation
-        PRODUCT_CODE = E.productCode
-        PRODUCT_NAME = E.productName
-        PRODUCT_VERSION = E.productVersion
-        FILE = E.file
-        MANIFEST = E.manifestEntry
-        PREV_MANIFEST = E.previousManifestEntry
 
-        xmlDocStr = '''UPDATE(
-            LOGFILE('install.log'),
-            UPDATE_JOBS(
-
-                UPDATE_JOB(
-                    SEQUENCE('0'),
-                    PACKAGES(
-                        %s
-                        )
-                    )
-                )
-            )'''
-
-        pkgTemplate = '''PACKAGE(
-            TYPE('msi'),
-            SEQUENCE('%s'),
-            LOGFILE('install.log'),
-            OPERATION('install'),
-            PRODUCT_CODE("%s"),
-            PRODUCT_NAME("%s"),
-            PRODUCT_VERSION("%s"),
-            FILE("%s"),
-            MANIFEST("%s"),
-            PREV_MANIFEST("%s")
-            )'''
-        removeTemplate = '''PACKAGE(
-            TYPE('msi'),
-            SEQUENCE('%s'),
-            LOGFILE('uninstall.log'),
-            OPERATION('uninstall'),
-            PRODUCT_CODE("%s"),
-            PRODUCT_NAME("%s"),
-            PRODUCT_VERSION("%s"),
-            MANIFEST("%s"),
-            )'''
-        pkgStr = ''
-        seqNum = 0
-        for ((f, t),c) in zip(filesToGet,contents):
-            if t.name() in oldMsiDict:
-                ot = oldMsiDict[t.name()]
-                # skip the upgrade if we have the same msi
-                if ot.troveInfo.capsule.msi.productCode() == \
-                        t.troveInfo.capsule.msi.productCode():
-                    continue
-                oldManifestName = '%s=%s[%s]' % (ot.name(),
-                                                 ot.version().freeze(),
-                                                 str(ot.flavor()))
-            else:
-                oldManifestName = ''
-            values = (str(seqNum),
-                      t.troveInfo.capsule.msi.productCode(),
-                      t.troveInfo.capsule.msi.name(),
-                      t.troveInfo.capsule.msi.version(),
-                      f[1],
-                      '%s=%s[%s]' % (t.name(), t.version().freeze(),
-                                     str(t.flavor())),
-                      '%s' % oldManifestName)
-            pkgStr = pkgStr + pkgTemplate % values + ',\n'
-
-            # verify free space on the target drive
-            packageDir = os.path.join(updateDir,
-                                      t.troveInfo.capsule.msi.productCode())
-            os.makedirs(packageDir)
-            stat = os.statvfs(packageDir)
-            fsSize = stat[statvfs.F_BFREE] * stat[statvfs.F_BSIZE]
-            cSize = c.get().fileobj.size
-            if (fsSize < cSize * 3):
-                    raise bfp.GenericError(
-                        r'Not enough space on the drive to install %s'
-                        % t.troveInfo.capsule.msi.name())
-
-            # write the contents
-            contentsPath = os.path.join(packageDir,f[1])
-            open(contentsPath,'w').write(c.f.read())
-
-            seqNum = seqNum + 1
-
-        # write remove instructions
+        critPkgList = processPackages(critPkgs, critContents, oldMsiDict, updateDir, critical=True)
+        stdPkgList = processPackages(stdPkgs, contents, oldMsiDict, updateDir)
+        rmPkgList = []
+        seqnum = len(stdPkgList) - 1
         for s, t in enumerate(removeTrvs):
-            values = (str(s + seqNum),
-                      t.troveInfo.capsule.msi.productCode(),
-                      t.troveInfo.capsule.msi.name(),
-                      t.troveInfo.capsule.msi.version(),
-                      '%s=%s[%s]' % (t.name(), t.version().freeze(),
-                                     str(t.flavor())),)
-            pkgStr = pkgStr + removeTemplate % values + ',\n'
+            pkgXml = E.package(
+                E.type('msi'),
+                E.sequence(str(seqnum)),
+                E.logFile('uninstall.log'),
+                E.operation('uninstall'),
+                E.productCode(t.troveInfo.capsule.msi.productCode()),
+                E.productName(t.troveInfo.capsule.msi.name()),
+                E.productVersion(t.troveInfo.capsule.msi.version()),
+                E.manifest('%s=%s[%s]' % (t.name(), t.version().freeze(),
+                                     str(t.flavor()))))
+            seqnum = seqnum + 1
+            rmPkgList.append(pkgXml)
+
+        updateJobs = []
+        updateJobs.append(E.updateJob(
+                E.sequence('0'),
+                E.packages(*(critPkgList))
+                ))
+        updateJobs.append(E.updateJob(
+                E.sequence('1'),
+                E.packages(*(stdPkgList + rmPkgList))
+                ))
+        servicingXml = E.update(
+            E.logFile('install.log'),
+            E.updateJobs(
+                E.updateJob(*updateJobs)))
 
         # write servicing.xml
-        xmlDocStr = xmlDocStr % pkgStr
-        xmlDoc = eval(xmlDocStr)
         open(os.path.join(updateDir,'servicing.xml'),'w').write(
-                etree.tostring(xmlDoc,pretty_print=True))
+                etree.tostring(servicingXml,pretty_print=True))
 
         statusCallback(C.MSG_GENERIC,
                        'Waiting for the package installation(s) to finish')
@@ -472,7 +472,7 @@ def doUpdate(wc, sources, jobid, statusCallback):
         # wait until completed
         wc.waitForServiceToStop('rPath Tools Install Service')
 
-    # TODO: Check for Errors
+        # TODO: Check for Errors
 
     statusCallback(C.MSG_GENERIC,
                    'Updating state information in the registry')
