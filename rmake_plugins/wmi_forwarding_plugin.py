@@ -203,6 +203,7 @@ class WMITaskHandler(bfp.BaseTaskHandler):
             n = [x.strip() for x in n]
             device_name, ipaddr, netmask, hostname, domain = n
             hostname = hostname.lower()
+            domain = domain.split()[0]
             ip_address = ipv6_address = None
             if ":" in ipaddr:
                 ipv6_address = ipaddr
