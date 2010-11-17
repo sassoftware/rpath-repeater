@@ -34,6 +34,7 @@ from rpath_repeater.codes import Codes as C
 from rpath_repeater.utils import base_forwarding_plugin as bfp
 #log.setVerbosity(log.INFO)
 
+REBOOT_TIMEOUT =  600 #  seconds
 CRITICAL_PACKAGES = set('rTIS:msi',)
 
 def runModel(client, cache, modelText):
@@ -133,18 +134,28 @@ class wmiClient(object):
     def queryUUID(self):
         return self._wmiQueryRequest('uuid')
 
-    def waitForServiceToStop(self, service):
-        # query the service until is is no longer active
+    def waitForServiceToStop(self, service, statusCallback=None):
+        rebootStartTime = 0
         while 1:
-            rc, ret = self.queryService('rPath Tools Install Service')
-            if ret.strip() == 'Service Not Active':
+            key = r"SYSTEM\CurrentControlSet\Services\rPath Tools Install Service\Parameters"
+            value = 'Running'
+            rc, status = self.getRegistryKey(key, value, ignoreExceptions=True)
+            if not rc and status == "stopped":
                 return
+            elif not rc and status == "running":
+                rebootStartTime = 0
+            elif not rc and status == "rebooting" and not rebootStartTime:
+                if statusCallback:
+                    statusCallback(C.MSG_GENERIC, 'Waiting For Machine To Reboot')
+                rebootStartTime = time.time()
+            elif rebootStartTime and time.time() - rebootStartTime > REBOOT_TIMEOUT:
+                raise bfp.GenericError('Unable to contact target system after reboot.')
             time.sleep(self.QuerySleepInterval)
 
-    def getRegistryKey(self, key, value):
+    def getRegistryKey(self, key, value, ignoreExceptions=False):
         wmicmd = self.baseCmd + ["registry", "getkey", key, value]
         rc, results = self._wmiCall(wmicmd)
-        if rc:
+        if rc and not ignoreExceptions:
             raise bfp.RegistryAccess(C.WmiCodes.errorMessage(rc, results,
                  params={'registry_key': key,
                          'registry_value': value,
@@ -310,7 +321,7 @@ def processPackages(files, contents, oldMsiDict, updateDir, critical=False):
 
 def doUpdate(wc, sources, jobid, statusCallback):
     statusCallback(C.MSG_GENERIC, 'Waiting for previous job to complete')
-    wc.waitForServiceToStop('rPath Tools Install Service')
+    wc.waitForServiceToStop('rPath Tools Install Service', statusCallback)
 
     statusCallback(C.MSG_GENERIC, 'Retrieving the current system state')
     # fetch old sys model
@@ -470,7 +481,7 @@ def doUpdate(wc, sources, jobid, statusCallback):
         rc, _ = wc.startService("rPath Tools Install Service")
 
         # wait until completed
-        wc.waitForServiceToStop('rPath Tools Install Service')
+        wc.waitForServiceToStop('rPath Tools Install Service', statusCallback)
 
         # TODO: Check for Errors
 
