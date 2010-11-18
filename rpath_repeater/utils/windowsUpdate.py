@@ -36,7 +36,7 @@ from rpath_repeater.utils import base_forwarding_plugin as bfp
 #log.setVerbosity(log.INFO)
 
 REBOOT_TIMEOUT =  600 #  seconds
-CRITICAL_PACKAGES = set('rTIS:msi',)
+CRITICAL_PACKAGES = set(('rTIS:msi',))
 
 def runModel(client, cache, modelText):
     model = cml.CML(client.cfg)
@@ -261,6 +261,14 @@ def doBootstrap(wc):
     rc, rtxt = wc.runCmd(cmd)
     wc.waitForServiceToStop('rPath Tools Install Service')
 
+    # record the installation to the manifest
+    key, value = r"SOFTWARE\rPath\conary", "manifest"
+    rc, currManifest = wc.getRegistryKey(key,value)
+    currManifest = currManifest.split('\n')
+    installedTs = '%s=%s[%s]' % (trv.name(), trv.version().freeze(),
+                                 str(trv.flavor()))
+    currManifest.append(installedTs)
+    rc, rtxt = wc.setRegistryKey(key, value, [x for x in currManifest if x])
     return True
 
 def processPackages(files, contents, oldMsiDict, updateDir, critical=False):
@@ -453,19 +461,24 @@ def doUpdate(wc, sources, jobid, statusCallback):
             rmPkgList.append(pkgXml)
 
         updateJobs = []
+        currJob = 0
         # FIXME: Temporarily disable critical update until rTIS gets support
-        #updateJobs.append(E.updateJob(
-        #        E.sequence('0'),
-        #        E.packages(*(critPkgList))
-        #        ))
-        updateJobs.append(E.updateJob(
-                E.sequence('1'),
-                E.packages(*(stdPkgList + rmPkgList))
-                ))
+        if critPkgList and False:
+            updateJobs.append(E.updateJob(
+                    E.sequence(str(currJob)),
+                    E.packages(*(critPkgList))
+                    ))
+            currJob = currJob + 1
+        if stdPkgList:
+            updateJobs.append(E.updateJob(
+                    E.sequence(str(currJob)),
+                    E.packages(*(stdPkgList + rmPkgList))
+                    ))
+            currJob = currJob + 1
+
         servicingXml = E.update(
             E.logFile('install.log'),
-            E.updateJobs(
-                E.updateJob(*updateJobs)))
+            E.updateJobs(*updateJobs))
 
         # write servicing.xml
         open(os.path.join(updateDir,'servicing.xml'),'w').write(
@@ -475,7 +488,7 @@ def doUpdate(wc, sources, jobid, statusCallback):
                        'Waiting for the package installation(s) to finish')
 
         # set the registry keys
-        commandValue = ["job=0", "update=%s" % updateBaseDir]
+        commandValue = ["update=%s" % updateBaseDir]
         key = r"SYSTEM\CurrentControlSet\Services\rPath Tools Install Service\Parameters"
         value = 'Commands'
         rc, tb = wc.setRegistryKey(key, value, commandValue)
