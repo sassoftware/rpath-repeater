@@ -37,11 +37,14 @@ class WmiTest(TestBase):
             'ComputerName')
         pollingManifest = ('registry', 'getkey', 'SOFTWARE\\rPath\\conary',
             'polling_manifest')
+        manifest = ('registry', 'getkey', 'SOFTWARE\\rPath\\conary',
+            'manifest')
         systemModel = ('registry', 'getkey', 'SOFTWARE\\rPath\\conary',
             'system_model')
         queryNetwork = ('query', 'network')
         queryUUID = ('query', 'uuid')
-
+        running = ('registry', 'getkey', 'SYSTEM\\CurrentControlSet\\Services\\rPath Tools Install Service\\Parameters', 'Running')
+        setRoot = ('registry', 'setkey', 'SYSTEM\\CurrentControlSet\\Services\\rPath Tools Install Service\\Parameters', 'Root', 'C:\\Program Files\\rPath\\Updates')
     class MultiChoice(object):
         def __init__(self, choices):
             self._counter = 0
@@ -64,17 +67,23 @@ class WmiTest(TestBase):
         K.setLocalUuid: "blah\n",
         K.computerName: "my very own computer\n",
         K.localUuid: "6947ee3b-4776-e11b-5d98-5b8284d4f810\n",
-        K.generatedUuid: "  feeddeadbeef\n\n",
+        K.generatedUuid: "feeddeadbeef",
         K.pollingManifest: """
             group-foo=/conary.rpath.com@rpl:2/123.45:1-2-3[is: x86]
             group-bar=/conary.rpath.com@rpl:2/923.45:9-2-3[is: x86_64]
+""",
+        K.manifest: """
+            group-foo=/conary.rpath.com@rpl:2/1-2-3[is: x86]
+            group-bar=/conary.rpath.com@rpl:2/9-2-3[is: x86_64]
 """,
         K.systemModel: """
             install 'group-foo=conary.rpath.com@rpl:2[is: x86]'
             install 'group-bar=conary.rpath.com@rpl:2[is: x86_64]'
 """,
         K.queryNetwork: "65539, 172.16.175.218, 255.255.240.0, ENG-E1DA0E00778, eng.rpath.com",
-        K.queryUUID: "6947ee3b-4776-e11b-5d98-5b8284d4f810"
+        K.queryUUID: "6947ee3b-4776-e11b-5d98-5b8284d4f810",
+        K.running: "stopped",
+        K.setRoot: 'bla',
     }
 
     class WmiClient(wmi_forwarding_plugin.WMITaskHandler.WmiClientFactory):
@@ -140,6 +149,7 @@ class WmiTest(TestBase):
 
     def testRegister(self):
         params = self._wmiParams()
+
         self.client.register_wmi(params)
         self.failUnlessEqual(
             [ (x.status.code, x.status.text) for x in self.results.register ],
