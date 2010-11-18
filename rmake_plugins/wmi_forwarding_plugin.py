@@ -222,7 +222,7 @@ class WMITaskHandler(bfp.BaseTaskHandler):
                                          T("dns_name", dns_name),
                                          T("required", required)))
 
-            return XML.Element("networks",*nodes)
+        return XML.Element("networks",*nodes)
 
     def _setUUIDs(self, wc, generated_uuid, local_uuid):
         keyPath = r'SOFTWARE\rPath\inventory'

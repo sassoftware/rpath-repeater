@@ -117,8 +117,6 @@ class wmiClient(object):
                                params={'action':action }))
         return rc, rtxt
 
-        wmicmd = self.baseCmd + ['query', action]
-        return self._wmiCall(wmicmd)
 
     def startService(self, service):
         return self._wmiServiceRequest('start', service)
