@@ -15,6 +15,8 @@
 import base64
 import logging
 
+from conary.lib import cfg as cny_cfg
+from conary.lib import cfgtypes
 from rmake3.lib import chutney
 from rmake3.lib.jabberlink import message
 from rmake3.lib.jabberlink.handlers import link
@@ -33,6 +35,18 @@ from twisted.internet import reactor
 NS = 'http://rpath.com/permanent/xmpp/repeater-1.0'
 log = logging.getLogger(__name__)
 
+
+class RestForwardingConfig(cny_cfg.ConfigFile):
+    # Launcher
+    key                     = (cfgtypes.CfgString, None)
+    cert                    = (cfgtypes.CfgString, None)
+    httpPort                = (cfgtypes.CfgInt, None)
+    httpsPort               = (cfgtypes.CfgInt, None)
+
+    # Dispatcher
+    repeaterTarget          = (cfgtypes.CfgString, None)
+
+
 class RestForwardingPlugin(plug_dispatcher.DispatcherPlugin,
     plug_worker.LauncherPlugin):
 
@@ -40,39 +54,23 @@ class RestForwardingPlugin(plug_dispatcher.DispatcherPlugin,
         """ The Sputnik end of the rMake topology """
         endpoint = EndPoint(launcher.bus)
 
-        # get configuration options
-        if self.__class__.__name__ in launcher.cfg.pluginOption:
-            options = launcher.cfg.pluginOption[self.__class__.__name__]
-            for option in options:
-                key, value = option.split()
-                if key == 'key':
-                    self.sslkey = value
-
-                elif key == 'cert':
-                    self.sslcert = value
-
-                elif key == 'httpPort':
-                    reactor.listenTCP(int(value),
-                        server.Site(resource.IResource(endpoint)))
-
-                elif key == 'httpsPort':
-                    reactor.listenSSL(int(value),
-                        server.Site(resource.IResource(endpoint)),
-                        ssl.DefaultOpenSSLContextFactory(self.sslkey,
-                            self.sslcert))
+        cfg = self.populateConfigFromOptions(RestForwardingConfig())
+        if cfg.httpPort:
+            reactor.listenTCP(cfg.httpPort,
+                    server.Site(resource.IResource(endpoint)))
+        if cfg.httpsPort:
+            reactor.listenSSL(cfg.httpsPort,
+                    server.Site(resource.IResource(endpoint)),
+                    ssl.DefaultOpenSSLContextFactory(cfg.key, cfg.cert))
 
     def dispatcher_post_setup(self, dispatcher):
         """ The rBuilder end of the rMake topology """
 
-        # get configuration options
-        if self.__class__.__name__ in dispatcher.cfg.pluginOption:
-            options = dispatcher.cfg.pluginOption[self.__class__.__name__]
-            for option in options:
-                key, value = option.split()
-
-                if key == 'repeaterTarget':
-                    dispatcher.bus.link.addMessageHandler(
-                        RepeaterMessageHandler(value, dispatcher.workers))
+        cfg = self.populateConfigFromOptions(RestForwardingConfig())
+        if cfg.repeaterTarget:
+            dispatcher.bus.link.addMessageHandler(
+                    RepeaterMessageHandler(cfg.repeaterTarget,
+                        dispatcher.workers))
 
 
 class RepeaterMessageHandler(message.MessageHandler):

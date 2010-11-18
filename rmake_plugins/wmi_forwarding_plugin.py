@@ -62,19 +62,6 @@ class WmiHandler(bfp.BaseHandler):
     def setup (self):
         bfp.BaseHandler.setup(self)
 
-        cfg = self.dispatcher.cfg
-
-        # get configuration options
-        if self.__class__.__name__ in cfg.pluginOption:
-            options = cfg.pluginOption[self.__class__.__name__]
-            for option in options:
-                key, value = option.split()
-
-                if key == 'timeout':
-                    self.timeout = int(value)
-                elif key == 'port':
-                    self.port = int(value)
-
     @classmethod
     def initParams(cls, data):
         return WmiParams(**data.pop('wmiParams', {}))
