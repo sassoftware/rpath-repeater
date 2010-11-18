@@ -112,7 +112,7 @@ class wmiClient(object):
         wmicmd = self.baseCmd + ['query', action]
         rc, rtxt = self._wmiCall(wmicmd)
         if rc:
-            raise bfp.WMIError(WC.errorMessage(rc, rtxt,
+            raise bfp.WmiError(WC.errorMessage(rc, rtxt,
                                message='Failure to query target via WMI interface',
                                params={'action':action }))
         return rc, rtxt
@@ -185,7 +185,7 @@ class wmiClient(object):
         wmicmd = self.baseCmd + ["process", "create", cmd]
         rc, rtxt = self._wmiCall(wmicmd)
         if rc:
-            raise bfp.WMIError(WC.errorMessage(rc, rtxt,
+            raise bfp.WmiError(WC.errorMessage(rc, rtxt,
                                message='Failed to remotely execute command on target',
                                params={'command':cmd }))
         return rc, rtxt
@@ -317,6 +317,7 @@ def processPackages(files, contents, oldMsiDict, updateDir, critical=False):
         contentsPath = os.path.join(packageDir,f[1])
         open(contentsPath,'w').write(c.f.read())
 
+    return pkgList
 
 def doUpdate(wc, sources, jobid, statusCallback):
     statusCallback(C.MSG_GENERIC, 'Waiting for previous job to complete')
@@ -431,10 +432,12 @@ def doUpdate(wc, sources, jobid, statusCallback):
         # write the files and installation instructions
         E = ElementMaker()
 
-        critPkgList = processPackages(critPkgs, critContents, oldMsiDict, updateDir, critical=True)
-        stdPkgList = processPackages(stdPkgs, contents, oldMsiDict, updateDir)
+        critPkgList = processPackages(critFilesToGet, critContents,
+                                      oldMsiDict, updateDir, critical=True)
+        stdPkgList = processPackages(filesToGet, contents,
+                                     oldMsiDict, updateDir)
         rmPkgList = []
-        seqnum = len(stdPkgList) - 1
+        seqnum = len(stdPkgList)
         for s, t in enumerate(removeTrvs):
             pkgXml = E.package(
                 E.type('msi'),
