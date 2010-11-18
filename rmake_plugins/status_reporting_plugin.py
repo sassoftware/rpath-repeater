@@ -68,6 +68,12 @@ class NodeReportingPlugin(plug_dispatcher.DispatcherPlugin):
             # We only support one zone per management node
             children.append(E('zone', T('name', worker.zoneNames[0])))
         ipv4, ipv6 = self._splitAddressTypes(worker.addresses)
+        # Prefer the ipv4 address for display purposes
+        if ipv4:
+            hname = min(ipv4)
+        else:
+            hname = min(ipv6)
+        children.append(T("hostname", "rPath Update Service - %s" % hname))
         isLocal = str(bool(self.localAddresses.intersection(worker.addresses))).lower()
         networks = [ E("network",
             T("ip_address", x), T("dns_name", x), T("device_name", "eth0"))
