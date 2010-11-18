@@ -20,7 +20,6 @@ from conary.lib.formattrace import formatTrace
 
 from rmake3.core import types
 from rmake3.core import handler
-from rmake3.core import plug_dispatcher
 
 from rmake3.worker import plug_worker
 
@@ -44,15 +43,6 @@ from rpath_repeater.codes import Codes as C
 CimParams = types.slottype('CimParams',
     'host port clientCert clientKey eventUuid instanceId targetName targetType launchWaitTime')
 LaunchData = types.slottype('LaunchData', 'p response')
-
-class LaunchPlugin(plug_dispatcher.DispatcherPlugin, plug_worker.WorkerPlugin):
-    def dispatcher_pre_setup(self, dispatcher):
-        handler.registerHandler(LaunchHandler)
-
-    def worker_get_task_types(self):
-        return {
-            LAUNCH_TASK_WAIT_FOR_NETWORK: WaitForNetworkTask,
-        }
 
 
 class LaunchHandler(handler.JobHandler):
@@ -118,6 +108,8 @@ class LaunchHandler(handler.JobHandler):
 
 
 class WaitForNetworkTask(plug_worker.TaskHandler):
+
+    taskType = LAUNCH_TASK_WAIT_FOR_NETWORK
     TemporaryDir = "/dev/shm"
 
     def loadTargetDriverClasses(self):
