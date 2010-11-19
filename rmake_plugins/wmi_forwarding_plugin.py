@@ -190,7 +190,11 @@ class WMITaskHandler(bfp.BaseTaskHandler):
             n = [x.strip() for x in n]
             device_name, ipaddr, netmask, hostname, domain = n
             hostname = hostname.lower()
-            domain = domain.split()[0]
+            domain = domain.split()
+            if domain:
+                dns_name = "%s.%s" % (hostname, domain[0])
+            else:
+                dns_name = hostname
             ip_address = ipv6_address = None
             if ":" in ipaddr:
                 ipv6_address = ipaddr
@@ -202,7 +206,6 @@ class WMITaskHandler(bfp.BaseTaskHandler):
                     while i:
                         netmask = netmask + (i & 1)
                         i = i >> 1
-            dns_name = "%s.%s" % (hostname, domain)
             required = str((ip_address==wc.target) or \
                 (dns_name==wc.target)).lower()
 
