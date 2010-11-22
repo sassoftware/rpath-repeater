@@ -85,8 +85,8 @@ class wmiClient(object):
 
         # Older mount.cifs don't seem to support passing the user via an
         # environment variable
-        self.mountCmd = [ "/bin/mount", "-t", "cifs", "-o", "user=%s" % user,
-            "//%s/c$" % target ]
+        self.mountCmd = [ "/bin/mount", "-n", "-t", "cifs", "-o",
+                          "user=%s" % user, "//%s/c$" % target ]
         self.mountEnv = dict(PASSWD=password)
 
         self._rootDir = None
@@ -217,14 +217,14 @@ class wmiClient(object):
     def unmount(self):
         try:
             # unmount and delete the root file system
-            self._rootDir = None
             self._doUnmount()
             os.rmdir(self._rootDir)
+            self._rootDir = None
         except:
             pass
 
     def _doUnmount(self):
-        os.system('/bin/umount ' + self._rootDir)
+        os.system('/bin/umount -n ' + self._rootDir)
 
 def getConaryClient(flavors = []):
     cfg = conarycfg.ConaryConfiguration()
