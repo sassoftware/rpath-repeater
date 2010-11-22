@@ -29,6 +29,7 @@ from conary import conaryclient
 from conary import versions
 from conary.conaryclient import modelupdate, cml, cmdline
 from conary.deps import deps
+from conary.errors import TroveSpecsNotFound
 
 from rpath_repeater.codes import Codes as C
 from rpath_repeater.codes import WmiCodes as WC
@@ -374,9 +375,15 @@ def doUpdate(wc, sources, jobid, statusCallback):
     client = getConaryClient(flavors = [newTrvTups[0][2]])
     cache = modelupdate.CMLTroveCache(client.getDatabase(),
                                               client.getRepos())
+
+    # create jobs sets from old system model
+    try:
+        oldJobSets = runModel(client, cache, oldModel)
+    except TroveSpecsNotFound, e:
+        raise bfp.GenericError(
+            r'This system is alread associated with an appliance %s whic is not accessable from this rbuilder.' % str(e.specList[0]))
     # use msi manifest to "correct" the state defined by the old model if needed
     additionalInstalls = []
-    oldJobSets = runModel(client, cache, oldModel)
     for job in oldJobSets:
         for t in job:
             currTrv = currManifestDict.pop(t[0], None)
@@ -415,10 +422,6 @@ def doUpdate(wc, sources, jobid, statusCallback):
 
     if stdPkgs or critPkgs or removePkgs:
         #FIXME: This is only necessary while critial updates are disabled
-        if critPkgs:
-            statusCallback(C.MSG_GENERIC,
-                           'This group contains rPath Tools...')
-
         if not stdPkgs and not removePkgs:
             return
 
@@ -506,7 +509,7 @@ def doUpdate(wc, sources, jobid, statusCallback):
         # wait until completed
         wc.waitForServiceToStop('rPath Tools Install Service', statusCallback)
 
-        # TODO: Check for Errors
+    # TODO: Check for Errors
 
     statusCallback(C.MSG_GENERIC,
                    'Updating state information in the registry')
