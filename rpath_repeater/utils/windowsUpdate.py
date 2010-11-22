@@ -217,10 +217,9 @@ class wmiClient(object):
     def unmount(self):
         try:
             # unmount and delete the root file system
-            if self._rootDir:
-                self._rootDir = None
-                self._doUnmount()
-                os.rmdir(self._rootDir)
+            self._rootDir = None
+            self._doUnmount()
+            os.rmdir(self._rootDir)
         except:
             pass
 
@@ -271,13 +270,14 @@ def doBootstrap(wc):
     rc, rtxt = wc.setRegistryKey(key, value, [x for x in currManifest if x])
     return True
 
-def processPackages(files, contents, oldMsiDict, updateDir, critical=False):
-    seqNum = 0
+def processPackages(updateDir, files, contents=None, oldMsiDict=None,
+                    critical=False, remove=False, seqNum=0):
+    if not contents:
+        contents = len(files) * [None]
     pkgList = []
     E = ElementMaker()
-
-    for ((f, t),c) in zip(files,contents):
-        if t.name() in oldMsiDict:
+    for ((f, t),c) in zip(files, contents):
+        if oldMsiDict and t.name() in oldMsiDict:
             ot = oldMsiDict[t.name()]
             # skip the upgrade if we have the same msi
             if ot.troveInfo.capsule.msi.productCode() == \
@@ -293,21 +293,29 @@ def processPackages(files, contents, oldMsiDict, updateDir, critical=False):
         pkgXml = E.package(
             E.type('msi'),
             E.sequence(str(seqNum)),
-            E.logFile('install.log'),
-            E.operation('install'),
             E.productCode(t.troveInfo.capsule.msi.productCode()),
             E.productName(t.troveInfo.capsule.msi.name()),
             E.productVersion(t.troveInfo.capsule.msi.version()),
             E.file(f[1]),
             E.manifest('%s=%s[%s]' % (t.name(), t.version().freeze(),
                                       str(t.flavor()))),
-            E.prevManifest(oldManifestName),
             )
+        if remove:
+            pkgXml.append(E.logFile('uninstall.log'))
+            pkgXml.append(E.operation('uninstall'))
+        else:
+            pkgXml.append(E.logFile('install.log'))
+            pkgXml.append(E.operation('install'))
+            pkgXml.append(E.prevManifest(oldManifestName))
+
         if critical:
             pkgXml.append(E.critical('1'))
 
         seqNum = seqNum + 1
         pkgList.append(pkgXml)
+
+        if remove:
+            continue
 
         # verify free space on the target drive
         packageDir = os.path.join(updateDir,
@@ -406,6 +414,14 @@ def doUpdate(wc, sources, jobid, statusCallback):
     removePkgs = [x for x in removeTroves if x[0].endswith(':msi')]
 
     if stdPkgs or critPkgs or removePkgs:
+        #FIXME: This is only necessary while critial updates are disabled
+        if critPkgs:
+            statusCallback(C.MSG_GENERIC,
+                           'This group contains rPath Tools...')
+
+        if not stdPkgs and not removePkgs:
+            return
+
         statusCallback(C.MSG_GENERIC,
                        'Fetching new packages from the repository')
         # fetch the old troves
@@ -429,7 +445,10 @@ def doUpdate(wc, sources, jobid, statusCallback):
                                                     compressed=False)
 
         # fetch the packages to remove
-        removeTrvs = client.repos.getTroves(removePkgs, withFiles=False)
+        removeTrvs = client.repos.getTroves(removePkgs, withFiles=True)
+        filesToRemove = []
+        for t in removeTrvs:
+            filesToRemove.append((list(t.iterFileList(capsules=True))[0], t))
 
         # Set the update dir
         updateBaseDir = 'job-%s' % jobid
@@ -440,25 +459,12 @@ def doUpdate(wc, sources, jobid, statusCallback):
         # write the files and installation instructions
         E = ElementMaker()
 
-        critPkgList = processPackages(critFilesToGet, critContents,
-                                      oldMsiDict, updateDir, critical=True)
-        stdPkgList = processPackages(filesToGet, contents,
-                                     oldMsiDict, updateDir)
-        rmPkgList = []
-        seqnum = len(stdPkgList)
-        for s, t in enumerate(removeTrvs):
-            pkgXml = E.package(
-                E.type('msi'),
-                E.sequence(str(seqnum)),
-                E.logFile('uninstall.log'),
-                E.operation('uninstall'),
-                E.productCode(t.troveInfo.capsule.msi.productCode()),
-                E.productName(t.troveInfo.capsule.msi.name()),
-                E.productVersion(t.troveInfo.capsule.msi.version()),
-                E.manifest('%s=%s[%s]' % (t.name(), t.version().freeze(),
-                                     str(t.flavor()))))
-            seqnum = seqnum + 1
-            rmPkgList.append(pkgXml)
+        critPkgList = processPackages(updateDir, critFilesToGet, critContents,
+                                      oldMsiDict, critical=True)
+        stdPkgList = processPackages(updateDir, filesToGet, contents,
+                                     oldMsiDict)
+        rmPkgList = processPackages(updateDir, filesToRemove,
+                                    remove=True, seqNum=len(stdPkgList))
 
         updateJobs = []
         currJob = 0
@@ -469,7 +475,7 @@ def doUpdate(wc, sources, jobid, statusCallback):
                     E.packages(*(critPkgList))
                     ))
             currJob = currJob + 1
-        if stdPkgList:
+        if stdPkgList or rmPkgList:
             updateJobs.append(E.updateJob(
                     E.sequence(str(currJob)),
                     E.packages(*(stdPkgList + rmPkgList))
@@ -481,6 +487,7 @@ def doUpdate(wc, sources, jobid, statusCallback):
             E.updateJobs(*updateJobs))
 
         # write servicing.xml
+        os.makedirs(updateDir)
         open(os.path.join(updateDir,'servicing.xml'),'w').write(
                 etree.tostring(servicingXml,pretty_print=True))
 
