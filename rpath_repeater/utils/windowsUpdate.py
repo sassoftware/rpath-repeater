@@ -381,7 +381,7 @@ def doUpdate(wc, sources, jobid, statusCallback):
         oldJobSets = runModel(client, cache, oldModel)
     except TroveSpecsNotFound, e:
         raise bfp.GenericError(
-            r'This system is alread associated with an appliance (%s) which is not accessable from this rbuilder.' % str(e.specList[0]))
+            r'This system is alread associated with an appliance (%s) which is not accessable.' % str(e.specList[0]))
     # use msi manifest to "correct" the state defined by the old model if needed
     additionalInstalls = []
     for job in oldJobSets:
