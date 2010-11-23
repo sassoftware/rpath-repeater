@@ -15,6 +15,7 @@ class Suite(suite.TestSuite):
 
     execPathVarNames = [
         'CONARY_PATH',
+        'XOBJ_PATH',
     ]
 
 _s = Suite()
