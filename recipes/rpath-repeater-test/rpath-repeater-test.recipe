@@ -11,6 +11,7 @@ class rPathRepeaterTest(TestPackageRecipe):
 
     buildRequires = [
         'lxml:python',
+        'xobj:python',
         'make:runtime',
         'python:devel',
         'pywbem:python',
