@@ -23,6 +23,8 @@ import subprocess
 from lxml import etree
 from lxml.builder import ElementMaker
 
+from xobj import xobj
+
 #from conary.lib import log
 from conary import conarycfg
 from conary import conaryclient
@@ -298,7 +300,7 @@ def processPackages(updateDir, files, contents=None, oldMsiDict=None,
             E.productName(t.troveInfo.capsule.msi.name()),
             E.productVersion(t.troveInfo.capsule.msi.version()),
             E.file(f[1]),
-            E.manifest('%s=%s[%s]' % (t.name(), t.version().freeze(),
+            E.manifestEntry('%s=%s[%s]' % (t.name(), t.version().freeze(),
                                       str(t.flavor()))),
             )
         if remove:
@@ -307,7 +309,7 @@ def processPackages(updateDir, files, contents=None, oldMsiDict=None,
         else:
             pkgXml.append(E.logFile('install.log'))
             pkgXml.append(E.operation('install'))
-            pkgXml.append(E.prevManifest(oldManifestName))
+            pkgXml.append(E.prevManifestEntry(oldManifestName))
 
         if critical:
             pkgXml.append(E.critical('1'))
@@ -490,7 +492,8 @@ def doUpdate(wc, sources, jobid, statusCallback):
             E.updateJobs(*updateJobs))
 
         # write servicing.xml
-        os.makedirs(updateDir)
+        if not os.path.exists(updateDir):
+            os.makedirs(updateDir)
         open(os.path.join(updateDir,'servicing.xml'),'w').write(
                 etree.tostring(servicingXml,pretty_print=True))
 
@@ -509,7 +512,44 @@ def doUpdate(wc, sources, jobid, statusCallback):
         # wait until completed
         wc.waitForServiceToStop('rPath Tools Install Service', statusCallback)
 
-    # TODO: Check for Errors
+        # verify that things installed correctly
+        #x1.update.updateJobs.updateJob.packages.package.packageStatus.exitCode
+        failedPkgs = {}
+        notInstPkgs = []
+        xml = xobj.parse(
+            open(os.path.join(updateDir,'servicing.xml')).read())
+
+        joblst = xml.update.updateJobs.updateJob
+        if type(joblst) is not list:
+            joblst = [joblst]
+        for j in joblst:
+            pkglst = j.packages.package
+            if type(pkglst) is not list:
+                pkglst = [pkglst]
+            for p in pkglst:
+                if str(p.packageStatus.status) != 'completed':
+                    # operation failed, fetch the log
+                    logPath = '%s/%s/%s' % (
+                        updateDir, str(p.productCode), str(p.logFile))
+                    n = "%s (%s)" % (str(p.productName), str(p.manifestEntry))
+                    if os.path.exists(logPath):
+                        failedPkgs[n] = open(logPath).read().decode('utf-16')
+                    else:
+                        notInstPkgs.append(n)
+
+        if failedPkgs or notInstPkgs:
+            msg = ['Some packages did not install\n\n']
+            if failedPkgs:
+                msg.append(
+                    'These packages failed to install (see below for the complete log):\n' \
+                        '%s\n' % ' '.join(failedPkgs.keys()))
+                for p in failedPkgs:
+                    msg.append('Log for %s' % p)
+                    msg.append(failedPkgs[p])
+            if notInstPkgs:
+                msg = msg.append('No attempt was made to install these packages (likely because the installation was aborted due to the above failure(s):\n' \
+                                     '%s\n\n' % ' '.join(notInstPkgs))
+            raise bfp.GenericError('\n'.join(msg))
 
     statusCallback(C.MSG_GENERIC,
                    'Updating state information in the registry')
