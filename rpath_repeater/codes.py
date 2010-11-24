@@ -37,12 +37,14 @@ class WmiCodes(object):
     ERR_TIMEOUT = 0x100
     ERR_FILE_NOT_FOUND = 0x200
     ERR_ACCESS_DENIED = 0x500
+    ERR_ACCESS_DENIED2 = 0xBD00
     ERR_BAD_CREDENTIALS = 0x6D00
 
     errMsg = {
         ERR_TIMEOUT: "Timeout waiting for a response",
         ERR_FILE_NOT_FOUND: "The file or registry key/value pair cannot be found.",
-        ERR_ACCESS_DENIED: "The credentials provided do not have permission to access the requested resource.",
+        ERR_ACCESS_DENIED: "The credentials provided do not have permission to access the requested resource. If this system is running Windows 2008 R2, please refer to the 'rPath Platform Guilde for Microsoft Windows' for special configuration requirements necessary to enable remote WMI access.",
+        ERR_ACCESS_DENIED2: "The credentials provided do not have permission to access the requested resource.",
         ERR_BAD_CREDENTIALS: "The username, password or domain is invalid"
         }
 
