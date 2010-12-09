@@ -312,6 +312,8 @@ def processPackages(updateDir, files, contents=None, oldMsiDict=None,
             pkgXml.append(E.prevManifestEntry(oldManifestName))
 
         pkgXml.append(E.critical(str(critical).lower()))
+        if hasattr(t.troveInfo.capsule.msi,'msiArgs'):
+            pkgXml.append(E.msiArguments(t.troveInfo.capsule.msi.msiArgs()))
 
         seqNum = seqNum + 1
         pkgList.append(pkgXml)
