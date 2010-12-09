@@ -311,8 +311,7 @@ def processPackages(updateDir, files, contents=None, oldMsiDict=None,
             pkgXml.append(E.operation('install'))
             pkgXml.append(E.prevManifestEntry(oldManifestName))
 
-        if critical:
-            pkgXml.append(E.critical('1'))
+        pkgXml.append(E.critical(str(critical).lower()))
 
         seqNum = seqNum + 1
         pkgList.append(pkgXml)
@@ -411,7 +410,6 @@ def doUpdate(wc, sources, jobid, statusCallback):
     # determine what new packages to install
     oldTroves, newTroves, removeTroves = modelsToJobs(cache, client,
                                                       oldJobSets, newModel)
-
     stdPkgs = []
     critPkgs = []
     for m in [x for x in newTroves if x[0].endswith(':msi')]:
@@ -422,17 +420,47 @@ def doUpdate(wc, sources, jobid, statusCallback):
     oldPkgs = [x for x in oldTroves if x[0].endswith(':msi')]
     removePkgs = [x for x in removeTroves if x[0].endswith(':msi')]
 
-    if stdPkgs or critPkgs or removePkgs:
-        #FIXME: This is only necessary while critial updates are disabled
-        if not stdPkgs and not removePkgs:
-            return
+    # fetch the old troves
+    oldTrvs = client.repos.getTroves(oldPkgs, withFiles=False)
+    oldMsiDict = dict(zip([x.name() for x in oldTrvs], oldTrvs))
 
+    if critPkgs:
+        statusCallback(C.MSG_GENERIC,
+                       'Installing critical updates')
+        winLogPath = 'C:\\Windows\\Temp\\'
+        ctrvs = client.repos.getTroves(critPkgs, withFiles=True)
+        critFilesToGet = []
+        for t in ctrvs:
+            critFilesToGet.append((list(t.iterFileList(capsules=True))[0], t))
+        critContents = client.repos.getFileContents([(f[0][2],f[0][3])
+                                                     for f in critFilesToGet],
+                                                    compressed=False)
+        for ((f, t),c) in zip(critFilesToGet, critContents):
+            logName = t.name().split(':')[0]
+            if oldMsiDict and t.name() in oldMsiDict:
+                ot = oldMsiDict[t.name()]
+                # skip the upgrade if we have the same msi
+                if ot.troveInfo.capsule.msi.productCode() == \
+                        t.troveInfo.capsule.msi.productCode():
+                    continue
+                else:
+                    # remove the old version
+                    cmd = r'msiexec.exe /uninstall %s /quiet /l*vx %s' % \
+                        (ot.troveInfo.capsule.msi.productCode(),
+                         winLogPath + logName + '_Uninstall.log')
+                    rc, rtxt = wc.runCmd(cmd)
+            # install the new version
+            contentsPath = os.path.join(rootDir, 'Windows/Temp', f[1])
+            winContentsPath = 'C:\\Windows\\Temp\\' + f[1]
+            open(contentsPath,'w').write(c.f.read())
+            cmd = r'msiexec.exe /i %s /quiet /l*vx %s' % \
+                (winContentsPath, winLogPath + logName + '_Install.log')
+            rc, rtxt = wc.runCmd(cmd)
+            wc.waitForServiceToStop('rPath Tools Install Service')
+
+    if stdPkgs or removePkgs:
         statusCallback(C.MSG_GENERIC,
                        'Fetching new packages from the repository')
-        # fetch the old troves
-        oldTrvs = client.repos.getTroves(oldPkgs, withFiles=False)
-        oldMsiDict = dict(zip([x.name() for x in oldTrvs], oldTrvs))
-
         # fetch the new packages
         trvs = client.repos.getTroves(stdPkgs, withFiles=True)
         filesToGet = []
@@ -441,13 +469,6 @@ def doUpdate(wc, sources, jobid, statusCallback):
         contents = client.repos.getFileContents([(f[0][2],f[0][3])
                                                  for f in filesToGet],
                                                 compressed=False)
-        ctrvs = client.repos.getTroves(critPkgs, withFiles=True)
-        critFilesToGet = []
-        for t in ctrvs:
-            critFilesToGet.append((list(t.iterFileList(capsules=True))[0], t))
-        critContents = client.repos.getFileContents([(f[0][2],f[0][3])
-                                                     for f in critFilesToGet],
-                                                    compressed=False)
 
         # fetch the packages to remove
         removeTrvs = client.repos.getTroves(removePkgs, withFiles=True)
@@ -464,8 +485,6 @@ def doUpdate(wc, sources, jobid, statusCallback):
         # write the files and installation instructions
         E = ElementMaker()
 
-        critPkgList = processPackages(updateDir, critFilesToGet, critContents,
-                                      oldMsiDict, critical=True)
         stdPkgList = processPackages(updateDir, filesToGet, contents,
                                      oldMsiDict)
         rmPkgList = processPackages(updateDir, filesToRemove,
@@ -473,13 +492,6 @@ def doUpdate(wc, sources, jobid, statusCallback):
 
         updateJobs = []
         currJob = 0
-        # FIXME: Temporarily disable critical update until rTIS gets support
-        if critPkgList and False:
-            updateJobs.append(E.updateJob(
-                    E.sequence(str(currJob)),
-                    E.packages(*(critPkgList))
-                    ))
-            currJob = currJob + 1
         if stdPkgList or rmPkgList:
             updateJobs.append(E.updateJob(
                     E.sequence(str(currJob)),
