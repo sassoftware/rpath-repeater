@@ -19,6 +19,7 @@ import tempfile
 import itertools
 import statvfs
 import subprocess
+import socket
 
 from lxml import etree
 from lxml.builder import ElementMaker
@@ -79,18 +80,19 @@ def modelsToJobs(cache, client, oldJobSets, newModel):
 class wmiClient(object):
     QuerySleepInterval = 5.0
     def __init__(self, target, domain, user, password):
-        self.target = target
+        self.target = socket.getaddrinfo(target,None)[0][4][0]
         self.domain = domain
         self.user = user
         self.password = password
-        self.baseCmd = ['/usr/bin/wmic', '--host', target, '--user', user,
-            '--password', password, '--domain', domain or target]
+        self.baseCmd = ['/usr/bin/wmic', '--host', self.target, '--user',
+                        self.user, '--password', self.password, '--domain',
+                        self.domain or self.target]
 
         # Older mount.cifs don't seem to support passing the user via an
         # environment variable
         self.mountCmd = [ "/bin/mount", "-n", "-t", "cifs", "-o",
-                          "user=%s" % user, "//%s/c$" % target ]
-        self.mountEnv = dict(PASSWD=password)
+                          "user=%s" % self.user, "//%s/c$" % self.target ]
+        self.mountEnv = dict(PASSWD=self.password)
 
         self._rootDir = None
 
@@ -108,7 +110,7 @@ class wmiClient(object):
         if rc:
             raise bfp.WindowsServiceError(WC.errorMessage(rc, rtxt,
                                message='Failure to access windows service %s' % service,
-                               params={'action':action }))
+                               params={'cmd':wmicmd }))
         return rc, rtxt
 
     def _wmiQueryRequest( self, action):
@@ -205,7 +207,9 @@ class wmiClient(object):
             if rc != 0:
                 os.rmdir(self._rootDir)
                 self._rootDir = None
-                raise bfp.CIFSMountError('Cannot mount remote filesystem')
+                raise bfp.CIFSMountError(
+                    'Cannot mount remote filesystem\ncommand: %s' %
+                    self.mountCmd + [self._rootDir] )
             return rc, self._rootDir
 
     def _doMount(self):
