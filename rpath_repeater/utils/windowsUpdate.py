@@ -140,21 +140,42 @@ class wmiClient(object):
 
     def waitForServiceToStop(self, service, statusCallback=None):
         rebootStartTime = 0
+        serviceQueries = 0
         while 1:
             key = r"SYSTEM\CurrentControlSet\Services\rPath Tools Install Service\Parameters"
             value = 'Running'
-            rc, status = self.getRegistryKey(key, value, ignoreExceptions=True)
-            status = status.strip()
-            if not rc and status == "stopped":
+            try:
+                rc, status = self.getRegistryKey(key, value)
+                status = status.strip()
+                serviceQueries = serviceQueries+1
+            except:
+                if rebootStartTime:
+                    # we're in the middle of a reboot
+                    if time.time() - rebootStartTime > REBOOT_TIMEOUT:
+                        raise bfp.GenericError(
+                            'Unable to contact target system after reboot.')
+                    if statusCallback:
+                        statusCallback(C.MSG_GENERIC,
+                                       'Waiting for target system to reboot')
+                elif serviceQueries:
+                    # we might have just started a reboot
+                    rebootStartTime = time.time()
+                else:
+                    # we simply failed to contact the service
+                    raise
+                time.sleep(self.QuerySleepInterval)
+                continue
+
+            if status == "stopped":
                 return
-            elif not rc and status == "running":
+            elif status == "running":
                 rebootStartTime = 0
-            elif not rc and status == "rebooting" and not rebootStartTime:
+            elif status == "rebooting":
+                rebootStartTime = 0
                 if statusCallback:
-                    statusCallback(C.MSG_GENERIC, 'Waiting For Machine To Reboot')
-                rebootStartTime = time.time()
-            elif rebootStartTime and time.time() - rebootStartTime > REBOOT_TIMEOUT:
-                raise bfp.GenericError('Unable to contact target system after reboot.')
+                    statusCallback(C.MSG_GENERIC,
+                                   'Reboot complete. '
+                                   'Waiting for installation to finish.')
             time.sleep(self.QuerySleepInterval)
 
     def getRegistryKey(self, key, value, ignoreExceptions=False):
@@ -172,6 +193,8 @@ class wmiClient(object):
     def setRegistryKey(self, key, value, data):
         if not isinstance(data, list):
             data = [data]
+        if not data:
+            data = ['']
         wmicmd = self.baseCmd + ["registry", "setkey", key, value] + data
         rc, results = self._wmiCall(wmicmd)
         if rc:
@@ -233,6 +256,20 @@ class wmiClient(object):
     def _doUnmount(self):
         os.system('/bin/umount -n ' + self._rootDir)
 
+    def getManifest(self):
+        key, value = r"SOFTWARE\rPath\conary", "manifest"
+        rc, manifest = self.getRegistryKey(key,value)
+        manifest = manifest.split('\n')
+        manifestTups = [cmdline.parseTroveSpec(t) for t in manifest if t]
+        return dict([(t.name, t) for t in manifestTups ])
+
+    def setManifest(self, manifestDict):
+        key, value = r"SOFTWARE\rPath\conary", "manifest"
+        manifest = ['%s=%s[%s]' % (x[0], x[1], str(x[2]))
+                    for x in manifestDict.values()]
+        manifest.sort()
+        return self.setRegistryKey(key,value, manifest)
+
 def getConaryClient(flavors = []):
     cfg = conarycfg.ConaryConfiguration()
     cfg.initializeFlavors()
@@ -260,17 +297,26 @@ def doBootstrap(wc):
     rc, rootDir = wc.mount()
     contentsPath = os.path.join(rootDir, 'Windows/Temp', f[1])
     winContentsPath = 'C:\\Windows\\Temp\\' + f[1]
-    winLogPath = 'C:\\Windows\\Temp\\rPath_Tools_Install.log'
+    winLogPath = 'C:\\Windows\\Temp\\rTIS_Install.log'
     open(contentsPath,'w').write(contents.f.read())
     cmd = r'msiexec.exe /i %s /quiet /l*vx %s' % \
         (winContentsPath, winLogPath)
     rc, rtxt = wc.runCmd(cmd)
     wc.waitForServiceToStop('rPath Tools Install Service')
 
+    # record the installation to the system model
+    key, value = r"SOFTWARE\rPath\conary", "system_model"
+    rc, currModel = wc.getRegistryKey(key,value)
+    currModel = currModel.split('\n')
+    installedTs = 'install %s=%s' % (trv.name(), str(trv.version()))
+    currModel.append(installedTs)
+    rc, rtxt = wc.setRegistryKey(key, value, [x for x in currModel if x])
+
     # record the installation to the manifest
     key, value = r"SOFTWARE\rPath\conary", "manifest"
     rc, currManifest = wc.getRegistryKey(key,value)
     currManifest = currManifest.split('\n')
+    currManifest.sort()
     installedTs = '%s=%s[%s]' % (trv.name(), trv.version().freeze(),
                                  str(trv.flavor()))
     currManifest.append(installedTs)
@@ -348,17 +394,14 @@ def doUpdate(wc, sources, jobid, statusCallback):
     wc.waitForServiceToStop('rPath Tools Install Service', statusCallback)
 
     statusCallback(C.MSG_GENERIC, 'Retrieving the current system state')
+
     # fetch old sys model
     key, value = r"SOFTWARE\rPath\conary", "system_model"
     rc, oldModel = wc.getRegistryKey(key,value)
     oldModel = [l.strip() for l in oldModel.split('\n') if l]
 
     # fetch old msi manifest
-    key, value = r"SOFTWARE\rPath\conary", "manifest"
-    rc, currManifest = wc.getRegistryKey(key,value)
-    currManifest = currManifest.split('\n')
-    currManifestTups = [cmdline.parseTroveSpec(t) for t in currManifest if t]
-    currManifestDict = dict([(t.name, t) for t in currManifestTups ])
+    currManifestDict = wc.getManifest()
 
     statusCallback(C.MSG_GENERIC, 'Mounting the filesystem')
     # mount the windows filesystem
@@ -424,7 +467,8 @@ def doUpdate(wc, sources, jobid, statusCallback):
         else:
             stdPkgs.append(m)
     oldPkgs = [x for x in oldTroves if x[0].endswith(':msi')]
-    removePkgs = [x for x in removeTroves if x[0].endswith(':msi')]
+    removePkgs = [x for x in removeTroves if x[0].endswith(':msi') and
+                  x[0] not in CRITICAL_PACKAGES]
 
     # fetch the old troves
     oldTrvs = client.repos.getTroves(oldPkgs, withFiles=False)
@@ -445,23 +489,34 @@ def doUpdate(wc, sources, jobid, statusCallback):
             logName = t.name().split(':')[0]
             if oldMsiDict and t.name() in oldMsiDict:
                 ot = oldMsiDict[t.name()]
-                # skip the upgrade if we have the same msi
-                if ot.troveInfo.capsule.msi.productCode() == \
+                manifestDict = wc.getManifest()
+
+                # remove the old version
+                del manifestDict[t.name()]
+                if ot.troveInfo.capsule.msi.productCode() != \
                         t.troveInfo.capsule.msi.productCode():
-                    continue
-                else:
-                    # remove the old version
                     cmd = r'msiexec.exe /uninstall %s /quiet /l*vx %s' % \
-                        (ot.troveInfo.capsule.msi.productCode(),
-                         winLogPath + logName + '_Uninstall.log')
+                        (ot.troveInfo.capsule.msi.productCode(), \
+                             winLogPath + logName + '_Uninstall.log')
                     rc, rtxt = wc.runCmd(cmd)
+                # update the manifest
+                wc.setManifest(manifestDict)
+
             # install the new version
-            contentsPath = os.path.join(rootDir, 'Windows/Temp', f[1])
-            winContentsPath = 'C:\\Windows\\Temp\\' + f[1]
-            open(contentsPath,'w').write(c.f.read())
-            cmd = r'msiexec.exe /i %s /quiet /l*vx %s' % \
-                (winContentsPath, winLogPath + logName + '_Install.log')
-            rc, rtxt = wc.runCmd(cmd)
+            manifestDict = wc.getManifest()
+            manifestDict[t.name()] = (t.name(), t.version().freeze(),
+                                      t.flavor())
+            if ot.troveInfo.capsule.msi.productCode() != \
+                    t.troveInfo.capsule.msi.productCode():
+                contentsPath = os.path.join(rootDir, 'Windows/Temp', f[1])
+                winContentsPath = 'C:\\Windows\\Temp\\' + f[1]
+                open(contentsPath,'w').write(c.f.read())
+                cmd = r'msiexec.exe /i %s /quiet /l*vx %s' % \
+                    (winContentsPath, winLogPath + logName + '_Install.log')
+                rc, rtxt = wc.runCmd(cmd)
+            # update the manifest
+            wc.setManifest(manifestDict)
+
             wc.waitForServiceToStop('rPath Tools Install Service')
 
     if stdPkgs or removePkgs:
@@ -479,9 +534,14 @@ def doUpdate(wc, sources, jobid, statusCallback):
         # fetch the packages to remove
         removeTrvs = client.repos.getTroves(removePkgs, withFiles=True)
         filesToRemove = []
+        manifestDict = wc.getManifest()
         for t in removeTrvs:
-            filesToRemove.append((list(t.iterFileList(capsules=True))[0], t))
-
+            # we only remove it if it is installed
+            if t.name() in manifestDict and \
+                    manifestDict[t.name()][1] == t.version() and \
+                    manifestDict[t.name()][2] == t.flavor():
+                filesToRemove.append(
+                    (list(t.iterFileList(capsules=True))[0], t))
         # Set the update dir
         updateBaseDir = 'job-%s' % jobid
         updateDir = os.path.join(rtisDir, updateBaseDir)
