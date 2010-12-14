@@ -148,7 +148,7 @@ class wmiClient(object):
                 rc, status = self.getRegistryKey(key, value)
                 status = status.strip()
                 serviceQueries = serviceQueries+1
-            except:
+            except bfp.RegistryAccessError:
                 if rebootStartTime:
                     # we're in the middle of a reboot
                     if time.time() - rebootStartTime > REBOOT_TIMEOUT:
@@ -426,6 +426,14 @@ def doUpdate(wc, sources, jobid, statusCallback):
     cache = modelupdate.CMLTroveCache(client.getDatabase(),
                                               client.getRepos())
 
+    newPollingManifest = []
+    for t in newTrvTups:
+        trv = cache.getTrove(t[0],versions.VersionFromString(t[1]),t[2],
+                                    withFiles=False)
+        s = "%s=%s[%s]" % (trv.getName(), trv.getVersion().freeze(),
+                           str(trv.getFlavor()))
+        newPollingManifest.append(s)
+
     # create jobs sets from old system model
     try:
         oldJobSets = runModel(client, cache, oldModel)
@@ -471,7 +479,7 @@ def doUpdate(wc, sources, jobid, statusCallback):
                   x[0] not in CRITICAL_PACKAGES]
 
     # fetch the old troves
-    oldTrvs = client.repos.getTroves(oldPkgs, withFiles=False)
+    oldTrvs = cache.getTroves(oldPkgs, withFiles=False)
     oldMsiDict = dict(zip([x.name() for x in oldTrvs], oldTrvs))
 
     if critPkgs:
@@ -561,12 +569,15 @@ def doUpdate(wc, sources, jobid, statusCallback):
         if stdPkgList or rmPkgList:
             updateJobs.append(E.updateJob(
                     E.sequence(str(currJob)),
+                    E.logFile('install.log'),
                     E.packages(*(stdPkgList + rmPkgList))
                     ))
             currJob = currJob + 1
 
         servicingXml = E.update(
             E.logFile('install.log'),
+            E.systemModel(newModel),
+            E.pollingManifest(newPollingManifest),
             E.updateJobs(*updateJobs))
 
         # write servicing.xml
@@ -629,19 +640,9 @@ def doUpdate(wc, sources, jobid, statusCallback):
                                      '%s\n\n' % ' '.join(notInstPkgs))
             raise bfp.GenericError('\n'.join(msg))
 
-    statusCallback(C.MSG_GENERIC,
-                   'Updating state information in the registry')
-    # write the new system_model
+    # The following is for backwards compatability and can be removed in
+    # the future.
     rc, _ = wc.setRegistryKey(r"SOFTWARE\rPath\conary",
                               "system_model", newModel)
-
-    # write the new polling manifest
-    pollManifest = []
-    for t in newTrvTups:
-        trv = client.repos.getTrove(t[0],versions.VersionFromString(t[1]),t[2])
-        s = "%s=%s[%s]" % (trv.getName(), trv.getVersion().freeze(),
-                           str(trv.getFlavor()))
-        pollManifest.append(s)
     rc, _ = wc.setRegistryKey(r"SOFTWARE\rPath\conary",
-                              "polling_manifest", pollManifest)
-
+                              "polling_manifest", newPollingManifest)
