@@ -495,6 +495,7 @@ def doUpdate(wc, sources, jobid, statusCallback):
                                                     compressed=False)
         for ((f, t),c) in zip(critFilesToGet, critContents):
             logName = t.name().split(':')[0]
+            ot = None
             if oldMsiDict and t.name() in oldMsiDict:
                 ot = oldMsiDict[t.name()]
                 manifestDict = wc.getManifest()
@@ -514,7 +515,7 @@ def doUpdate(wc, sources, jobid, statusCallback):
             manifestDict = wc.getManifest()
             manifestDict[t.name()] = (t.name(), t.version().freeze(),
                                       t.flavor())
-            if ot.troveInfo.capsule.msi.productCode() != \
+            if ot and ot.troveInfo.capsule.msi.productCode() != \
                     t.troveInfo.capsule.msi.productCode():
                 contentsPath = os.path.join(rootDir, 'Windows/Temp', f[1])
                 winContentsPath = 'C:\\Windows\\Temp\\' + f[1]
