@@ -254,7 +254,7 @@ class wmiClient(object):
             pass
 
     def _doUnmount(self):
-        os.system('/bin/umount -n ' + self._rootDir)
+        os.system('/bin/umount ' + self._rootDir)
 
     def getManifest(self):
         key, value = r"SOFTWARE\rPath\conary", "manifest"
@@ -576,8 +576,8 @@ def doUpdate(wc, sources, jobid, statusCallback):
 
         servicingXml = E.update(
             E.logFile('install.log'),
-            E.systemModel(newModel),
-            E.pollingManifest(newPollingManifest),
+            E.systemModel('\n'.join(newModel)),
+            E.pollingManifest('\n'.join(newPollingManifest)),
             E.updateJobs(*updateJobs))
 
         # write servicing.xml
