@@ -244,8 +244,7 @@ class BaseTaskHandler(plug_worker.TaskHandler):
         try:
             self._run(data)
         except nodeinfo.ProbeHostError, e:
-            self.sendStatus(C.ERR_NOT_FOUND, "%s not found on %s:%d: %s" % (
-                self.InterfaceName, data.p.host, data.p.port, str(e)))
+            self.sendStatus(C.ERR_NOT_FOUND, "Management interface not found on %s: %s" % (data.p.host, str(e)))
         except AuthenticationError, e:
             if e.error:
                 errmsg = e.error
