@@ -154,12 +154,13 @@ class wmiClient(object):
                     if time.time() - rebootStartTime > REBOOT_TIMEOUT:
                         raise bfp.GenericError(
                             'Unable to contact target system after reboot.')
-                    if statusCallback:
-                        statusCallback(C.MSG_GENERIC,
-                                       'Waiting for target system to reboot')
                 elif serviceQueries:
                     # we might have just started a reboot
                     rebootStartTime = time.time()
+                    self.unmount() 
+                    if statusCallback:
+                        statusCallback(C.MSG_GENERIC,
+                                       'Waiting for target system to reboot')
                 else:
                     # we simply failed to contact the service
                     raise
@@ -224,6 +225,7 @@ class wmiClient(object):
         return self._wmiCall(wmicmd)
 
     def mount(self):
+        rc = 0
         if not self._rootDir:
             self._rootDir = tempfile.mkdtemp()
             rc = self._doMount()
@@ -233,7 +235,7 @@ class wmiClient(object):
                 raise bfp.CIFSMountError(
                     'Cannot mount remote filesystem\ncommand: %s' %
                     self.mountCmd + [self._rootDir] )
-            return rc, self._rootDir
+        return rc, self._rootDir
 
     def _doMount(self):
         cmd = self.mountCmd + [ self._rootDir ]
@@ -255,6 +257,11 @@ class wmiClient(object):
 
     def _doUnmount(self):
         os.system('/bin/umount ' + self._rootDir)
+
+    def getWinPath(self, *paths):
+        if not self._rootDir:
+            self.mount()
+        return os.path.join(self._rootDir, *paths)
 
     def getManifest(self):
         key, value = r"SOFTWARE\rPath\conary", "manifest"
@@ -294,8 +301,7 @@ def doBootstrap(wc):
     contents = contents[0]
 
     # copy it to the target machine
-    rc, rootDir = wc.mount()
-    contentsPath = os.path.join(rootDir, 'Windows/Temp', f[1])
+    contentsPath = wc.getWinPath('Windows/Temp', f[1])
     winContentsPath = 'C:\\Windows\\Temp\\' + f[1]
     winLogPath = 'C:\\Windows\\Temp\\rTIS_Install.log'
     open(contentsPath,'w').write(contents.f.read())
@@ -404,13 +410,11 @@ def doUpdate(wc, sources, jobid, statusCallback):
     currManifestDict = wc.getManifest()
 
     statusCallback(C.MSG_GENERIC, 'Mounting the filesystem')
-    # mount the windows filesystem
-    rc, rootDir = wc.mount()
 
     # Set the rtis root dir
-    rtisDir = os.path.join(rootDir, r'Program Files/rPath/Updates')
-    if not os.path.exists(rtisDir):
-        os.makedirs(rtisDir)
+    rtisDirBase = r'Program Files/rPath/Updates'
+    if not os.path.exists(wc.getWinPath(rtisDirBase)):
+        os.makedirs(wc.getWinPath(rtisDirBase))
 
     rtisWinDir = 'C:\\Program Files\\rPath\\Updates'
     rc, _ = wc.setRegistryKey(
@@ -517,7 +521,8 @@ def doUpdate(wc, sources, jobid, statusCallback):
                                       t.flavor())
             if ot and ot.troveInfo.capsule.msi.productCode() != \
                     t.troveInfo.capsule.msi.productCode():
-                contentsPath = os.path.join(rootDir, 'Windows/Temp', f[1])
+                contentsPath = wc.getWinPath('Windows/Temp',
+                                            f[1])
                 winContentsPath = 'C:\\Windows\\Temp\\' + f[1]
                 open(contentsPath,'w').write(c.f.read())
                 cmd = r'msiexec.exe /i %s /quiet /l*vx %s' % \
@@ -552,17 +557,19 @@ def doUpdate(wc, sources, jobid, statusCallback):
                 filesToRemove.append(
                     (list(t.iterFileList(capsules=True))[0], t))
         # Set the update dir
-        updateBaseDir = 'job-%s' % jobid
-        updateDir = os.path.join(rtisDir, updateBaseDir)
+        updateBase = 'job-%s' % jobid
+        updateDirBase = os.path.join(rtisDirBase, updateBase)
 
         statusCallback(C.MSG_GENERIC, 'Writing packages and install instructions')
 
         # write the files and installation instructions
         E = ElementMaker()
 
-        stdPkgList = processPackages(updateDir, filesToGet, contents,
+        stdPkgList = processPackages(wc.getWinPath(updateDirBase),
+                                     filesToGet, contents,
                                      oldMsiDict)
-        rmPkgList = processPackages(updateDir, filesToRemove,
+        rmPkgList = processPackages(wc.getWinPath(updateDirBase),
+                                    filesToRemove,
                                     remove=True, seqNum=len(stdPkgList))
 
         updateJobs = []
@@ -582,16 +589,16 @@ def doUpdate(wc, sources, jobid, statusCallback):
             E.updateJobs(*updateJobs))
 
         # write servicing.xml
-        if not os.path.exists(updateDir):
-            os.makedirs(updateDir)
-        open(os.path.join(updateDir,'servicing.xml'),'w').write(
+        if not os.path.exists(wc.getWinPath(updateDirBase)):
+            os.makedirs(wc.getWInPath(updateDirBase))
+        open(wc.getWinPath(updateDirBase,'servicing.xml'),'w').write(
                 etree.tostring(servicingXml,pretty_print=True))
 
         statusCallback(C.MSG_GENERIC,
                        'Waiting for the package installation(s) to finish')
 
         # set the registry keys
-        commandValue = ["update=%s" % updateBaseDir]
+        commandValue = ["update=%s" % updateBase]
         key = r"SYSTEM\CurrentControlSet\Services\rPath Tools Install Service\Parameters"
         value = 'Commands'
         rc, tb = wc.setRegistryKey(key, value, commandValue)
@@ -607,7 +614,7 @@ def doUpdate(wc, sources, jobid, statusCallback):
         failedPkgs = {}
         notInstPkgs = []
         xml = xobj.parse(
-            open(os.path.join(updateDir,'servicing.xml')).read())
+            open(wc.getWinPath(updateDirBase,'servicing.xml')).read())
 
         joblst = xml.update.updateJobs.updateJob
         if type(joblst) is not list:
@@ -619,8 +626,8 @@ def doUpdate(wc, sources, jobid, statusCallback):
             for p in pkglst:
                 if str(p.packageStatus.status) != 'completed':
                     # operation failed, fetch the log
-                    logPath = '%s/%s/%s' % (
-                        updateDir, str(p.productCode), str(p.logFile))
+                    logPath = wc.getWinPath(updateDirBase, str(p.productCode),
+                                           str(p.logFile))
                     n = "%s (%s)" % (str(p.productName), str(p.manifestEntry))
                     if os.path.exists(logPath):
                         failedPkgs[n] = open(logPath).read().decode('utf-16')

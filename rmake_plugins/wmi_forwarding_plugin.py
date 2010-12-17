@@ -165,8 +165,8 @@ class WMITaskHandler(bfp.BaseTaskHandler):
     @classmethod
     def _getUuids(cls, wc ):
         rc, localUUID = wc.getRegistryKey(r'SOFTWARE\rPath\inventory',
-                                            'local_uuid')
-        rc, generatedUUID = wc.getRegistryKey(r'SOFTWARE\rPath\inventory', 'generated_uuid')
+                                            'local_uuid').strip()
+        rc, generatedUUID = wc.getRegistryKey(r'SOFTWARE\rPath\inventory', 'generated_uuid').strip()
 
         T = XML.Text
         return [T("local_uuid", localUUID.strip()),
