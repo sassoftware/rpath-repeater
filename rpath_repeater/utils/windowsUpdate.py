@@ -590,7 +590,7 @@ def doUpdate(wc, sources, jobid, statusCallback):
 
         # write servicing.xml
         if not os.path.exists(wc.getWinPath(updateDirBase)):
-            os.makedirs(wc.getWInPath(updateDirBase))
+            os.makedirs(wc.getWinPath(updateDirBase))
         open(wc.getWinPath(updateDirBase,'servicing.xml'),'w').write(
                 etree.tostring(servicingXml,pretty_print=True))
 
