@@ -138,31 +138,37 @@ class wmiClient(object):
     def queryUUID(self):
         return self._wmiQueryRequest('uuid')
 
-    def waitForServiceToStop(self, service, statusCallback=None):
+    def waitForServiceToStop(self, service, statusCallback=None,
+                             allowReboot=True):
         rebootStartTime = 0
         serviceQueries = 0
+        serviceQueryRetries = 3
         while 1:
             key = r"SYSTEM\CurrentControlSet\Services\rPath Tools Install Service\Parameters"
             value = 'Running'
             try:
+                serviceQueries = serviceQueries+1
                 rc, status = self.getRegistryKey(key, value)
                 status = status.strip()
-                serviceQueries = serviceQueries+1
-            except bfp.RegistryAccessError:
-                if rebootStartTime:
+            except:
+                if serviceQueries <= serviceQueryRetries:
+                    # things can be a bit strange when the service is first
+                    # installed so we eat the first few exceptions and let
+                    # things settle
+                    pass
+                elif rebootStartTime:
                     # we're in the middle of a reboot
                     if time.time() - rebootStartTime > REBOOT_TIMEOUT:
                         raise bfp.GenericError(
                             'Unable to contact target system after reboot.')
-                elif serviceQueries:
+                elif allowReboot:
                     # we might have just started a reboot
                     rebootStartTime = time.time()
-                    self.unmount() 
+                    self.unmount()
                     if statusCallback:
                         statusCallback(C.MSG_GENERIC,
                                        'Waiting for target system to reboot')
                 else:
-                    # we simply failed to contact the service
                     raise
                 time.sleep(self.QuerySleepInterval)
                 continue
@@ -308,7 +314,7 @@ def doBootstrap(wc):
     cmd = r'msiexec.exe /i %s /quiet /l*vx %s' % \
         (winContentsPath, winLogPath)
     rc, rtxt = wc.runCmd(cmd)
-    wc.waitForServiceToStop('rPath Tools Install Service')
+    wc.waitForServiceToStop('rPath Tools Install Service', allowReboot=False)
 
     # record the installation to the system model
     key, value = r"SOFTWARE\rPath\conary", "system_model"
@@ -397,7 +403,8 @@ def processPackages(updateDir, files, contents=None, oldMsiDict=None,
 
 def doUpdate(wc, sources, jobid, statusCallback):
     statusCallback(C.MSG_GENERIC, 'Waiting for previous job to complete')
-    wc.waitForServiceToStop('rPath Tools Install Service', statusCallback)
+    wc.waitForServiceToStop('rPath Tools Install Service', statusCallback,
+                            allowReboot=False)
 
     statusCallback(C.MSG_GENERIC, 'Retrieving the current system state')
 
@@ -531,7 +538,7 @@ def doUpdate(wc, sources, jobid, statusCallback):
             # update the manifest
             wc.setManifest(manifestDict)
 
-            wc.waitForServiceToStop('rPath Tools Install Service')
+            wc.waitForServiceToStop('rPath Tools Install Service', allowReboot=False)
 
     if stdPkgs or removePkgs:
         statusCallback(C.MSG_GENERIC,
@@ -607,7 +614,8 @@ def doUpdate(wc, sources, jobid, statusCallback):
         rc, _ = wc.startService("rPath Tools Install Service")
 
         # wait until completed
-        wc.waitForServiceToStop('rPath Tools Install Service', statusCallback)
+        wc.waitForServiceToStop('rPath Tools Install Service', statusCallback,
+                                allowReboot=True)
 
         # verify that things installed correctly
         #x1.update.updateJobs.updateJob.packages.package.packageStatus.exitCode
