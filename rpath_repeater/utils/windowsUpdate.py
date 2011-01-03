@@ -519,7 +519,7 @@ def doUpdate(wc, sources, jobid, statusCallback):
             manifestDict = wc.getManifest()
             manifestDict[t.name()] = (t.name(), t.version().freeze(),
                                       t.flavor())
-            if ot and ot.troveInfo.capsule.msi.productCode() != \
+            if not ot or ot.troveInfo.capsule.msi.productCode() != \
                     t.troveInfo.capsule.msi.productCode():
                 contentsPath = wc.getWinPath('Windows/Temp',
                                             f[1])
