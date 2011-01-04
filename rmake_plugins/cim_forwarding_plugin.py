@@ -300,12 +300,12 @@ class ConfigurationTask(CIMTaskHandler):
             self.sendStatus(C.OK, "Host %s configuration applied" % data.p.host)
         else:
             self.sendStatus(C.ERR_GENERIC,
-                "Host %s configuration failed to apply")
+                "Host %s configuration failed to apply" % data.p.host)
 
     def _applyConfigurationChange(self, server, configuration):
         import pywbem
         op = pywbem.CIMInstanceName('RPATH_Configuration',
-            keybindings=dict(SettingID='/var/lib/rpath-iconf/values.xml'))
+            keybindings=dict(SettingID='/var/lib/iconfig/values.xml'))
         instance = server.RPATH_Configuration.GetInstance(op)
         instance.properties['Value'] = pywbem.CIMProperty('Value',
             configuration, type="string")

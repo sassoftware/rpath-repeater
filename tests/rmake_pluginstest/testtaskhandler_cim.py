@@ -28,7 +28,7 @@ class CimTest(TestBase):
         OperatingSystem = CIMInstanceName('Linux_SoftwareIdentity',
             keybindings=dict(name="mysystem.example.com"))
         Configuration = CIMInstanceName('RPATH_Configuration',
-            keybindings=dict(SettingID='/var/lib/rpath-iconf/values.xml'))
+            keybindings=dict(SettingID='/var/lib/iconfig/values.xml'))
 
     _defaultData = dict(
         intrinsic=dict(
