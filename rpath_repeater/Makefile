@@ -20,7 +20,7 @@ all: default-subdirs default-all
 
 install: all install-subdirs pyfiles-install default-install 
 	$(PYTHON) -c "import compileall; compileall.compile_dir('$(DESTDIR)$(repeaterdir)', ddir='$(repeaterdir)', quiet=1)"
-        $(PYTHON) -OO -c "import compileall; compileall.compile_dir('$(DESTDIR)$(repeaterdir)', ddir='$(repeaterdir)', quiet=1)"
+	$(PYTHON) -OO -c "import compileall; compileall.compile_dir('$(DESTDIR)$(repeaterdir)', ddir='$(repeaterdir)', quiet=1)"
 
 dist: default-dist
 
