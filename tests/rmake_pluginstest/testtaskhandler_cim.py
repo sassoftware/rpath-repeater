@@ -5,6 +5,7 @@ testsuite.setup()
 
 import pywbem
 
+from rpath_repeater import models
 import cim_forwarding_plugin
 
 from testtaskhandler import TestBase

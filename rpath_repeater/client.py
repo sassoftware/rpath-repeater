@@ -14,6 +14,8 @@
 import sys
 import time
 
+from conary.lib import util
+
 from rmake3.client import RmakeClient
 from rmake3.lib import uuid as RmakeUuid
 
@@ -21,51 +23,35 @@ from rmake3.core.types import RmakeJob
 from rmake3.core.types import SlotCompare
 
 from rpath_repeater.utils.immutabledict import FrozenImmutableDict
+from rpath_repeater import models
 
 class RepeaterClient(object):
     __WMI_PLUGIN_NS = 'com.rpath.sputnik.wmiplugin'
     __CIM_PLUGIN_NS = 'com.rpath.sputnik.cimplugin'
     __LAUNCH_PLUGIN_NS = 'com.rpath.sputnik.launchplugin'
     __MGMT_IFACE_PLUGIN_NS = 'com.rpath.sputnik.interfacedetectionplugin'
+    __IMAGE_UPLOAD_PLUGIN_NS = 'com.rpath.sputnik.imageuploadplugin'
 
-    class _BaseSlotCompare(SlotCompare):
-        def toDict(self):
-            ret = {}
-            for slot in self.__slots__:
-                val = getattr(self, slot)
-                if val is not None:
-                    ret[slot] = val
-            return ret
+    CimParams = models.CimParams
+    WmiParams = models.WmiParams
+    ManagementInterfaceParams = models.ManagementInterfaceParams
+    URL = models.URL
+    ResultsLocation = models.ResultsLocation
+    ImageFile = models.ImageFile
 
-    class CimParams(_BaseSlotCompare):
-        """
-        Information required in order to talk to a WBEM endpoint
-        """
-        __slots__ = [ 'host', 'port', 'clientCert', 'clientKey', 
-            'eventUuid', 'instanceId', 'targetName', 'targetType',
-            'launchWaitTime']
-        # XXX instanceId, targetName, targetType have nothing to do with
-        # CimParams, they should be in a different data structure
-
-    class WmiParams(_BaseSlotCompare):
-        """
-        Information required in order to talk to a WBEM endpoint
-        """
-        __slots__ = [ 'host', 'port', 'username', 'password', 'domain',
-            'eventUuid', ]
-
-    class ManagementInterfaceParams(_BaseSlotCompare):
-        """
-        Information needed for probing for a management interface (e.g. WMI,
-        WBEM)
-        """
-        __slots__ = [ 'host', 'interfacesList', 'eventUuid', ]
-
-    class ResultsLocation(_BaseSlotCompare):
-        """
-        Results will be posted to this location
-        """
-        __slots__ = [ 'scheme', 'host', 'port', 'path', ]
+    @classmethod
+    def makeUrl(cls, url, headers=None):
+        scheme, user, passwd, host, port, path, query, fragment = util.urlSplit(
+            url)
+        # Join back query and fragment
+        unparsedPath = path
+        if query:
+            unparsedPath = "%s?%s" % (unparsedPath, query)
+        if fragment:
+            unparsedPath = "%s#%s" % (unparsedPath, fragment)
+        return cls.URL(scheme=scheme, username=user, password=passwd,
+            host=host, port=port, path=path, query=query, fragment=fragment,
+            unparsedPath=unparsedPath, headers=headers)
 
     def __init__(self, address=None, zone=None):
         if not address:
@@ -215,6 +201,24 @@ class RepeaterClient(object):
 
         return (uuid, job.thaw())
 
+    def download_images(self, token, imageList):
+        """
+        """
+        params = dict(
+            token = token,
+            imageList = [ x.toDict() for x in imageList ],)
+        data = FrozenImmutableDict(params)
+        job = RmakeJob(RmakeUuid.uuid4(), self.__IMAGE_UPLOAD_PLUGIN_NS,
+                       owner='nobody',
+                       data=data,
+                       ).freeze()
+
+        uuid = job.job_uuid
+        job = self.client.createJob(job)
+
+        return (uuid, job.thaw())
+
+
     def getJob(self, uuid):
         return self.client.getJob(uuid).thaw()
 
@@ -265,7 +269,7 @@ def main():
         uuid, job = cli.poll_wmi(wmiParams,
             resultsLocation = resultsLocation,
             zone = zone)
-    else:
+    elif 0:
         uuid, job = cli.update_wmi(wmiParams,
             resultsLocation = resultsLocation,
             zone = zone,
@@ -273,6 +277,21 @@ def main():
                 'group-windemo-appliance=/windemo.eng.rpath.com@rpath:windemo-1-devel/1-2-1[]',
             ],
             )
+    else:
+        headers = {'X-rBuilder-OutputToken' : 'aaa'}
+        images = [
+            cli.ImageFile(url=cli.makeUrl('http://george.rdu.rpath.com/CentOS/5.5/isos/x86_64/CentOS-5.5-x86_64-bin-1of8.iso'),
+                destination=cli.makeUrl('http://localhost:1234/uploadImage/1',
+                    headers=headers),
+                progress=cli.makeUrl('http://localhost:1234/foo/1',
+                    headers=headers)),
+            cli.ImageFile(url=cli.makeUrl('http://george.rdu.rpath.com/CentOS/5.5/isos/x86_64/CentOS-5.5-x86_64-bin-2of8.iso'),
+                destination=cli.makeUrl('http://localhost:1234/uploadImage/2',
+                    headers=headers),
+                progress=cli.makeUrl('http://localhost:1234/foo/2',
+                    headers=headers)),
+        ]
+        uuid, job = cli.download_images('token', images)
     while 1:
         job = cli.getJob(uuid)
         if job.status.final:
