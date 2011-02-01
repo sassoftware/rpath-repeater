@@ -12,13 +12,8 @@
 # full details.
 #
 
-import collections
 import logging
-import tempfile
-import time
 
-from twisted.internet import error as internet_error
-from twisted.internet import reactor, ssl
 from rmake3.core import plug_dispatcher
 from rmake3.core import handler
 from rpath_repeater.models import ImageFile, URL
@@ -50,3 +45,4 @@ class ImageUploadHandler(handler.JobHandler):
 
     def processImage(self, image):
         splicer = bfp.Splicer(image.url, image.destination, image.progress)
+        return splicer
