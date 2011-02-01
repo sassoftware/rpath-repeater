@@ -370,7 +370,7 @@ def PipingAgent(url, headers, response, progressUrl):
     agent = client.Agent(reactor)
     finished = defer.Deferred()
     @finished.addCallback
-    def cb(response):
+    def cb_bodyProducer(response):
         print "body produced"
         return "Succeeded"
     bodyProducer = BodyProducer(response, finished, progressUrl)
@@ -384,7 +384,7 @@ def PipingAgent(url, headers, response, progressUrl):
         bodyProducer)
 
     @deferred.addCallback
-    def cb(response):
+    def cb_response(response):
         print "Response received: %s %s" % (response.version, response.code)
         return response
 
