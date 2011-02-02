@@ -12,6 +12,11 @@
 # full details.
 #
 
+import logging
+
+log = logging.getLogger(__name__)
+
+import os
 import collections
 import StringIO
 import socket
@@ -22,6 +27,7 @@ from xml.dom import minidom
 
 from conary import versions
 from conary import conaryclient
+from conary.lib import digestlib
 from conary.lib.formattrace import formatTrace
 
 from twisted.internet import defer, protocol, reactor
@@ -137,12 +143,12 @@ class BaseHandler(handler.JobHandler):
             headers = headers)
         @fact.deferred.addCallback
         def processResult(result):
-            print "Received result for", host, result
+            log.debug("Received result for %s: %s", host, result)
             return result
 
         @fact.deferred.addErrback
         def processError(error):
-            print "Error!", error.getErrorMessage()
+            log.error("Error: %s", error.getErrorMessage())
 
         reactor.connectTCP(host, port, fact)
 
@@ -344,10 +350,53 @@ class HTTPClientFactory(client.HTTPClientFactory):
         self.deferred.addCallback(
             lambda data: (data, self.status, self.response_headers))
 
+def ImagesUpload(imageList, statusReportURL, putFilesURL):
+    dl = []
+    for image in imageList:
+        dl.append(ImageUpload(image, statusReportURL))
+    deferred = defer.DeferredList(dl)
+
+    @deferred.addCallback
+    def cb(resultList):
+        imagesList = [ x[1] for x in resultList ]
+        imagesUpload(imagesList, statusReportURL, putFilesURL)
+
+def imagesUploadXML(images):
+    files = [
+        XML.Element("file",
+            XML.Text("title", "Title"),
+            XML.Text("size", str(i.size)),
+            XML.Text("sha1", i.sha1),
+            XML.Text("fileName", i.fileName))
+        for i in images ]
+    root = XML.Element("files", *files)
+    data = BaseHandler.toXml(root)
+    return data
+
+def imagesUpload(images, statusReportURL, setFilesURL):
+    data = imagesUploadXML(images)
+    fact = ProgressReporter.createFactory(setFilesURL, "PUT", data)
+    ProgressReporter.registerFactory(setFilesURL, fact)
+
+    ProgressReporter.publishProgress(statusReportURL,
+        code=300, message="Finished")
+
+def ImageUpload(image, statusReportURL):
+    deferred = defer.Deferred()
+    @deferred.addCallback
+    def cb((sha1, size)):
+        image.sha1 = sha1
+        image.size = size
+        image.fileName = os.path.basename(image.destination.path)
+        return image
+    Splicer(image.url, image.destination, statusReportURL, deferred)
+    return deferred
+
+
 class Splicer(object):
     USER_AGENT = HTTPClientFactory.USER_AGENT
 
-    def __init__(self, urlsrc, urldest, progressUrl):
+    def __init__(self, urlsrc, urldest, progressUrl, consumerFinished):
         agent1 = client.Agent(reactor)
         headers = {
             'User-Agent' : [ self.USER_AGENT ],
@@ -358,35 +407,38 @@ class Splicer(object):
 
         @deferred.addCallback
         def cb(response):
-            print response.version, response.code
-            return PipingAgent(urldest, headers.copy(), response, progressUrl)
+            log.debug("Source response received: HTTP status %s", response.code)
+            PipingAgent(urldest, headers.copy(), response, progressUrl,
+                consumerFinished)
 
 def _toList(val):
     if not isinstance(val, list):
         val = [ val ]
     return val
 
-def PipingAgent(url, headers, response, progressUrl):
+def PipingAgent(url, headers, response, progressUrl, consumerFinished):
     agent = client.Agent(reactor)
     finished = defer.Deferred()
     @finished.addCallback
     def cb_bodyProducer(response):
-        print "body produced"
+        log.debug("body produced")
         return "Succeeded"
-    bodyProducer = BodyProducer(response, finished, progressUrl)
+    bodyProducer = BodyProducer(response, finished, url, progressUrl,
+        consumerFinished)
 
     headers.update({
         'Content-Type' : [ 'application/octet-string' ],
     })
     headers.update((x, _toList(y)) for (x, y) in (url.headers or {}).items())
     udst = url.asString()
-    deferred = agent.request("POST", udst, client.Headers(headers),
+    deferred = agent.request("PUT", udst, client.Headers(headers),
         bodyProducer)
 
     @deferred.addCallback
     def cb_response(response):
-        print "Response received: %s %s" % (response.version, response.code)
+        log.debug("Response received: HTTP code %s", response.code)
         return response
+    return consumerFinished
 
 class SplicingProtocol(protocol.Protocol):
     """
@@ -403,41 +455,76 @@ class SplicingProtocol(protocol.Protocol):
         self._consumer.write(bytes)
 
     def connectionLost(self, reason):
-        print 'Finished receiving body:', reason.getErrorMessage()
+        log.debug('Finished receiving body: %s', reason.getErrorMessage())
         if self._consumer:
             self._consumer.close()
             self._consumer = None
         self.finished.callback(None)
 
+class ProgressReporter(object):
+    @classmethod
+    def publishProgress(cls, progressUrl, code, message):
+        root = XML.Element('imageStatus',
+            XML.Text('code', str(code)),
+            XML.Text('message', message))
+
+        data = BaseHandler.toXml(root)
+        fact = cls.createFactory(progressUrl, "PUT", data)
+        @fact.deferred.addCallback
+        def cb(data):
+            log.debug("Finished uploading status")
+        cls.registerFactory(progressUrl, fact)
+
+    @classmethod
+    def createFactory(cls, url, method, data, headers=None):
+        fheaders = { 'Content-Type' : 'application/xml',
+            'Host' : url.host, }
+        if url.headers:
+            fheaders.update(url.headers)
+        if headers:
+            fheaders.update(headers)
+        log.debug("Headers: %s; data: %s", fheaders, data)
+        fact = HTTPClientFactory(url.unparsedPath, method=method,
+            postdata=data, headers=fheaders)
+        return fact
+
+    @classmethod
+    def registerFactory(cls, url, factory):
+        port = int(url.port or 80)
+        reactor.connectTCP(url.host, port, factory)
+
 class BufferedConsumer(object):
     BUFFER_SIZE = 10
     PROGRESS_TIMEOUT = 2
-    def __init__(self, protocol, length, progressUrl):
+    def __init__(self, protocol, length, url, progressUrl, finished):
         self._readproto = protocol
         self._consumer = None
         self._buf = collections.deque()
         self._bytesDownloaded = 0
         self._paused = True
         self._length = length
+        self._url = url
         self.nextProgressCall = 0
         self.progressUrl = progressUrl
+        self._ctx = digestlib.sha1()
+        self._finished = finished
 
     def setConsumer(self, consumer):
         self._consumer = consumer
         self._paused = False
 
     def write(self, data):
-        print "Producer: produced %d bytes" % len(data)
+        log.debug("Producer: produced %d bytes", len(data))
         if data:
             self._buf.append(data)
         self._consume()
 
     def _consume(self):
         if self._consumer is None:
-            print "Waiting for a consumer"
+            log.debug("Waiting for a consumer")
             self.producer_pauseProducing()
             return
-        print "Consuming; buffer length: ", len(self._buf)
+        log.debug("Consuming; buffer length: %d", len(self._buf))
         self.flush()
 
     def flush(self):
@@ -446,11 +533,12 @@ class BufferedConsumer(object):
             data = self._buf.popleft()
             self._bytesDownloaded += len(data)
             self._consumer.write(data)
+            self._ctx.update(data)
 
         if now > self.nextProgressCall or self._bytesDownloaded == self._length:
             self.nextProgressCall = now + self.PROGRESS_TIMEOUT
             self.progressCallback(self._bytesDownloaded, self._length)
-        print " flush: buffer length %d" % len(self._buf)
+        log.debug(" flush: buffer length %d", len(self._buf))
 
     def close(self):
         self.flush()
@@ -458,72 +546,66 @@ class BufferedConsumer(object):
             self.producer_stopProducing()
 
     def producer_pauseProducing(self):
-        print "readproto: pauseProducing"
+        log.debug("readproto: pauseProducing")
         self._paused = True
         if len(self._buf) < self.BUFFER_SIZE:
             return
-        print "readproto: really pauseProducing"
+        log.debug("readproto: really pauseProducing")
         self._readproto.transport.pauseProducing()
 
     def producer_resumeProducing(self):
-        print "readproto: resumeProducing"
+        log.debug("readproto: resumeProducing")
         self._readproto.transport.resumeProducing()
         self._paused = False
         self.flush()
 
     def producer_stopProducing(self):
-        print "readproto: stopProducing"
-        self._progressCallback(300, "Download finished")
+        log.debug("readproto: stopProducing")
         if self._readproto:
             self._readproto.transport.stopProducing()
             self._readproto = None
+            sha1 = self._ctx.hexdigest()
+            self._finished.callback((sha1, self._length))
 
     def progressCallback(self, bytesDownloaded, bytesTotal):
         if not self.progressUrl:
             return
-        msg = "Downloaded %s/%s (%d%%)" % (bytesDownloaded, bytesTotal,
+        msg = "%s: Downloaded %s/%s (%d%%)" % (
+            os.path.basename(self._url.path),
+            bytesDownloaded, bytesTotal,
             int(bytesDownloaded * 100 / bytesTotal))
         code = 100
         self._progressCallback(code, msg)
 
     def _progressCallback(self, code, message):
-        print message
-        root = XML.Element('imageStatus',
-            XML.Text('code', str(code)),
-            XML.Text('message', message))
-
-        data = BaseHandler.toXml(root)
-        headers = { 'Content-Type' : 'text/xml' }
-        if self.progressUrl.headers:
-            headers.update(self.progressUrl.headers)
-        port = int(self.progressUrl.port or 80)
-        fact = HTTPClientFactory(self.progressUrl.path, method="POST",
-            postdata=data, headers=headers)
-        @fact.deferred.addCallback
-        def cb(data):
-            print "Finished uploading status"
-        reactor.connectTCP(self.progressUrl.host, port, fact)
+        return ProgressReporter.publishProgress(self.progressUrl, code, message)
 
 class BodyProducer(object):
     implements(iweb.IBodyProducer)
 
-    def __init__(self, response, finished, progressUrl):
+    def __init__(self, response, finished, url, progressUrl, consumerFinished):
         self.length = response.length
         self.finished = finished
         protocol = SplicingProtocol(finished)
-        self._consumer = BufferedConsumer(protocol, self.length, progressUrl)
+        self._consumerFinished = consumerFinished
+        self._consumer = BufferedConsumer(protocol, self.length, url,
+            progressUrl, self._consumerFinished)
         protocol.setConsumer(self._consumer)
         # Send the response's body to the protocol.
         # This calls the protocol's dataReceived, which will buffer the read
         # and then attempt to consume it.
         response.deliverBody(protocol)
 
+    @property
+    def consumerFinished(self):
+        return self._consumerFinished
+
     def startProducing(self, consumer):
         self._consumer.setConsumer(consumer)
         d = defer.Deferred()
         @d.addCallback
         def cb(res):
-            print "Produced"
+            log.debug("Produced")
         return d
 
     def stopProducing(self):

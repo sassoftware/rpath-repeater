@@ -20,7 +20,6 @@ from rmake3.client import RmakeClient
 from rmake3.lib import uuid as RmakeUuid
 
 from rmake3.core.types import RmakeJob
-from rmake3.core.types import SlotCompare
 
 from rpath_repeater.utils.immutabledict import FrozenImmutableDict
 from rpath_repeater import models
@@ -67,7 +66,6 @@ class RepeaterClient(object):
         if resultsLocation is not None:
             assert isinstance(resultsLocation, self.ResultsLocation)
             params['resultsLocation'] = resultsLocation.toDict()
-        data = FrozenImmutableDict(params)
         return params
 
     def _launchRmakeJob(self, namespace, params):
@@ -201,12 +199,13 @@ class RepeaterClient(object):
 
         return (uuid, job.thaw())
 
-    def download_images(self, token, imageList):
+    def download_images(self, imageList, statusReportURL, putFilesURL):
         """
         """
         params = dict(
-            token = token,
-            imageList = [ x.toDict() for x in imageList ],)
+            putFilesURL = putFilesURL,
+            statusReportURL = statusReportURL,
+            imageList = imageList)
         data = FrozenImmutableDict(params)
         job = RmakeJob(RmakeUuid.uuid4(), self.__IMAGE_UPLOAD_PLUGIN_NS,
                        owner='nobody',
@@ -291,7 +290,7 @@ def main():
                 progress=cli.makeUrl('http://localhost:1234/foo/2',
                     headers=headers)),
         ]
-        uuid, job = cli.download_images('token', images)
+        uuid, job = cli.download_images(images)
     while 1:
         job = cli.getJob(uuid)
         if job.status.final:

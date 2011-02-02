@@ -12,15 +12,10 @@
 # full details.
 #
 
-import logging
-
 from rmake3.core import plug_dispatcher
 from rmake3.core import handler
-from rpath_repeater.models import ImageFile, URL
 from rpath_repeater.codes import Codes as C
 from rpath_repeater.utils import base_forwarding_plugin as bfp
-
-log = logging.getLogger(__name__)
 
 IMAGE_UPLOAD_JOB = bfp.PREFIX + '.imageuploadplugin'
 
@@ -33,16 +28,9 @@ class ImageUploadHandler(handler.JobHandler):
 
     def starting(self):
         self.params = self.getData().thaw().getDict()
-        self.imageList = [ ImageFile(url=URL(**x['url']),
-                destination=URL(**x['destination']),
-                progress=URL(**x['progress']),
-                headers=x.get('headers'))
-            for x in self.params.get('imageList', []) ]
-        for image in self.imageList:
-            self.processImage(image)
+        self.putFilesURL = self.params['putFilesURL']
+        self.statusReportURL = self.params['statusReportURL']
+        self.imageList = self.params['imageList']
+        bfp.ImagesUpload(self.imageList, self.statusReportURL, self.putFilesURL)
 
-        self.setStatus(C.OK, "Done")
-
-    def processImage(self, image):
-        splicer = bfp.Splicer(image.url, image.destination, image.progress)
-        return splicer
+        self.setStatus(C.OK, "Image import initiated")

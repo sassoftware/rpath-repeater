@@ -76,8 +76,9 @@ class URL(_BaseSlotCompare):
             port = port or 80
         elif self.scheme == "https":
             port = port or 443
-        return "%s://%s:%s%s" % (self.scheme, self.host, port,
+        url = "%s://%s:%s%s" % (self.scheme, self.host, port,
             self.unparsedPath)
+        return url.encode('ascii')
 
 class ResultsLocation(URL):
     """
@@ -85,4 +86,4 @@ class ResultsLocation(URL):
     """
 
 class ImageFile(_BaseSlotCompare):
-    __slots__ = [ 'url', 'destination', 'progress', ]
+    __slots__ = [ 'url', 'destination', 'fileName', 'sha1', 'size' ]
