@@ -15,6 +15,7 @@
 from rmake3.core import types
 from rmake3.core import handler
 
+from rpath_repeater.models import CimParams
 from rpath_repeater.codes import Codes as C
 from rpath_repeater.utils import wbemlib
 from rpath_repeater.utils import nodeinfo
@@ -31,8 +32,6 @@ CIM_TASK_POLLING = CIM_JOB + '.poll'
 CIM_TASK_UPDATE = CIM_JOB + '.update'
 CIM_TASK_CONFIGURATION = CIM_JOB + '.configuration'
 
-CimParams = types.slottype('CimParams',
-    'host port clientCert clientKey eventUuid instanceId targetName targetType launchWaitTime')
 # These are just the starting point attributes
 CimData = types.slottype('CimData', 'p response')
 RactivateData = types.slottype('RactivateData',

@@ -105,9 +105,8 @@ class NodeReportingPlugin(plug_dispatcher.DispatcherPlugin):
         headers = {
             'Content-Type' : 'application/xml; charset="utf-8"',
             'Host' : host, }
-        agent = "rmake-plugin/1.0"
         fact = bfp.HTTPClientFactory(path, method='PUT', postdata=data,
-            headers = headers, agent = agent)
+            headers = headers)
         @fact.deferred.addCallback
         def processResult(result):
             print "Received result for %s: %s" % (host, result)
