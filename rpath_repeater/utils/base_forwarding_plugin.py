@@ -546,6 +546,8 @@ class BufferedConsumer(object):
             self.producer_stopProducing()
 
     def producer_pauseProducing(self):
+        if self._readproto is None:
+            return
         log.debug("readproto: pauseProducing")
         self._paused = True
         if len(self._buf) < self.BUFFER_SIZE:
@@ -554,6 +556,8 @@ class BufferedConsumer(object):
         self._readproto.transport.pauseProducing()
 
     def producer_resumeProducing(self):
+        if self._readproto is None:
+            return
         log.debug("readproto: resumeProducing")
         self._readproto.transport.resumeProducing()
         self._paused = False
