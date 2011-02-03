@@ -36,7 +36,9 @@ class RepeaterClient(object):
     ManagementInterfaceParams = models.ManagementInterfaceParams
     URL = models.URL
     ResultsLocation = models.ResultsLocation
+    Image = models.Image
     ImageFile = models.ImageFile
+    ImageMetadata = models.ImageMetadata
 
     @classmethod
     def makeUrl(cls, url, headers=None):
@@ -199,13 +201,13 @@ class RepeaterClient(object):
 
         return (uuid, job.thaw())
 
-    def download_images(self, imageList, statusReportURL, putFilesURL):
+    def download_images(self, image, statusReportURL, putFilesURL):
         """
         """
         params = dict(
             putFilesURL = putFilesURL,
             statusReportURL = statusReportURL,
-            imageList = imageList)
+            image=image)
         data = FrozenImmutableDict(params)
         job = RmakeJob(RmakeUuid.uuid4(), self.__IMAGE_UPLOAD_PLUGIN_NS,
                        owner='nobody',

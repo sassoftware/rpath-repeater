@@ -350,46 +350,46 @@ class HTTPClientFactory(client.HTTPClientFactory):
         self.deferred.addCallback(
             lambda data: (data, self.status, self.response_headers))
 
-def ImagesUpload(imageList, statusReportURL, putFilesURL):
+def ImageUpload(image, statusReportURL, putFilesURL):
     dl = []
-    for image in imageList:
-        dl.append(ImageUpload(image, statusReportURL))
+    for imageFile in image.files:
+        dl.append(ImageFileUpload(imageFile, statusReportURL))
     deferred = defer.DeferredList(dl)
 
     @deferred.addCallback
     def cb(resultList):
-        imagesList = [ x[1] for x in resultList ]
-        imagesUpload(imagesList, statusReportURL, putFilesURL)
+        imageFiles = [ x[1] for x in resultList ]
+        image.files = imageFiles
+        setImageStatus(image, statusReportURL, putFilesURL)
 
-def imagesUploadXML(images):
+def _getImageStatusXML(image):
     files = [
         XML.Element("file",
-            XML.Text("title", "Title"),
+            XML.Text("title", i.title),
             XML.Text("size", str(i.size)),
             XML.Text("sha1", i.sha1),
             XML.Text("fileName", i.fileName))
-        for i in images ]
+        for i in image.files ]
     root = XML.Element("files", *files)
     data = BaseHandler.toXml(root)
     return data
 
-def imagesUpload(images, statusReportURL, setFilesURL):
-    data = imagesUploadXML(images)
+def setImageStatus(image, statusReportURL, setFilesURL):
+    data = _getImageStatusXML(image)
     fact = ProgressReporter.createFactory(setFilesURL, "PUT", data)
     ProgressReporter.registerFactory(setFilesURL, fact)
 
     ProgressReporter.publishProgress(statusReportURL,
         code=300, message="Finished")
 
-def ImageUpload(image, statusReportURL):
+def ImageFileUpload(imageFile, statusReportURL):
     deferred = defer.Deferred()
     @deferred.addCallback
     def cb((sha1, size)):
-        image.sha1 = sha1
-        image.size = size
-        image.fileName = os.path.basename(image.destination.path)
-        return image
-    Splicer(image.url, image.destination, statusReportURL, deferred)
+        imageFile.sha1 = sha1
+        imageFile.size = size
+        return imageFile
+    Splicer(imageFile.url, imageFile.destination, statusReportURL, deferred)
     return deferred
 
 

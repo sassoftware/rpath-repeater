@@ -28,9 +28,9 @@ class ImageUploadHandler(handler.JobHandler):
 
     def starting(self):
         self.params = self.getData().thaw().getDict()
-        self.putFilesURL = self.params['putFilesURL']
-        self.statusReportURL = self.params['statusReportURL']
-        self.imageList = self.params['imageList']
-        bfp.ImagesUpload(self.imageList, self.statusReportURL, self.putFilesURL)
+        putFilesURL = self.params['putFilesURL']
+        statusReportURL = self.params['statusReportURL']
+        image = self.params['image']
+        bfp.ImageUpload(image, statusReportURL, putFilesURL)
 
         self.setStatus(C.OK, "Image import initiated")

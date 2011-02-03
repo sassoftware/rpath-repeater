@@ -86,4 +86,10 @@ class ResultsLocation(URL):
     """
 
 class ImageFile(_BaseSlotCompare):
-    __slots__ = [ 'url', 'destination', 'fileName', 'sha1', 'size' ]
+    __slots__ = [ 'title', 'size', 'sha1', 'fileName', 'url', 'destination', ]
+
+class ImageMetadata(_BaseSlotCompare):
+    __slots__ = [ 'owner', 'billingCode', 'deptCode', 'cost', ]
+
+class Image(_BaseSlotCompare):
+    __slots__ = [ 'name', 'architecture', 'files', 'metadata', ]
