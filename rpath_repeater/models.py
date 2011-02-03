@@ -52,7 +52,7 @@ class _Serializable(object):
                     continue
                 children.append(val)
                 continue
-            if not isinstance(val, basestring):
+            if not isinstance(val, (basestring, int, long, float)):
                 continue
             # Assume string
             children.append(XML.Text(slot, unicode(val)))
