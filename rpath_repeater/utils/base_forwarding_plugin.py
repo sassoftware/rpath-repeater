@@ -23,7 +23,6 @@ import socket
 import sys
 import tempfile
 import time
-from xml.dom import minidom
 
 from conary import versions
 from conary import conaryclient
@@ -43,6 +42,8 @@ PREFIX = 'com.rpath.sputnik'
 
 from rpath_repeater.codes import Codes as C
 from rpath_repeater.utils import nodeinfo
+from xml.dom import minidom
+from rpath_repeater.utils.xmlutils import XML
 
 GenericData = types.slottype('GenericData', 'p nodes argument response')
 
@@ -314,31 +315,6 @@ class BaseTaskHandler(plug_worker.TaskHandler):
         return XML.Element("version", full, label, revision, ordering, flavor)
 
 
-class XML(object):
-    @classmethod
-    def Text(cls, tagName, text):
-        txt = minidom.Text()
-        txt.data = text
-        return cls.Element(tagName, txt)
-
-    @classmethod
-    def Element(cls, tagName, *children, **attributes):
-        node = cls._Node(tagName, minidom.Element)
-        for child in children:
-            node.appendChild(child)
-        for k, v in attributes.items():
-            node.setAttribute(k, unicode(v).encode("utf-8"))
-        return node
-
-    @classmethod
-    def _Node(cls, tagName, factory):
-        node = factory(tagName)
-        return node
-
-    @classmethod
-    def toString(cls, elt):
-        return elt.toxml(encoding="UTF-8").encode("utf-8")
-
 class HTTPClientFactory(client.HTTPClientFactory):
     USER_AGENT = "rmake-plugin/1.0"
 
@@ -363,15 +339,9 @@ def ImageUpload(image, statusReportURL, putFilesURL):
         setImageStatus(image, statusReportURL, putFilesURL)
 
 def _getImageStatusXML(image):
-    files = [
-        XML.Element("file",
-            XML.Text("title", i.title),
-            XML.Text("size", str(i.size)),
-            XML.Text("sha1", i.sha1),
-            XML.Text("fileName", i.fileName))
-        for i in image.files ]
-    root = XML.Element("files", *files)
-    data = BaseHandler.toXml(root)
+    elts = models.ImageFiles(image.files)
+    elts.append(image.metadata)
+    data = elts.toXml()
     return data
 
 def setImageStatus(image, statusReportURL, setFilesURL):

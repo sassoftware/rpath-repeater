@@ -12,6 +12,8 @@
 # full details.
 #
 
+from rpath_repeater.utils.xmlutils import XML
+
 from rmake3.core.types import SlotCompare
 from rmake3.lib import chutney
 
@@ -26,6 +28,51 @@ class ModelMeta(type):
             # just yet.
             chutney.register(new_class, _force=True)
         return new_class
+
+class _Serializable(object):
+    _tag = None
+
+    def _getTag(self, tag=None):
+        if tag is None:
+            return self._tag
+        return tag
+
+    def _toXmlDom(self, tag=None):
+        tag = self._getTag()
+        if tag is None:
+            return None
+        children = []
+        for slot in self.__slots__:
+            val = getattr(self, slot)
+            if val is None:
+                continue
+            if hasattr(val, '_toXmlDom'):
+                val = val._toXmlDom(slot)
+                if val is None:
+                    continue
+                children.append(val)
+                continue
+            if not isinstance(val, basestring):
+                continue
+            # Assume string
+            children.append(XML.Text(slot, unicode(val)))
+        return XML.Element(tag, *children)
+
+    def toXml(self):
+        dom = self._toXmlDom()
+        if dom is None:
+            return None
+        return XML.toString(dom)
+
+class _SerializableList(list, _Serializable):
+    def _toXmlDom(self, tag=None):
+        tag = self._getTag()
+        if tag is None:
+            return None
+        children = (x._toXmlDom() for x in self)
+        children = (x for x in children if x is not None)
+        return XML.Element(tag, *children)
+
 
 class _BaseSlotCompare(SlotCompare):
     __metaclass__ = ModelMeta
@@ -85,11 +132,24 @@ class ResultsLocation(URL):
     Results will be posted to this location
     """
 
-class ImageFile(_BaseSlotCompare):
+class ImageFile(_BaseSlotCompare, _Serializable):
     __slots__ = [ 'title', 'size', 'sha1', 'fileName', 'url', 'destination', ]
+    _tag = "file"
 
-class ImageMetadata(_BaseSlotCompare):
+class ImageMetadata(_BaseSlotCompare, _Serializable):
     __slots__ = [ 'owner', 'billingCode', 'deptCode', 'cost', ]
+    _tag = "metadata"
 
 class Image(_BaseSlotCompare):
     __slots__ = [ 'name', 'architecture', 'files', 'metadata', ]
+
+class ImageFiles(_SerializableList):
+    _tag = "files"
+
+if __name__ == '__main__':
+    files = ImageFiles([ ImageFile(title="i1", sha1="s1"),
+        ImageFile(title="i2", sha1="s2") ])
+    metadata = ImageMetadata(owner="me")
+    files.append(metadata)
+    print metadata.toXml()
+    print files.toXml()
