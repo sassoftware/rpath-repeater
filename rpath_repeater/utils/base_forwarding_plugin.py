@@ -43,7 +43,7 @@ PREFIX = 'com.rpath.sputnik'
 from rpath_repeater.codes import Codes as C
 from rpath_repeater.utils import nodeinfo
 from xml.dom import minidom
-from rpath_repeater.utils import models
+from rpath_repeater import models
 from rpath_repeater.utils.xmlutils import XML
 
 GenericData = types.slottype('GenericData', 'p nodes argument response')
