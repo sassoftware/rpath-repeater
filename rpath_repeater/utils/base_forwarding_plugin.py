@@ -349,9 +349,10 @@ def setImageStatus(image, statusReportURL, setFilesURL):
     data = _getImageStatusXML(image)
     fact = ProgressReporter.createFactory(setFilesURL, "PUT", data)
     ProgressReporter.registerFactory(setFilesURL, fact)
-
-    ProgressReporter.publishProgress(statusReportURL,
-        code=300, message="Finished")
+    @fact.deferred.addCallback
+    def cb(self):
+        ProgressReporter.publishProgress(statusReportURL,
+            code=300, message="Finished")
 
 def ImageFileUpload(imageFile, statusReportURL):
     deferred = defer.Deferred()
