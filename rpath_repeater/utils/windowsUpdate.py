@@ -557,12 +557,19 @@ def doUpdate(wc, sources, jobid, statusCallback):
         filesToRemove = []
         manifestDict = wc.getManifest()
         for t in removeTrvs:
+            name = t.name()
+
+            if name not in manifestDict:
+                continue
+
+            version = versions.ThawVersion(manifestDict[name].version)
+            flavor = manifestDict[name].flavor
+
             # we only remove it if it is installed
-            if t.name() in manifestDict and \
-                    manifestDict[t.name()][1] == t.version() and \
-                    manifestDict[t.name()][2] == t.flavor():
+            if version == t.version() and flavor == t.flavor():
                 filesToRemove.append(
                     (list(t.iterFileList(capsules=True))[0], t))
+
         # Set the update dir
         updateBase = 'job-%s' % jobid
         updateDirBase = os.path.join(rtisDirBase, updateBase)
