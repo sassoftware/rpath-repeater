@@ -16,6 +16,7 @@ from rmake3.lib import uuid
 from rmake3.core import types
 from rmake3.core import handler
 
+from rpath_repeater.models import WmiParams
 from rpath_repeater.codes import Codes as C
 from rpath_repeater.utils import windowsUpdate
 from rpath_repeater.utils import base_forwarding_plugin as bfp
@@ -29,8 +30,6 @@ WMI_TASK_POLLING = WMI_JOB + '.poll'
 WMI_TASK_UPDATE = WMI_JOB + '.update'
 WMI_TASK_CONFIGURATION = WMI_JOB + '.configuration'
 
-WmiParams = types.slottype('WmiParams',
-    'host port username password domain eventUuid')
 # These are just the starting point attributes
 WmiData = types.slottype('WmiData', 'p response')
 
