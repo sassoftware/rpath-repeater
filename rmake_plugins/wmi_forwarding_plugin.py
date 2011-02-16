@@ -315,5 +315,35 @@ class UpdateTask(WMITaskHandler):
 
 class ConfigurationTask(WMITaskHandler):
     def _run(self, data):
-        self.sendStatus(C.ERR_METHOD_NOT_ALLOWED,
-            "Configuration changes of Windows System %s is not supported" % (data.p.host))
+        self.sendStatus(C.MSG_START, 'Contacting host %s on port %d to trigger '
+            'configuration change' % (data.p.host, data.p.port))
+
+        results = []
+        wc = self._getWmiClient(data)
+        try:
+            results = windowsUpdate.doConfiguration(wc, data.argument,
+                str(self.task.job_uuid), self.sendStatus)
+        finally:
+            wc.unmount()
+
+        self.sendStatus(C.MSG_GENERIC, 'Configuration Complete, Processing '
+            'Results')
+
+        children = self._getWmiSystemData(wc)
+        el = XML.Element("system", *children)
+
+        data.response = XML.toString(el)
+        self.setData(data)
+
+        errors = [ x for x in results if x[0] != 0 ]
+
+        if errors:
+            self.sendStatus(C.ERR_GENERIC, '%s Applying configuration failed:'
+                % data.p.host)
+            for rc, handler, msg in errors:
+                self.sendStatus(C.ERR_GENERIC, '%s: Handler %s exited with a '
+                    'return code of % and the following message %s'
+                    % (data.p.host, handler, rc, msg))
+        else:
+            self.sendStatus(C.OK, 'Host %s has been configured successfully'
+                % data.p.host)
