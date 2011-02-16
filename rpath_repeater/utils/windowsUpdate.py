@@ -21,6 +21,8 @@ import statvfs
 import subprocess
 import socket
 
+from cStringIO import StringIO
+
 from lxml import etree
 from lxml.builder import ElementMaker
 
@@ -669,3 +671,104 @@ def doUpdate(wc, sources, jobid, statusCallback):
                               "system_model", newModel)
     rc, _ = wc.setRegistryKey(r"SOFTWARE\rPath\conary",
                               "polling_manifest", newPollingManifest)
+
+def doConfiguration(wc, values, jobid, statusCallback):
+    def status(msg):
+        statusCallback(C.MSG_GENERIC, msg)
+
+    # Wait for any previous install or config jobs to complete.
+    wc.waitForServiceToStop('rPath Tools Install Service', statusCallback,
+                            allowReboot=False)
+
+    status('Mounting the filesystem')
+
+    # Set the rtis root dir
+    rtisDirBase = r'Program Files/rPath/Updates'
+    if not os.path.exists(wc.getWinPath(rtisDirBase)):
+        os.makedirs(wc.getWinPath(rtisDirBase))
+
+    rtisWinDir = 'C:\\Program Files\\rPath\\Updates'
+    rc, _ = wc.setRegistryKey(
+        r"SYSTEM\CurrentControlSet\Services\rPath Tools Install Service\Parameters",
+        'Root', rtisWinDir)
+
+    status('Preparing job configuration data')
+
+    # Set the update dir
+    updateBase = 'job-%s' % jobid
+    updateDirBase = os.path.join(rtisDirBase, updateBase)
+    updateDir = wc.getWinPath(updateDirBase)
+
+    e = ElementMaker()
+
+    # Parse values into elements
+    valuesElement = etree.parse(StringIO(values)).getroot()
+
+    currJob = 0
+    updateJobs = []
+    updateJobs.append(
+        e.configJob(e.sequence(str(currJob)),
+                    e.logFile('setup.log'),
+                    valuesElement
+        )
+    )
+
+    servicing = e.update(e.logFile('setup.log'), e.updateJobs(*updateJobs))
+
+    # write servicing.xml
+    if not os.path.exists(updateDir):
+        os.makedirs(updateDir)
+    servicingFn = os.path.join(updateDir, 'servicing.xml')
+    open(servicingFn,'w').write(etree.tostring(servicing, pretty_print=True))
+
+    status('Applying Configuration')
+
+    # set the registry keys
+    commandValue = ["update=%s" % updateBase]
+    key = r"SYSTEM\CurrentControlSet\Services\rPath Tools Install Service\Parameters"
+    value = 'Commands'
+    rc, tb = wc.setRegistryKey(key, value, commandValue)
+
+    # start the service
+    rc, _ = wc.startService("rPath Tools Install Service")
+
+    # wait until completed
+    wc.waitForServiceToStop('rPath Tools Install Service', statusCallback,
+                            allowReboot=True)
+
+    status('Gathering Results')
+
+    # Get the modified servicing.xml from the machine.
+    results = []
+    xml = xobj.parse(open(servicingFn).read())
+    updateJobs = xml.update.updateJobs
+
+    # extract configJob and updateJob information
+    updateJob = []
+    if hasattr(updateJobs, 'updateJob'):
+        updateJob = updateJobs.updateJob
+        if not isinstance(updateJob, list):
+            updateJob = [ updateJob, ]
+
+    configJob = []
+    if hasattr(updateJobs, 'configJob'):
+        configJob = updateJobs.configJob
+        if not isinstance(configJob, list):
+            configJob = [ configJob, ]
+
+    jobs = [ z for y, z in sorted((int(x.sequence), x)
+        for x in itertools.chain(updateJob, configJob)) ]
+
+    # extract handler results
+    for job in jobs:
+        handlers = []
+        if hasattr(job, 'handlers') and hasattr(job.handlers, 'handler'):
+            handlers = job.handlers.handler
+            if not isinstance(handlers, list):
+                handlers = [ handlers, ]
+
+        for hdlr in handlers:
+            results.append((int(hdlr.exitCode), hdlr.name,
+                            hdlr.exitCodeDescription))
+
+    return results
