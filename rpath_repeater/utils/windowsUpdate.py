@@ -709,7 +709,8 @@ def doConfiguration(wc, values, jobid, statusCallback):
     updateJobs.append(
         e.configJob(e.sequence(str(currJob)),
                     e.logFile('setup.log'),
-                    valuesElement
+                    e.values(*[ x for x in valuesElement.iterchildren()
+                                if x.tag != 'id' ]),
         )
     )
 
