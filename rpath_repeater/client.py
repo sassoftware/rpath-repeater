@@ -136,7 +136,6 @@ class RepeaterClient(object):
 
     def configuration_wmi(self, wmiParams, resultsLocation=None, zone=None, configuration=None):
         method = 'configuration'
-        raise NotImplementedError(method)
         return self._wmiCallDispatcher(method, wmiParams, resultsLocation, zone,
             configuration=configuration)
 

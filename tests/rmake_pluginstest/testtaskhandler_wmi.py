@@ -4,6 +4,7 @@ import testsuite
 testsuite.setup()
 
 import os
+import uuid
 from conary.lib import util
 
 import wmi_forwarding_plugin
@@ -244,7 +245,20 @@ class WmiTest(TestBase):
 
     def testConfiguration(self):
         params = self._wmiParams()
-        self.failUnlessRaises(NotImplementedError,
-            self.client.configuration_wmi, params)
+        configuration = '<values><foo>bar</foo></values>'
+
+        command = 'update=job-%s' % uuid.UUID(int=self.client._counter+1)
+        key = ('registry', 'setkey', 'SYSTEM\\CurrentControlSet\\Services\\'
+            'rPath Tools Install Service\\Parameters', 'Commands', command)
+        self._data[key] = ''
+
+        self._data[('service', 'start', 'rPath Tools Install Service')] = ''
+
+        self.client.configuration_wmi(params, configuration=configuration)
+
+        task = self.results.configuration[-1].thaw()
+        self.failIf(task.status.failed)
+        self.failUnlessEqual(task.status.text, 'Host 1.2.3.4 has been '
+            'configured successfully')
 
 testsuite.main()
