@@ -28,9 +28,7 @@ class ReportingMixIn(object):
         ReportingXmlTag (class variable)
     """
     def postResults(self, elt=None):
-        host = self.resultsLocation.get('host', 'localhost')
-        port = self.resultsLocation.get('port', 80)
-        path = self.resultsLocation.get('path')
+        host, port, path = self.getResultsLocation()
         if not path:
             return
         if elt is None:
@@ -54,6 +52,12 @@ class ReportingMixIn(object):
             log.error("Error: %s", error.getErrorMessage())
 
         reactor.connectTCP(host, port, fact)
+
+    def getResultsLocation(self):
+        host = self.resultsLocation.get('host', 'localhost')
+        port = self.resultsLocation.get('port', 80)
+        path = self.resultsLocation.get('path')
+        return host, port, path
 
     def postFailure(self):
         el = XML.Element(self.ReportingXmlTag)
