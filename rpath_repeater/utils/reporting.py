@@ -39,7 +39,7 @@ class ReportingMixIn(object):
         headers = {
             'Content-Type' : 'application/xml; charset="utf-8"',
             'Host' : host, }
-        self.postprocessHeaders(headers)
+        self.postprocessHeaders(elt, headers)
         fact = HTTPClientFactory(path, method='PUT', postdata=data,
             headers = headers)
         @fact.deferred.addCallback
