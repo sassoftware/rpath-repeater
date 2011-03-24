@@ -14,7 +14,7 @@
 
 from rpath_repeater.utils.xmlutils import XML
 
-from rmake3.core.types import SlotCompare
+from rmake3.core.types import SlotCompare, freezify
 from rmake3.lib import chutney
 
 class ModelMeta(type):
@@ -27,6 +27,8 @@ class ModelMeta(type):
             # import this module and find this class, when it's not created
             # just yet.
             chutney.register(new_class, _force=True)
+            frozenType = freezify(new_class)
+            globals()[frozenType.__name__] = frozenType
         return new_class
 
 class _Serializable(object):
