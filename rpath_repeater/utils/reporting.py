@@ -68,3 +68,7 @@ class ReportingMixIn(object):
 
     def postprocessHeaders(self, elt, headers):
         pass
+
+    @classmethod
+    def toXml(cls, elt):
+        return XML.toString(elt)

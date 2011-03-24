@@ -156,10 +156,6 @@ class BaseHandler(handler.JobHandler, ReportingMixIn):
         job = XML.Element("job", *children)
         elt.appendChild(XML.Element("jobs", job))
 
-    @classmethod
-    def toXml(cls, elt):
-        return XML.toString(elt)
-
     def _getZoneAddresses(self):
         """Return set of IP addresses of all nodes in this zone."""
         needed = set([
