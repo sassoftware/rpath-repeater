@@ -42,9 +42,10 @@ PREFIX = 'com.rpath.sputnik'
 
 from rpath_repeater.codes import Codes as C
 from rpath_repeater.utils import nodeinfo
-from xml.dom import minidom
 from rpath_repeater import models
 from rpath_repeater.utils.xmlutils import XML
+from rpath_repeater.utils.http import HTTPClientFactory
+from rpath_repeater.utils.reporting import ReportingMixIn
 
 GenericData = types.slottype('GenericData', 'p nodes argument response')
 
@@ -92,9 +93,10 @@ class Options(object):
         self.exposed.add(name)
 
 
-class BaseHandler(handler.JobHandler):
+class BaseHandler(handler.JobHandler, ReportingMixIn):
     X_Event_Uuid_Header = 'X-rBuilder-Event-UUID'
     RegistrationTaskNS = None
+    ReportingXmlTag = "system"
 
     class __metaclass__(type):
         def __new__(cls, name, bases, attrs):
@@ -123,40 +125,14 @@ class BaseHandler(handler.JobHandler):
         self.watchTask(task, self.jobUpdateCallback)
         return task
 
-    def postResults(self, elt=None):
-        host = self.resultsLocation.get('host', 'localhost')
-        port = self.resultsLocation.get('port', 80)
-        path = self.resultsLocation.get('path')
-        if not path:
-            return
-        if elt is None:
-            dom = minidom.parseString(self.job.data)
-            elt = dom.firstChild
+    def postprocessXmlNode(self, elt):
         self.addEventInfo(elt)
         self.addJobInfo(elt)
-        data = self.toXml(elt)
-        headers = {
-            'Content-Type' : 'application/xml; charset="utf-8"',
-            'Host' : host, }
+
+    def postprocessHeaders(self, elt, headers):
         eventUuid = self.eventUuid
         if eventUuid:
             headers[self.X_Event_Uuid_Header] = eventUuid.encode('ascii')
-        fact = HTTPClientFactory(path, method='PUT', postdata=data,
-            headers = headers)
-        @fact.deferred.addCallback
-        def processResult(result):
-            log.debug("Received result for %s: %s", host, result)
-            return result
-
-        @fact.deferred.addErrback
-        def processError(error):
-            log.error("Error: %s", error.getErrorMessage())
-
-        reactor.connectTCP(host, port, fact)
-
-    def postFailure(self):
-        el = XML.Element("system")
-        self.postResults(el)
 
     def addEventInfo(self, elt):
         if not self.eventUuid:
@@ -315,17 +291,6 @@ class BaseTaskHandler(plug_worker.TaskHandler):
         flavor = cls._flavor(f)
         return XML.Element("version", full, label, revision, ordering, flavor)
 
-
-class HTTPClientFactory(client.HTTPClientFactory):
-    USER_AGENT = "rmake-plugin/1.0"
-
-    def __init__(self, url, *args, **kwargs):
-        if 'agent' not in kwargs:
-            kwargs.update(agent=self.USER_AGENT)
-        client.HTTPClientFactory.__init__(self, url, *args, **kwargs)
-        self.status = None
-        self.deferred.addCallback(
-            lambda data: (data, self.status, self.response_headers))
 
 def ImageUpload(image, statusReportURL, putFilesURL):
     dl = []
