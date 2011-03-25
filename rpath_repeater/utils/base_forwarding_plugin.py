@@ -24,7 +24,6 @@ import sys
 import tempfile
 import time
 
-from conary import versions
 from conary import conaryclient
 from conary.lib import digestlib
 from conary.lib.formattrace import formatTrace
@@ -262,31 +261,7 @@ class BaseTaskHandler(plug_worker.TaskHandler):
 
     @classmethod
     def _trove(cls, troveSpec):
-        Text = XML.Text
-        n, v, f = conaryclient.cmdline.parseTroveSpec(troveSpec)
-
-        name = Text("name", n)
-        version = cls._version(v, f)
-        flavor = cls._flavor(f)
-        return XML.Element("trove", name, version, flavor)
-
-    @classmethod
-    def _flavor(cls, flavor):
-        if flavor is None:
-            return XML.Element("flavor")
-        return XML.Text("flavor", str(flavor))
-
-    @classmethod
-    def _version(cls, v, f):
-        thawed_v = versions.ThawVersion(v)
-        Text = XML.Text
-        full = Text("full", str(thawed_v))
-        ordering = Text("ordering", thawed_v.timeStamps()[0])
-        revision = Text("revision", str(thawed_v.trailingRevision()))
-        label = Text("label", str(thawed_v.trailingLabel()))
-        flavor = cls._flavor(f)
-        return XML.Element("version", full, label, revision, ordering, flavor)
-
+        return models.Trove.fromTroveSpec(troveSpec).toXmlDom()
 
 def ImageUpload(image, statusReportURL, putFilesURL):
     dl = []

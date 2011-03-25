@@ -12,6 +12,9 @@
 # full details.
 #
 
+from conary import conaryclient
+from conary import versions
+
 from rpath_repeater.utils.xmlutils import XML
 
 from rmake3.core.types import SlotCompare, freezify
@@ -39,7 +42,7 @@ class _Serializable(object):
             return self._tag
         return tag
 
-    def _toXmlDom(self, tag=None):
+    def toXmlDom(self, tag=None):
         tag = self._getTag()
         if tag is None:
             return None
@@ -48,8 +51,8 @@ class _Serializable(object):
             val = getattr(self, slot)
             if val is None:
                 continue
-            if hasattr(val, '_toXmlDom'):
-                val = val._toXmlDom(slot)
+            if hasattr(val, 'toXmlDom'):
+                val = val.toXmlDom(slot)
                 if val is None:
                     continue
                 children.append(val)
@@ -61,17 +64,17 @@ class _Serializable(object):
         return XML.Element(tag, *children)
 
     def toXml(self):
-        dom = self._toXmlDom()
+        dom = self.toXmlDom()
         if dom is None:
             return None
         return XML.toString(dom)
 
 class _SerializableList(list, _Serializable):
-    def _toXmlDom(self, tag=None):
+    def toXmlDom(self, tag=None):
         tag = self._getTag()
         if tag is None:
             return None
-        children = (x._toXmlDom() for x in self)
+        children = (x.toXmlDom() for x in self)
         children = (x for x in children if x is not None)
         return XML.Element(tag, *children)
 
@@ -147,6 +150,40 @@ class Image(_BaseSlotCompare):
 
 class ImageFiles(_SerializableList):
     _tag = "files"
+
+class Trove(_BaseSlotCompare, _Serializable):
+    __slots__ = ( 'name', 'version', 'flavor', )
+    _tag = "trove"
+
+    @classmethod
+    def fromTroveSpec(cls, troveSpec):
+        n, v, f = conaryclient.cmdline.parseTroveSpec(troveSpec)
+        obj = cls()
+        obj.name = n
+        obj.version = Version.fromVersionFlavor(v, f)
+        obj.flavor = Version.sanitizeFlavor(f)
+        return obj
+
+class Version(_BaseSlotCompare, _Serializable):
+    __slots__ = ( 'full', 'label', 'revision', 'ordering', 'flavor', )
+    _tag = "version"
+
+    @classmethod
+    def fromVersionFlavor(cls, frozenVersion, flavor):
+        nobj = cls()
+        thawed_v = versions.ThawVersion(frozenVersion)
+        nobj.full = str(thawed_v)
+        nobj.ordering = thawed_v.timeStamps()[0]
+        nobj.revision = str(thawed_v.trailingRevision())
+        nobj.label = str(thawed_v.trailingLabel())
+        nobj.flavor = cls.sanitizeFlavor(flavor)
+        return nobj
+
+    @classmethod
+    def sanitizeFlavor(cls, flavor):
+        if flavor is None:
+            return ""
+        return str(flavor)
 
 if __name__ == '__main__':
     files = ImageFiles([ ImageFile(title="i1", sha1="s1"),
