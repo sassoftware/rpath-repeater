@@ -177,7 +177,7 @@ class Version(_BaseSlotCompare, _Serializable):
     def fromVersionFlavor(cls, version, flavor):
         nobj = cls()
         nobj.full = str(version)
-        nobj.ordering = version.timeStamps()[0]
+        nobj.ordering = str(version.timeStamps()[0])
         nobj.revision = str(version.trailingRevision())
         nobj.label = str(version.trailingLabel())
         nobj.flavor = cls.sanitizeFlavor(flavor)
