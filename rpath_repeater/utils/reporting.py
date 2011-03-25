@@ -27,7 +27,9 @@ class ReportingMixIn(object):
         resultsLocation
         ReportingXmlTag (class variable)
     """
-    def postResults(self, elt=None):
+    def postResults(self, elt=None, method=None):
+        if method is None:
+            method = 'PUT'
         host, port, path = self.getResultsLocation()
         if not path:
             return
@@ -40,7 +42,7 @@ class ReportingMixIn(object):
             'Content-Type' : 'application/xml; charset="utf-8"',
             'Host' : host, }
         self.postprocessHeaders(elt, headers)
-        fact = HTTPClientFactory(path, method='PUT', postdata=data,
+        fact = HTTPClientFactory(path, method=method, postdata=data,
             headers = headers)
         @fact.deferred.addCallback
         def processResult(result):
@@ -59,9 +61,9 @@ class ReportingMixIn(object):
         path = self.resultsLocation.get('path')
         return host, port, path
 
-    def postFailure(self):
+    def postFailure(self, method=None):
         el = XML.Element(self.ReportingXmlTag)
-        self.postResults(el)
+        self.postResults(el, method=method)
 
     def postprocessXmlNode(self, elt):
         pass
