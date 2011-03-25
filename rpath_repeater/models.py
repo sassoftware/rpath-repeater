@@ -158,10 +158,15 @@ class Trove(_BaseSlotCompare, _Serializable):
     @classmethod
     def fromTroveSpec(cls, troveSpec):
         n, v, f = conaryclient.cmdline.parseTroveSpec(troveSpec)
+        thawed_v = versions.ThawVersion(v)
+        return cls.fromNameVersionFlavor(n, thawed_v, f)
+
+    @classmethod
+    def fromNameVersionFlavor(cls, name, version, flavor):
         obj = cls()
-        obj.name = n
-        obj.version = Version.fromVersionFlavor(v, f)
-        obj.flavor = Version.sanitizeFlavor(f)
+        obj.name = name
+        obj.version = Version.fromVersionFlavor(version, flavor)
+        obj.flavor = Version.sanitizeFlavor(flavor)
         return obj
 
 class Version(_BaseSlotCompare, _Serializable):
@@ -169,13 +174,12 @@ class Version(_BaseSlotCompare, _Serializable):
     _tag = "version"
 
     @classmethod
-    def fromVersionFlavor(cls, frozenVersion, flavor):
+    def fromVersionFlavor(cls, version, flavor):
         nobj = cls()
-        thawed_v = versions.ThawVersion(frozenVersion)
-        nobj.full = str(thawed_v)
-        nobj.ordering = thawed_v.timeStamps()[0]
-        nobj.revision = str(thawed_v.trailingRevision())
-        nobj.label = str(thawed_v.trailingLabel())
+        nobj.full = str(version)
+        nobj.ordering = version.timeStamps()[0]
+        nobj.revision = str(version.trailingRevision())
+        nobj.label = str(version.trailingLabel())
         nobj.flavor = cls.sanitizeFlavor(flavor)
         return nobj
 
