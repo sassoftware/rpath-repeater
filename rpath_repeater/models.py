@@ -69,7 +69,7 @@ class _Serializable(object):
             return None
         return XML.toString(dom)
 
-class _SerializableList(list, _Serializable):
+class _SerializableListMixIn(_Serializable):
     def toXmlDom(self, tag=None):
         tag = self._getTag()
         if tag is None:
@@ -77,6 +77,9 @@ class _SerializableList(list, _Serializable):
         children = (x.toXmlDom() for x in self)
         children = (x for x in children if x is not None)
         return XML.Element(tag, *children)
+
+class _SerializableList(list, _SerializableListMixIn):
+    pass
 
 
 class _BaseSlotCompare(SlotCompare):
