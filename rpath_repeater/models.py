@@ -12,6 +12,8 @@
 # full details.
 #
 
+import sys
+
 from conary import conaryclient
 from conary import versions
 
@@ -31,7 +33,10 @@ class ModelMeta(type):
             # just yet.
             chutney.register(new_class, _force=True)
             frozenType = freezify(new_class)
-            globals()[frozenType.__name__] = frozenType
+            # Frozen models belong to the same module as the class
+            frozenType.__module__ = new_class.__module__
+            module = sys.modules[new_class.__module__]
+            module.__dict__[frozenType.__name__] = frozenType
         return new_class
 
 class _Serializable(object):
