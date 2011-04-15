@@ -90,7 +90,7 @@ class CimParams(_BaseSlotCompare):
     """
     Information required in order to talk to a WBEM endpoint
     """
-    __slots__ = [ 'host', 'port', 'clientCert', 'clientKey', 
+    __slots__ = [ 'host', 'port', 'clientCert', 'clientKey', 'requiredNetwork',
         'eventUuid', 'instanceId', 'targetName', 'targetType',
         'launchWaitTime']
     # XXX instanceId, targetName, targetType have nothing to do with

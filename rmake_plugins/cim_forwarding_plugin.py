@@ -33,9 +33,7 @@ CIM_TASK_UPDATE = CIM_JOB + '.update'
 CIM_TASK_CONFIGURATION = CIM_JOB + '.configuration'
 
 # These are just the starting point attributes
-CimData = types.slottype('CimData', 'p response')
-RactivateData = types.slottype('RactivateData',
-        'p nodes requiredNetwork response')
+CimData = types.slottype('CimData', 'p nodes response')
 
 class CimForwardingPlugin(bfp.BaseForwardingPlugin):
     def dispatcher_pre_setup(self, dispatcher):
@@ -91,11 +89,8 @@ class CimHandler(bfp.BaseHandler):
 
     @classmethod
     def _getArgs(cls, taskType, params, methodArguments, zoneAddresses):
-        if taskType in [ CIM_TASK_REGISTER ]:
-            return RactivateData(params, zoneAddresses,
-                methodArguments.get('requiredNetwork'))
-        if taskType in [ CIM_TASK_SHUTDOWN, CIM_TASK_POLLING ]:
-            return CimData(params)
+        if taskType in [ CIM_TASK_REGISTER, CIM_TASK_SHUTDOWN, CIM_TASK_POLLING ]:
+            return CimData(params, zoneAddresses)
         if taskType in [ CIM_TASK_UPDATE ]:
             sources = methodArguments['sources']
             return bfp.GenericData(params, zoneAddresses, sources)
@@ -203,8 +198,8 @@ class RegisterTask(CIMTaskHandler):
             ManagementNodeAddresses = sorted(data.nodes))
         if data.p.eventUuid:
             arguments.update(EventUUID = data.p.eventUuid)
-        if data.requiredNetwork:
-            arguments.update(RequiredNetwork = data.requiredNetwork)
+        if data.p.requiredNetwork:
+            arguments.update(RequiredNetwork = data.p.requiredNetwork)
         ret = server.conn.callMethod(cimInstances[0], 'RemoteRegistration',
             **arguments)
         data.response = "<system/>"
@@ -246,7 +241,16 @@ class PollingTask(CIMTaskHandler):
         self.sendStatus(C.MSG_START, "Contacting host %s on port %d to Poll it for info"
             % (data.p.host, data.p.port))
 
+        arguments = dict(
+            ManagementNodeAddresses = sorted(data.nodes))
+        if data.p.requiredNetwork:
+            arguments.update(RequiredNetwork = data.p.requiredNetwork)
+
         server = self.getWbemConnection(data)
+        cimInstances = server.RPATH_ComputerSystem.EnumerateInstanceNames()
+        server.conn.callMethod(cimInstances[0], 'UpdateManagementConfiguration',
+            **arguments)
+
         children = self._getUuids(server)
         children.extend(self._getServerCert())
         children.append(self._getSoftwareVersions(server))

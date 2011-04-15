@@ -99,17 +99,13 @@ class RepeaterClient(object):
         params['wmiParams'] = wmiParams.toDict()
         return self._launchRmakeJob(self.__WMI_PLUGIN_NS, params)
 
-    def register_cim(self, cimParams, resultsLocation=None, zone=None,
-            requiredNetwork=None):
+    def register_cim(self, cimParams, resultsLocation=None, zone=None):
         method = 'register'
-        return self._cimCallDispatcher(method, cimParams, resultsLocation, zone,
-            requiredNetwork=requiredNetwork)
+        return self._cimCallDispatcher(method, cimParams, resultsLocation, zone)
 
-    def register_wmi(self, wmiParams, resultsLocation=None, zone=None,
-            requiredNetwork=None):
+    def register_wmi(self, wmiParams, resultsLocation=None, zone=None):
         method = 'register'
-        return self._wmiCallDispatcher(method, wmiParams, resultsLocation, zone,
-            requiredNetwork=requiredNetwork)
+        return self._wmiCallDispatcher(method, wmiParams, resultsLocation, zone)
 
     def shutdown_cim(self, cimParams, resultsLocation=None, zone=None):
         method = 'shutdown'
