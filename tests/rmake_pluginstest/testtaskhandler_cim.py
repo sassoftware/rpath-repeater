@@ -95,6 +95,7 @@ class CimTest(TestBase):
         ),
         extrinsic=dict(
             RemoteRegistration = (0, dict(errorSummary="", errorDetails="")),
+            UpdateManagementConfiguration = (0, dict(errorSummary="", errorDetails="")),
             Shutdown = (0, dict()),
             ApplyToMSE = (64, dict()),
         ),
@@ -154,7 +155,8 @@ class CimTest(TestBase):
         defaults = dict(
             host='1.2.3.4', port=8135,
             clientCert="Client cert", clientKey="Client key",
-            eventUuid="deadbeef")
+            eventUuid="deadbeef", requiredNetwork='1.1.1.1',
+            )
         defaults.update(kwargs)
         return self.client.CimParams(**defaults)
 
