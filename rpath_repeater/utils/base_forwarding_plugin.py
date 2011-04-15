@@ -480,6 +480,7 @@ class BufferedConsumer(object):
         self.progressUrl = progressUrl
         self._ctx = digestlib.sha1()
         self._finished = finished
+        self._startTime = time.time()
 
     def setConsumer(self, consumer):
         self._consumer = consumer
@@ -546,10 +547,16 @@ class BufferedConsumer(object):
     def progressCallback(self, bytesDownloaded, bytesTotal):
         if not self.progressUrl:
             return
-        msg = "%s: Downloaded %s/%s (%d%%)" % (
+        now = time.time()
+        if now - self._startTime < 1:
+            # Avoid division by zero
+            now = self._startTime + 2
+        rate = int(bytesDownloaded / (now - self._startTime) / 1024)
+        msg = "%s: Downloaded %s/%s (%d%%; %d KB/s)" % (
             os.path.basename(self._url.path),
             bytesDownloaded, bytesTotal,
-            int(bytesDownloaded * 100 / bytesTotal))
+            int(bytesDownloaded * 100 / bytesTotal),
+            rate)
         code = 100
         self._progressCallback(code, msg)
 
