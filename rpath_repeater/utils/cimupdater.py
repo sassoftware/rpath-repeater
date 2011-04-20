@@ -28,6 +28,7 @@ class CIMUpdater(object):
     '''
 
     DEFAULT_TIMEOUT = 3600
+    WAIT_TIMEOUT = 15
 
     def __init__(self, server, logger=None):
         self.server = server
@@ -111,8 +112,21 @@ class CIMUpdater(object):
         The call returns None on timeout, or the job instance otherwise.
         '''
         timeEnd = time.time() + timeout
+        waited = False
         while time.time() < timeEnd:
-            instance = self.server.GetInstance(job)
+
+            # If querying for the job instance fails, wait one time and try
+            # again.
+            try:
+                instance = self.server.GetInstance(job)
+            except Exception, e:
+                if not waited:
+                    wait = True
+                    time.sleep(self.WAIT_TIMEOUT)
+                    continue
+                else:
+                    raise e
+
             jobCompleted, instance = self.isJobComplete(instance)
             print ("jobCompleted", jobCompleted,
                 instance.properties['JobState'].value)
