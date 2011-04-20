@@ -121,7 +121,7 @@ class CIMUpdater(object):
                 instance = self.server.GetInstance(job)
             except Exception, e:
                 if not waited:
-                    wait = True
+                    waited = True
                     time.sleep(self.WAIT_TIMEOUT)
                     continue
                 else:
