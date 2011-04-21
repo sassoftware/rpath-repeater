@@ -72,6 +72,9 @@ class RepeaterClient(object):
 
     def _launchRmakeJob(self, namespace, params):
         data = FrozenImmutableDict(params)
+        return self._createRmakeJob(self, namespace, data)
+
+    def _createRmakeJob(self, namespace, data):
         job = RmakeJob(RmakeUuid.uuid4(), namespace, owner='nobody',
                        data=data,
                        ).freeze()
