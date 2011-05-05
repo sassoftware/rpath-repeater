@@ -299,9 +299,19 @@ def getConaryClient(flavors = []):
 def doBootstrap(wc):
     client = getConaryClient()
 
+    keyPath = r'SYSTEM\CurrentControlSet\Control\Session Manager\Environment'
+    key = 'PROCESSOR_ARCHITECTURE'
+    rc, value = wc.getRegistryKey(keyPath, key)
+    value = value.strip()
+
+    if value == 'AMD64':
+       flavor = deps.parseFlavor('is: x86_64')
+    else:
+       flavor = deps.parseFlavor('is: x86')
+
     # fetch the rTIS MSI
     nvf = client.repos.findTrove(None, ('rTIS:msi',
-            '/windows.rpath.com@rpath:windows-common',None))
+            '/windows.rpath.com@rpath:windows-common', flavor))
     trv = client.repos.getTrove(*nvf[0])
     f = (list(trv.iterFileList(capsules=True)))[0]
     contents = client.repos.getFileContents(((f[2],f[3]),),
