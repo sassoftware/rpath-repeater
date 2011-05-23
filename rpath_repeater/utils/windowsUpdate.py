@@ -169,7 +169,7 @@ class wmiClient(object):
                     self.unmount()
                     if statusCallback:
                         statusCallback(C.MSG_GENERIC,
-                                       'Waiting for target system to reboot')
+                                       'Waiting for target system')
                 else:
                     raise
                 time.sleep(self.QuerySleepInterval)
