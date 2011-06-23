@@ -12,16 +12,16 @@
 # full details.
 #
 
-from rmake3.lib import uuid
+from lxml import etree
+from lxml.builder import ElementMaker
+
 from rmake3.core import types
 from rmake3.core import handler
 
+from rpath_repeater.utils import windows
 from rpath_repeater.models import WmiParams
 from rpath_repeater.codes import Codes as C
-from rpath_repeater.utils import windowsUpdate
 from rpath_repeater.utils import base_forwarding_plugin as bfp
-
-XML = bfp.XML
 
 WMI_JOB = bfp.PREFIX + '.wmiplugin'
 WMI_TASK_REGISTER = WMI_JOB + '.register'
@@ -131,148 +131,61 @@ class WmiHandler(bfp.BaseHandler):
 class WMITaskHandler(bfp.BaseTaskHandler):
     InterfaceName = "WMI"
 
-    WmiClientFactory = windowsUpdate.wmiClient
+    def getSystem(self, data):
+        authInfo = windows.WindowsAuthInfo(data.p.host, data.p.domain,
+            data.p.username, data.p.password)
+        system = windows.WindowsSystem(authInfo, self.sendStatus)
+        return system
 
-    @classmethod
-    def _getWmiClient(cls, data):
-        wc = cls.WmiClientFactory(data.p.host, data.p.domain,
-                                  data.p.username, data.p.password)
-        cls._validateCredentials(wc)
-        return wc
+    def _trove(self, trvSpec):
+        xml = bfp.BaseTaskHandler._trove(self, trvSpec)
+        doc = etree.parse(xml)
+        return doc.getroot()
 
-    def _getWmiSystemData(self, wc):
-        children = self._getUuids(wc)
-        children.extend(self._getComputerName(wc))
-        children.append(self._getSoftwareVersions(wc))
-        children.append(self._getNetworkInfo(wc))
-        return children
+    def _poll(self, system):
+        uuids, hostname, softwareVersions, netInfo = system.poll()
 
-    @classmethod
-    def _validateCredentials(cls, wc):
-        # Validate credentials
-        key = r'SYSTEM\CurrentControlSet\Control\ComputerName\ActiveComputerName'
-        value = 'ComputerName'
-        return wc.getRegistryKey(key, value)
+        e = ElementMaker()
 
-    @classmethod
-    def _getComputerName(cls, wc):
-        key = r'SYSTEM\CurrentControlSet\Control\ComputerName\ActiveComputerName'
-        value = 'ComputerName'
-        rc, computername = wc.getRegistryKey(key, value)
-        return [ XML.Text("hostname", computername.strip()) ]
-
-    @classmethod
-    def _getUuids(cls, wc ):
-        rc, localUUID = wc.getRegistryKey(r'SOFTWARE\rPath\inventory',
-                                            'local_uuid')
-        rc, generatedUUID = wc.getRegistryKey(r'SOFTWARE\rPath\inventory', 'generated_uuid')
-
-        T = XML.Text
-        return [T("local_uuid", localUUID.strip()),
-                T("generated_uuid", generatedUUID.strip())]
-
-    @classmethod
-    def _getSoftwareVersions(cls, wc):
-        rc, siList = wc.getRegistryKey(r"SOFTWARE\rPath\conary", "polling_manifest")
-        siList = [x.strip() for x in siList.split('\n')]
-        # Start creating the XML document
-        troves = [cls._trove(tspec) for tspec in siList if tspec]
-        return XML.Element("installed_software", *troves)
-
-    @classmethod
-    def _getNetworkInfo(cls, wc):
-        rc, netInfo = wc.queryNetwork()
-        nets = [x.strip().split(',') for x in netInfo.split('\n') if x]
-
-        nodes = []
-        for n in nets:
-            n = [x.strip() for x in n]
-            device_name, ipaddr, netmask, hostname, domain = n
-            hostname = hostname.lower()
-            domain = domain.split()
-            if domain:
-                dns_name = "%s.%s" % (hostname, domain[0])
+        networks = e.networks()
+        for intf in netInfo:
+            network = e.network(
+                e.device_name(intf.name),
+                e.netmask(intf.cidr),
+                e.dns_name(intf.dns_name),
+                e.required(intf.required),
+            )
+            if intf.isv6:
+                network.append(e.ipv6_address(intf.ip_address))
             else:
-                dns_name = hostname
-            ip_address = ipv6_address = None
-            if ":" in ipaddr:
-                ipv6_address = ipaddr
-            else:
-                ip_address = ipaddr
-                ints = [int(x) for x in netmask.split('.') if int(x)]
-                netmask = 0
-                for i in ints:
-                    while i:
-                        netmask = netmask + (i & 1)
-                        i = i >> 1
-            required = str((ip_address==wc.target) or \
-                (dns_name==wc.target)).lower()
+                network.append(e.ip_address(intf.ip_address))
+            networks.append(network)
 
-            T = XML.Text
-            if ipv6_address:
-                nodes.append(XML.Element("network",
-                                         T("device_name", device_name),
-                                         T("ipv6_address", ipv6_address),
-                                         T("netmask", netmask),
-                                         T("dns_name", dns_name),
-                                         T("required", required)))
-            else:
-                nodes.append(XML.Element("network",
-                                         T("device_name", device_name),
-                                         T("ip_address", ip_address),
-                                         T("netmask", netmask),
-                                         T("dns_name", dns_name),
-                                         T("required", required)))
+        return e.system(
+            e.local_uuid(uuids[0]),
+            e.generated_uuid(uuids[1]),
+            e.hostname(hostname),
+            e.install_software([ self._trove(x) for x in softwareVersions ]),
+            networks,
+        )
 
-        return XML.Element("networks",*nodes)
-
-    def _setUUIDs(self, wc, generated_uuid, local_uuid):
-        keyPath = r'SOFTWARE\rPath\inventory'
-        wc.setRegistryKey(keyPath, 'generated_uuid', generated_uuid)
-        wc.setRegistryKey(keyPath, 'local_uuid', local_uuid)
-        self.sendStatus(C.MSG_GENERIC, 'Stored UUIDs on Windows system')
 
 class RegisterTask(WMITaskHandler):
     def _run(self, data):
-        self.sendStatus(C.MSG_CREDENTIALS_VALIDATION,
-            "Contacting host %s to validate credentials" % (data.p.host, ))
+        system = self.getSystem(data)
 
-        wc = self._getWmiClient(data)
-        self.wc = wc
+        localUUID, generatedUUID, computerName = system.register()
 
-        # Check to see if rTIS is installed
-        rc, status = wc.queryService('rPath Tools Install Service')
-        if rc or not status:
-            self.sendStatus(C.MSG_GENERIC, 'Installing rPath Tools')
-            try:
-                windowsUpdate.doBootstrap(wc)
-            finally:
-                wc.unmount()
+        e = ElementMaker()
 
-        # Generate a UUID for the system.
-        self.sendStatus(C.MSG_GENERIC, 'Gathering and/or generating UUIDs')
-        generated_uuid = self._getOrCreateGeneratedUuid()
-        rc, local_uuid = wc.queryUUID()
+        data.response = etree.toxml(e.system(
+            e.local_uuid(localUUID),
+            e.generated_uuid(generatedUUID),
+            e.hostname(computerName),
+        ))
 
-        self._setUUIDs(wc, generated_uuid, local_uuid)
-
-        children = [ XML.Text('local_uuid', local_uuid),
-                  XML.Text('generated_uuid', generated_uuid) ]
-        children.extend(self._getComputerName(wc))
-
-        el = XML.Element('system', *children)
-        data.response = XML.toString(el)
         self.setData(data)
 
-        self.sendStatus(C.OK, "Registration Complete for %s" % data.p.host)
-
-    def _getOrCreateGeneratedUuid(self):
-        key, value = r"SOFTWARE\rPath\inventory", "generated_uuid"
-        rc, gen_uuid = self.wc.getRegistryKey(key, value)
-        if not rc and gen_uuid:
-            return gen_uuid
-
-        return str(uuid.uuid4())
 
 class ShutdownTask(WMITaskHandler):
     def _run(self, data):
@@ -282,57 +195,38 @@ class ShutdownTask(WMITaskHandler):
 
 class PollingTask(WMITaskHandler):
     def _run(self, data):
-        self.sendStatus(C.MSG_START, "Contacting host %s on port %d to Poll it for info"
-            % (data.p.host, data.p.port))
+        system = self.getSystem(data)
 
-        wc = self._getWmiClient(data)
-        children = self._getWmiSystemData(wc)
-
-        el = XML.Element("system", *children)
-
-        data.response = XML.toString(el)
+        data.response = etree.toxml(self._poll(system))
         self.setData(data)
-        self.sendStatus(C.OK, "Host %s has been polled" % data.p.host)
+
 
 class UpdateTask(WMITaskHandler):
     def _run(self, data):
-        self.sendStatus(C.MSG_START, "Contacting host %s on port %d to update it" % (
-            data.p.host, data.p.port))
-        wc = self._getWmiClient(data)
-        try:
-            windowsUpdate.doUpdate(wc, data.argument,
-                str(self.task.job_uuid), self.sendStatus)
-        finally:
-            wc.unmount()
+        system = self.getSystem(data)
+        results = system.update(data.argument, str(self.task.job_uuid))
 
-        self.sendStatus(C.MSG_GENERIC, 'Update Complete. Gathering results.')
-        children = self._getWmiSystemData(wc)
-        el = XML.Element("system", *children)
-
-        data.response = XML.toString(el)
+        data.response = etree.toxml(self._poll(system))
         self.setData(data)
-        self.sendStatus(C.OK, "Host %s has been updated" % data.p.host)
+
+        for op, nvf, status in results:
+            code = C.OK
+            if not status:
+                msg = 'no results found'
+            else:
+                msg = status.get('status')
+                if status.get('exitCode') not in (None, '0'):
+                    msg += ' with exit code %s' % status.get('exitCode')
+                    code = C.ERR_GENERIC
+            self.sendStatus(code, '%s of %s %s' % (op, nvf, msg))
+
 
 class ConfigurationTask(WMITaskHandler):
     def _run(self, data):
-        self.sendStatus(C.MSG_START, 'Contacting host %s on port %d to trigger '
-            'configuration change' % (data.p.host, data.p.port))
+        system = self.getSystem(data)
+        results = system.configure(data.argument, str(self.task.job_uuid))
 
-        results = []
-        wc = self._getWmiClient(data)
-        try:
-            results = windowsUpdate.doConfiguration(wc, data.argument,
-                str(self.task.job_uuid), self.sendStatus)
-        finally:
-            wc.unmount()
-
-        self.sendStatus(C.MSG_GENERIC, 'Configuration Complete, Processing '
-            'Results')
-
-        children = self._getWmiSystemData(wc)
-        el = XML.Element("system", *children)
-
-        data.response = XML.toString(el)
+        data.response = etree.toxml(self._poll(system))
         self.setData(data)
 
         errors = [ x for x in results if x[0] != 0 ]
