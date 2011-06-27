@@ -26,6 +26,12 @@ class BaseCallback(object):
     def copyfile(self, name, version, flavor):
         pass
 
+    def start(self, msg):
+        pass
+
+    def done(self, msg):
+        pass
+
 
 class FileCopyCallback(object):
     def __init__(self, msg, total, cbfn):
@@ -49,7 +55,9 @@ class RepeaterWMICallback(WMICallback, BaseCallback):
         self._statusMethod = statusMethod
         self._logger = logging.getLogger('rpath_repeater.utils.windows')
 
-    def _log(self, level, msg):
+    def _log(self, level, msg=None):
+        if not msg:
+            msg = ''
         msg = self._prependHost(msg)
         self._statusMethod(level, msg)
 
@@ -67,3 +75,9 @@ class RepeaterWMICallback(WMICallback, BaseCallback):
 
     def copyfile(self, msg, size):
         return FileCopyCallback(msg, size, self.info)
+
+    def start(self, msg=None):
+        self._log(Codes.MSG_START, msg)
+
+    def done(self, msg=None):
+        self._log(Codes.OK, msg)

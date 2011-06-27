@@ -51,7 +51,7 @@ class Inventory(object):
 
         names = result.output
         assert len(names) == 1
-        return names[0]
+        return names[0].strip()
 
     @error_handler
     def _get_localUUID(self):
@@ -63,7 +63,7 @@ class Inventory(object):
         lines = result.output
         if lines:
             assert len(lines) == 1
-            return lines[0]
+            return lines[0].strip()
         else:
             return ''
 
@@ -86,7 +86,7 @@ class Inventory(object):
         lines = result.output
         if lines:
             assert len(lines) == 1
-            return lines[0]
+            return lines[0].strip()
         else:
             return ''
 

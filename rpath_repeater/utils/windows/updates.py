@@ -29,7 +29,7 @@ class UpdateJob(object):
     Class to represent a Windows update.
     """
 
-    CRITICAL_PACKAGES = ('rTIS', 'rTIS:msi', )
+    CRITICAL_PACKAGES = ('rPathTools', 'rPathTools:msi', )
 
     def __init__(self, systemFlavor, manifest, jobId, callback=None,
         copy=False):

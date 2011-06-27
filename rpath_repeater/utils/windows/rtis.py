@@ -120,16 +120,17 @@ class Servicing(object):
     def tostring(self, prettyPrint=False):
         return etree.tostring(self.root, pretty_print=prettyPrint)
 
-    def iterpackageresults(self, fobj):
-        def c2d(node):
-            return dict((x.tag, x) for x in node.iterchildren())
+    @staticmethod
+    def c2d(node):
+        return dict((x.tag, x) for x in node.iterchildren())
 
+    def iterpackageresults(self, fobj):
         root = etree.parse(fobj).getroot()
-        updateJobs = c2d(root).get('updateJobs')
+        updateJobs = self.c2d(root).get('updateJobs')
 
         for update in updateJobs.iterchildren():
-            for package in c2d(update).get('packages').iterchildren():
-                info = c2d(package)
+            for package in self.c2d(update).get('packages').iterchildren():
+                info = self.c2d(package)
                 operation = info.get('operation').text
 
                 if operation == self.operations.UPDATE:
@@ -144,6 +145,17 @@ class Servicing(object):
                         for x in info.get('packageStatus').iterchildren())
 
                 yield operation, trvSpec.text, status
+
+    def iterconfigresults(self, fobj):
+        root = etree.parse(fobj).getroot()
+        updateJobs = self.c2d(root).get('updateJobs')
+
+        for config in updateJobs.iterchildren():
+            handlers = self.c2d(config).get('handlers')
+            if not handlers:
+                continue
+            for hdlr in handlers.iterchildren():
+                yield int(hdlr.exitCode), hdlr.name, hdlr.exitCodeDescription
 
 
 class rTIS(object):
@@ -558,6 +570,7 @@ class rTIS(object):
             servicing.addValue(value)
 
         jobDir = self._smb.pathjoin(self.updatesDir, jobId)
+        self._smb.mkdir(jobDir)
 
         # Write out the servicing xml for this job.
         self.callback.debug(servicing.tostring(prettyPrint=True))
@@ -575,4 +588,7 @@ class rTIS(object):
         self.wait(allowReboot=True)
 
         # Get results from the target system
-        results = self._smb.pathopen(jobDir, servicing.FILENAME).read()
+        results = [ x for x in servicing.iterconfigresults(
+            self._smb.pathopen(jobDir, servicing.FILENAME))]
+
+        return results

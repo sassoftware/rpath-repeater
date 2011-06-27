@@ -71,7 +71,7 @@ class WindowsSystem(object):
 
     @cleanup
     def shutdown(self):
-        self.callback.info('Shutdown is not support for managed '
+        self.callback.error('Shutdown is not support for managed '
             'Windows systems')
         raise NotImplementedError
 
@@ -90,9 +90,9 @@ class WindowsSystem(object):
 
         criticalResults = None
         if not self.rtis.isInstalled:
-            if 'rTIS:msi' not in updJob:
-                error = ('rTIS:msi is not available for installation, can not '
-                    'continue.')
+            if 'rPathTools:msi' not in updJob:
+                error = ('rPathTools:msi is not available for installation, '
+                    'can not continue.')
                 self.callback.error(error)
                 raise errors.UpdateError, error
 

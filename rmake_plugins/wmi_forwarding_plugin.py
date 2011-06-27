@@ -138,9 +138,9 @@ class WMITaskHandler(bfp.BaseTaskHandler):
         return system
 
     def _trove(self, trvSpec):
-        xml = bfp.BaseTaskHandler._trove(self, trvSpec)
-        doc = etree.parse(xml)
-        return doc.getroot()
+        xml = bfp.BaseTaskHandler._trove(trvSpec).toxml()
+        doc = etree.fromstring(xml)
+        return doc
 
     def _poll(self, system):
         uuids, hostname, softwareVersions, netInfo = system.poll()
@@ -151,21 +151,25 @@ class WMITaskHandler(bfp.BaseTaskHandler):
         for intf in netInfo:
             network = e.network(
                 e.device_name(intf.name),
-                e.netmask(intf.cidr),
-                e.dns_name(intf.dns_name),
-                e.required(intf.required),
             )
+
             if intf.isv6:
                 network.append(e.ipv6_address(intf.ip_address))
             else:
                 network.append(e.ip_address(intf.ip_address))
+
+            network.extend([
+                e.netmask(str(intf.cidr)),
+                e.dns_name(intf.dns_name),
+                e.required(str(intf.required).lower()),
+            ])
             networks.append(network)
 
         return e.system(
             e.local_uuid(uuids[0]),
             e.generated_uuid(uuids[1]),
             e.hostname(hostname),
-            e.install_software([ self._trove(x) for x in softwareVersions ]),
+            e.installed_software(*[ self._trove(x) for x in softwareVersions ]),
             networks,
         )
 
@@ -173,18 +177,20 @@ class WMITaskHandler(bfp.BaseTaskHandler):
 class RegisterTask(WMITaskHandler):
     def _run(self, data):
         system = self.getSystem(data)
+        system.callback.start()
 
         localUUID, generatedUUID, computerName = system.register()
 
         e = ElementMaker()
 
-        data.response = etree.toxml(e.system(
+        data.response = etree.tostring(e.system(
             e.local_uuid(localUUID),
             e.generated_uuid(generatedUUID),
             e.hostname(computerName),
         ))
 
         self.setData(data)
+        system.callback.done()
 
 
 class ShutdownTask(WMITaskHandler):
@@ -196,18 +202,26 @@ class ShutdownTask(WMITaskHandler):
 class PollingTask(WMITaskHandler):
     def _run(self, data):
         system = self.getSystem(data)
+        system.callback.start()
 
-        data.response = etree.toxml(self._poll(system))
+        data.response = etree.tostring(self._poll(system))
         self.setData(data)
 
+        system.callback.done()
 
 class UpdateTask(WMITaskHandler):
     def _run(self, data):
         system = self.getSystem(data)
+        system.callback.start()
+
         results = system.update(data.argument, str(self.task.job_uuid))
 
-        data.response = etree.toxml(self._poll(system))
+        data.response = etree.tostring(self._poll(system))
         self.setData(data)
+
+        if not results:
+            self.sendStatus(C.ERR_GENERIC, 'no results found')
+            return
 
         for op, nvf, status in results:
             code = C.OK
@@ -224,9 +238,12 @@ class UpdateTask(WMITaskHandler):
 class ConfigurationTask(WMITaskHandler):
     def _run(self, data):
         system = self.getSystem(data)
-        results = system.configure(data.argument, str(self.task.job_uuid))
+        system.callback.start()
 
-        data.response = etree.toxml(self._poll(system))
+        values = etree.fromstring(data.argument).getchildren()
+        results = system.configure(str(self.task.job_uuid), values)
+
+        data.response = etree.tostring(self._poll(system))
         self.setData(data)
 
         errors = [ x for x in results if x[0] != 0 ]
