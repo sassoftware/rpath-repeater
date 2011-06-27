@@ -18,6 +18,7 @@ class rPathRepeaterTest(TestPackageRecipe):
         'rmake3:python',
         'rpath-repeater:lib',
         'rpath-repeater:python',
+        'wmiclient:python',
 
         # testsuites
         'conary-test:lib',
