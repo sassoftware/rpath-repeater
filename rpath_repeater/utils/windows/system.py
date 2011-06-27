@@ -88,7 +88,6 @@ class WindowsSystem(object):
             jobId, callback=self.callback)
         updJob.prepareUpdate(troveSpecs)
 
-        criticalResults = None
         if not self.rtis.isInstalled:
             if 'rPathTools:msi' not in updJob:
                 error = ('rPathTools:msi is not available for installation, '

@@ -10,7 +10,7 @@ def error_handler(func):
     def wrapper(self, *args, **kwargs):
         try:
             return func(self, *args, **kwargs)
-        except WMIFileNotFoundError, e:
+        except WMIFileNotFoundError:
             return None
     return wrapper
 
