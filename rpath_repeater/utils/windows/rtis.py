@@ -197,12 +197,12 @@ class rTIS(object):
             try:
                 queries += 1
                 result = func(*args, **kwargs)
-            except WMIFileNotFoundError, e:
+            except WMIFileNotFoundError:
                 if raiseErrors:
                     raise
                 result = default
                 break
-            except WMIBaseError, e:
+            except WMIBaseError:
                 if queries <= retries:
                     self.callback.info('retrying')
                     self._sleep()
@@ -237,7 +237,7 @@ class rTIS(object):
 
     def _set_system_model(self, model):
         self.callback.info('Writing system model')
-        result = self._query(self._wmi.registrySetKey, self._conary_keypath,
+        self._query(self._wmi.registrySetKey, self._conary_keypath,
             'system_model', model)
 
     system_model = property(_get_system_model, _set_system_model)
@@ -251,7 +251,7 @@ class rTIS(object):
     def _set_manifest(self, data):
         self.callback.info('Writing system manifest')
         data = [ x.asString(withTimestamp=True) for x in data ]
-        result = self._query(self._wmi.registrySetKey, self._conary_keypath,
+        self._query(self._wmi.registrySetKey, self._conary_keypath,
             'manifest', data)
 
     manifest = property(_get_manifest, _set_manifest)
@@ -264,7 +264,7 @@ class rTIS(object):
 
     def _set_polling_manifest(self, data):
         self.callback.info('Writing polling manifest')
-        result = self._query(self._wmi.registrySetKey, self._conary_keypath,
+        self._query(self._wmi.registrySetKey, self._conary_keypath,
             'polling_manifest', data)
 
     polling_manifest = property(_get_polling_manifest, _set_polling_manifest)
@@ -277,7 +277,7 @@ class rTIS(object):
 
     def _set_commands(self, data):
         self.callback.info('Setting commands')
-        resuot = self._query(self._wmi.registrySetKey, self._params_keypath,
+        self._query(self._wmi.registrySetKey, self._params_keypath,
             'Commands', data)
 
     commands = property(_get_commands, _set_commands)
@@ -377,7 +377,7 @@ class rTIS(object):
                                   self._params_keypath,
                                   statusKey, raiseErrors=True)
                 status = res[0]
-            except WMIBaseError, e:
+            except WMIBaseError:
                 # Handle reboot case
                 # NOTE: This may not actually be a reboot, the system may just
                 #       not be responding for some amount of time.
@@ -430,6 +430,7 @@ class rTIS(object):
         manifest = dict((x.name, x) for x in criticalJob.manifest)
 
         # Install rTIS
+        result = None
         contents = criticalJob.getFileContents()
         for job in criticalJob:
             name, _, (version, flavor), _ = job
@@ -465,6 +466,8 @@ class rTIS(object):
 
         self.manifest = manifest.values()
         self.polling_manifest = criticalJob.polling_manifest
+
+        return result
 
     def applyUpdate(self, updJob):
         """

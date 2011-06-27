@@ -95,7 +95,7 @@ class SMBClient(object):
         try:
             self._runCmd(self._mount_cmd + [ self._rootdir, ],
                 self._mount_env, self._mount_rc)
-        except Exception, e:
+        except Exception:
             self._rootdir = None
             raise
 

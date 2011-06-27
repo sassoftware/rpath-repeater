@@ -68,7 +68,7 @@ class Inventory(object):
             return ''
 
     def _set_localUUID(self, uuid):
-        result = self._wmi.registrySetKey(
+        self._wmi.registrySetKey(
             self._inventory_keypath,
             'local_uuid',
             uuid
@@ -91,7 +91,7 @@ class Inventory(object):
             return ''
 
     def _set_generatedUUID(self, uuid):
-        result = self._wmi.registrySetKey(
+        self._wmi.registrySetKey(
             self._inventory_keypath,
             'generated_uuid',
             uuid

@@ -96,15 +96,11 @@ class WindowsSystem(object):
                 self.callback.error(error)
                 raise errors.UpdateError, error
 
-            criticalResults = self.rtis.applyCriticalUpdate(updJob)
+            self.rtis.applyCriticalUpdate(updJob)
 
         results = self.rtis.applyUpdate(updJob)
 
-        if criticalResults:
-            results = criticalResults + results
-
         self.callback.info('Update Complete')
-
         return results
 
     @cleanup

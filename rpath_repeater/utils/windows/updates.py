@@ -72,7 +72,7 @@ class UpdateJob(object):
 
         try:
             troves = self._model_cache.getTroves(self._manifest)
-        except TroveSpecsNotFound, e:
+        except TroveSpecsNotFound:
             self.callback.error('This system is associated with an '
                 'appliance that can not be accessed: %s' % (self._manifest, ))
             raise
@@ -233,7 +233,6 @@ class UpdateJob(object):
 
                 name = os.path.basename(path)
                 fileInfo = files.ThawFile(fileStream, pathId)
-                flags = fileInfo.flags
 
                 cfile = cs.getFileContents(pathId, fileId, compressed=False)
                 contents = cfile[1].get()
