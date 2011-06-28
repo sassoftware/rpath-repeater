@@ -116,6 +116,13 @@ class WmiParams(_BaseSlotCompare):
     __slots__ = [ 'host', 'port', 'username', 'password', 'domain',
         'eventUuid', ]
 
+class SshParams(_BaseSlotCompare):
+    '''
+    Information required to enslave^W adopt a Linux system via SSH
+    TODO: should probably be SshAdoptionParams and ssh_adoption_plugin?
+    '''
+    __slots__ = [ 'host', 'port', 'sshUser', 'sshPassword', 'sshKey', 'eventUuid' ]
+
 class ManagementInterfaceParams(_BaseSlotCompare):
     """
     Information needed for probing for a management interface (e.g. WMI,

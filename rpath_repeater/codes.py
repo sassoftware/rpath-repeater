@@ -20,6 +20,7 @@ class Codes(object):
     MSG_CREDENTIALS_VALIDATION = 105
     MSG_PROBE = 106
     MSG_GENERIC = 110
+    MSG_BOOTSTRAP_REQ = 111
 
     # 200
     OK = 200

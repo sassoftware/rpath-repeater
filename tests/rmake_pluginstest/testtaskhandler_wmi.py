@@ -46,6 +46,7 @@ class WmiTest(TestBase):
         queryUUID = ('query', 'uuid')
         running = ('registry', 'getkey', 'SYSTEM\\CurrentControlSet\\Services\\rPath Tools Install Service\\Parameters', 'Running')
         setRoot = ('registry', 'setkey', 'SYSTEM\\CurrentControlSet\\Services\\rPath Tools Install Service\\Parameters', 'Root', 'C:\\Program Files\\rPath\\Updates')
+
     class MultiChoice(object):
         def __init__(self, choices):
             self._counter = 0
