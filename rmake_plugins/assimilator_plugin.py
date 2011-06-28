@@ -11,9 +11,6 @@ from rpath_repeater.codes import Codes as C
 from rpath_repeater.utils import base_forwarding_plugin as bfp
 from rpath_repeater.utils.ssh import SshConnector
 
-import paramiko
-import exceptions
-
 # various plugin boilerplate...
 XML = bfp.XML
 ASSIMILATOR_JOB = bfp.PREFIX + '.assimilatorplugin'

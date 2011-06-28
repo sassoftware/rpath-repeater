@@ -47,7 +47,7 @@ class AssimilatorTest(TestBase):
         params = self._params()
         self.client.bootstrap(params)
 
-        expected_response = '<system/>'
+        #expected_response = '<system/>'
 
         # NOTE -- this will fail because we haven't mocked up the SSH connection yet
         # so it will try a REAL connection.
