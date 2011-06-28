@@ -27,12 +27,15 @@ from rpath_repeater import models
 class RepeaterClient(object):
     __WMI_PLUGIN_NS = 'com.rpath.sputnik.wmiplugin'
     __CIM_PLUGIN_NS = 'com.rpath.sputnik.cimplugin'
+    # FIXME: the following is probably unused
+    __SSH_PLUGIN_NS = 'com.rpath.sputnik.sshplugin'
     __LAUNCH_PLUGIN_NS = 'com.rpath.sputnik.launchplugin'
     __MGMT_IFACE_PLUGIN_NS = 'com.rpath.sputnik.interfacedetectionplugin'
     __IMAGE_UPLOAD_PLUGIN_NS = 'com.rpath.sputnik.imageuploadplugin'
 
     CimParams = models.CimParams
     WmiParams = models.WmiParams
+    SshParams = models.SshParams
     ManagementInterfaceParams = models.ManagementInterfaceParams
     URL = models.URL
     ResultsLocation = models.ResultsLocation
@@ -109,6 +112,15 @@ class RepeaterClient(object):
     def register_wmi(self, wmiParams, resultsLocation=None, zone=None):
         method = 'register'
         return self._wmiCallDispatcher(method, wmiParams, resultsLocation, zone)
+
+    def bootstrap(self, sshParams, resultsLocation=None, zone=None):
+        '''this will only be valid for Linux, and adopts an unmanaged system'''
+        params = self._callParams('bootstrap', resultsLocation, zone)
+        assert isinstance(sshParams, self.SshParams)
+        if sshParams.port is None:
+            sshParams.port = 22
+        params['sshParams'] = sshParams.toDict()
+        return self._launchRmakeJob(self.__SSH_PLUGIN_NS, params)
 
     def shutdown_cim(self, cimParams, resultsLocation=None, zone=None):
         method = 'shutdown'

@@ -42,10 +42,8 @@ class WmiTest(TestBase):
         systemModel = ('registry', 'getkey', conaryPath, 'system_model')
         queryNetwork = ('query', 'network')
         queryUUID = ('query', 'uuid')
-        running = ('registry', 'getkey', rtisPath, 'Running')
-        setRoot = ('registry', 'setkey', rtisPath, 'Root', 'C:\\Program Files\\rPath\\Updates')
-        appData = ('registry', 'getkey', 'SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Folders', 'Common AppData')
-        getFlavor = ('registry', 'getkey', 'SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment', 'PROCESSOR_ARCHITECTURE')
+        running = ('registry', 'getkey', 'SYSTEM\\CurrentControlSet\\Services\\rPath Tools Install Service\\Parameters', 'Running')
+        setRoot = ('registry', 'setkey', 'SYSTEM\\CurrentControlSet\\Services\\rPath Tools Install Service\\Parameters', 'Root', 'C:\\Program Files\\rPath\\Updates')
 
     class MultiChoice(object):
         def __init__(self, choices):
