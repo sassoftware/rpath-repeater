@@ -2,7 +2,6 @@
 # SSH node communication tools
 
 import paramiko
-import os
 from contextlib import contextmanager
 
 class SshConnector(object):

@@ -6,9 +6,6 @@ testsuite.setup()
 import assimilator_plugin
 from testtaskhandler import TestBase
 
-# stock modules
-import exceptions
-    
 class AssimilatorTest(TestBase):
     ''' 
     Tests for the assimilator plugin, which enslaves new Linux Systems
