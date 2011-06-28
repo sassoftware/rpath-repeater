@@ -13,6 +13,7 @@
 
 import sys
 import time
+import os.path
 
 from conary.lib import util
 
@@ -255,6 +256,11 @@ def main():
         username="Administrator",
         password="password",
         domain=system)
+    sshParams = cli.SshParams(host=system, port=22,
+        sshUser='root',
+        sshKey=os.path.expanduser('~/.ssh/id_rsa'),
+        eventUuid=eventUuid)
+
     if 0:
         uuid, job = cli.register_cim(cimParams)
     elif 0:
@@ -288,7 +294,7 @@ def main():
                 'group-windemo-appliance=/windemo.eng.rpath.com@rpath:windemo-1-devel/1-2-1[]',
             ],
             )
-    else:
+    elif 0:
         headers = {'X-rBuilder-OutputToken' : 'aaa'}
         images = [
             cli.ImageFile(url=cli.makeUrl('http://george.rdu.rpath.com/CentOS/5.5/isos/x86_64/CentOS-5.5-x86_64-bin-1of8.iso'),
@@ -303,6 +309,10 @@ def main():
                     headers=headers)),
         ]
         uuid, job = cli.download_images(images)
+    else:
+        uuid, job = cli.bootstrap(sshParams,
+            resultsLocation = resultsLocation,
+            zone = zone)
     while 1:
         job = cli.getJob(uuid)
         if job.status.final:
