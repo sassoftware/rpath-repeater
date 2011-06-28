@@ -11,11 +11,8 @@ from rpath_repeater.models import SshParams
 from rpath_repeater.codes import Codes as C
 from rpath_repeater.utils import base_forwarding_plugin as bfp
 
-import sys
-import socket
 import paramiko
 import exceptions
-import os
 from contextlib import contextmanager
 
 # various plugin boilerplate...
