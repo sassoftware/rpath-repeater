@@ -29,14 +29,14 @@ class RepeaterClient(object):
     __WMI_PLUGIN_NS = 'com.rpath.sputnik.wmiplugin'
     __CIM_PLUGIN_NS = 'com.rpath.sputnik.cimplugin'
     # FIXME: the following is probably unused
-    __SSH_PLUGIN_NS = 'com.rpath.sputnik.sshplugin'
+    __ASSIMILATOR_PLUGIN_NS = 'com.rpath.sputnik.assimilatorplugin'
     __LAUNCH_PLUGIN_NS = 'com.rpath.sputnik.launchplugin'
     __MGMT_IFACE_PLUGIN_NS = 'com.rpath.sputnik.interfacedetectionplugin'
     __IMAGE_UPLOAD_PLUGIN_NS = 'com.rpath.sputnik.imageuploadplugin'
 
     CimParams = models.CimParams
     WmiParams = models.WmiParams
-    SshParams = models.SshParams
+    AssimilatorParams = models.AssimilatorParams
     ManagementInterfaceParams = models.ManagementInterfaceParams
     URL = models.URL
     ResultsLocation = models.ResultsLocation
@@ -114,14 +114,14 @@ class RepeaterClient(object):
         method = 'register'
         return self._wmiCallDispatcher(method, wmiParams, resultsLocation, zone)
 
-    def bootstrap(self, sshParams, resultsLocation=None, zone=None):
+    def bootstrap(self, assimilatorParams, resultsLocation=None, zone=None):
         '''this will only be valid for Linux, and adopts an unmanaged system'''
         params = self._callParams('bootstrap', resultsLocation, zone)
-        assert isinstance(sshParams, self.SshParams)
-        if sshParams.port is None:
-            sshParams.port = 22
-        params['sshParams'] = sshParams.toDict()
-        return self._launchRmakeJob(self.__SSH_PLUGIN_NS, params)
+        assert isinstance(assimilatorParams, self.AssimilatorParams)
+        if assimilatorParams.port is None:
+            assimilatorParams.port = 22
+        params['assimilatorParams'] = assimilatorParams.toDict()
+        return self._launchRmakeJob(self.__ASSIMILATOR_PLUGIN_NS, params)
 
     def shutdown_cim(self, cimParams, resultsLocation=None, zone=None):
         method = 'shutdown'
@@ -256,7 +256,7 @@ def main():
         username="Administrator",
         password="password",
         domain=system)
-    sshParams = cli.SshParams(host=system, port=22,
+    assimilatorParams = cli.AssimilatorParams(host=system, port=22,
         sshUser='root',
         sshKey=os.path.expanduser('~/.ssh/id_rsa'),
         eventUuid=eventUuid)
@@ -310,7 +310,7 @@ def main():
         ]
         uuid, job = cli.download_images(images)
     else:
-        uuid, job = cli.bootstrap(sshParams,
+        uuid, job = cli.bootstrap(assimilatorParams,
             resultsLocation = resultsLocation,
             zone = zone)
     while 1:
