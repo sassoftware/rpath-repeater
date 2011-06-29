@@ -20,19 +20,23 @@ class SshConnector(object):
     because it assumes machines will be frequently reprovisioned.
     """
 
-    def __init__(self, host=None, port=22, user='root', password='password', key=None):
+    def __init__(self, host=None, port=22, user='root', password='password', 
+		 key=None, client_class=paramiko.SSHClient, 
+         sftp_class=paramiko.SFTPClient):
        self.host      = host
        self.port      = port
        self.user      = user
        self.password  = password
        self.key       = key
-       self.client    = self._gen_client()
+       self.client_class = client_class
+       self.sftp_class = sftp_class
+       self.client     = self._gen_client()
 
     def _gen_client(self):
        '''
        Get a SSHClient handle, allows auth by key or username/password
        '''
-       client = paramiko.SSHClient()
+       client = self.client_class()
        client.load_system_host_keys()
        # might want an 'ignore' policy that doesn't chirp to stderr later
        client.set_missing_host_key_policy(paramiko.WarningPolicy())
@@ -74,7 +78,7 @@ class SshConnector(object):
 
     def _sftp(self):
         '''Create a SFTP connection'''
-        return paramiko.SFTPClient.from_transport(self.client.get_transport())
+        return self.sftp_class.from_transport(self.client.get_transport())
 
     def put_file(self, local_file, remote_file):
         '''place a file on the remote system'''

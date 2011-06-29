@@ -58,7 +58,7 @@ class LinuxAssimilator(object):
 	of handling it is a different bootstrap.sh in the payload.
 	'''
 	commands = []
-        commands.append("cd /tmp; tar -xvf rpath_assimilator.tar")
+        commands.append("cd /tmp; tar -xf rpath_assimilator.tar")
 	commands.append("cd /tmp/assimilator; " +
 	     "sh /tmp/assimilator/bootstrap.sh")
 	return commands
@@ -112,5 +112,6 @@ class LinuxAssimilator(object):
 		    "thus far=\n%s" % (cmd, rc, all_output))
 
         # all commands successful
+        self.ssh.close()
         return (0, all_output)
 
