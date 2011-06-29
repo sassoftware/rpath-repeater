@@ -181,7 +181,7 @@ class UpdateJob(object):
         self._newSystemModel = [ 'install %s=%s' % (x.name, x.version)
             for x in newTroveTups ]
 
-        self._newPollingManifest = [ x.asString()
+        self._newPollingManifest = [ x.asString(withTimestamp=True)
             for x in newTroveTups ]
 
         self._uJob = self.getUpdateJob(self._newSystemModel)
