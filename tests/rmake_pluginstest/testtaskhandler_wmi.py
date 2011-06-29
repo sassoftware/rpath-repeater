@@ -42,6 +42,7 @@ class WmiTest(TestBase):
         systemModel = ('registry', 'getkey', conaryPath, 'system_model')
         queryNetwork = ('query', 'network')
         queryUUID = ('query', 'uuid')
+        appData = ('registry', 'getkey', 'SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Folders', 'Common AppData')
         running = ('registry', 'getkey', 'SYSTEM\\CurrentControlSet\\Services\\rPath Tools Install Service\\Parameters', 'Running')
         setRoot = ('registry', 'setkey', 'SYSTEM\\CurrentControlSet\\Services\\rPath Tools Install Service\\Parameters', 'Root', 'C:\\Program Files\\rPath\\Updates')
 
