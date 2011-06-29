@@ -53,8 +53,7 @@ class UpdateJob(object):
         self._cfg.initializeFlavors()
         self._cfg.dbPath = ':memory:'
         self._cfg.flavor = [self._systemFlavor, ]
-#        self._cfg.readUrl('http://localhost.localdomain/conaryrc')
-        self._cfg.readUrl('http://dhcp224.eng.rpath.com/conaryrc')
+        self._cfg.readUrl('http://localhost.localdomain/conaryrc')
 
         self._client = conaryclient.ConaryClient(self._cfg)
 
