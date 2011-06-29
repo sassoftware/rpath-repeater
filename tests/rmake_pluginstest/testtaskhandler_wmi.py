@@ -39,12 +39,13 @@ class WmiTest(TestBase):
             'ComputerName')
         pollingManifest = ('registry', 'getkey', conaryPath, 'polling_manifest')
         manifest = ('registry', 'getkey', conaryPath, 'manifest')
-        systemModel = ('registry', 'getkey', conaryPath, 'system_model')
         queryNetwork = ('query', 'network')
         queryUUID = ('query', 'uuid')
         appData = ('registry', 'getkey', 'SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Folders', 'Common AppData')
-        running = ('registry', 'getkey', 'SYSTEM\\CurrentControlSet\\Services\\rPath Tools Install Service\\Parameters', 'Running')
-        setRoot = ('registry', 'setkey', 'SYSTEM\\CurrentControlSet\\Services\\rPath Tools Install Service\\Parameters', 'Root', 'C:\\Program Files\\rPath\\Updates')
+        systemModel = ('registry', 'getkey', conaryPath, 'system_model')
+        running = ('registry', 'getkey', rtisPath, 'Running')
+        setRoot = ('registry', 'setkey', rtisPath, 'Root', 'C:\\Program Files\\rPath\\Updates')
+        getFlavor = ('registry', 'getkey', 'SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment', 'PROCESSOR_ARCHITECTURE')
 
     class MultiChoice(object):
         def __init__(self, choices):
