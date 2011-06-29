@@ -10,6 +10,7 @@ from rpath_repeater.models import AssimilatorParams
 from rpath_repeater.codes import Codes as C
 from rpath_repeater.utils import base_forwarding_plugin as bfp
 from rpath_repeater.utils.ssh import SshConnector
+from rpath_repeater.utils.assimilator import LinuxAssimilator
 
 # various plugin boilerplate...
 XML = bfp.XML
@@ -134,7 +135,8 @@ class BootstrapTask(AssimilatorTaskHandler):
                     (data.p.host, errorSummary), errorDetails)
 
     def _bootstrap(self,host=None,port=None,user=None, 
-        password=None, key=None, uuid=None):
+        password=None, key=None, uuid=None, flavor='RHEL5'):
+	# FIXME: make flavor a constant, add to AssimilatorParams
         '''
         Guts of actual bootstrap code goes here...
         FIXME: finish this, add a utils/bootstrapper class that uses
@@ -145,34 +147,13 @@ class BootstrapTask(AssimilatorTaskHandler):
             password=password, key=key)
         conn.close()
 
+        asim = LinuxAssimilator(conn, flavor)
+        asim.assimilate()
+
         outParams = dict(
            errorSummary = '',
            errorDetails = ''
         )
         return (1, outParams)
         
-def testing_main():
-    '''
-    Attempt some Paramiko operations...
-    '''
-    # by username/password ...
-    conn = SshConnector(host='127.0.0.1',port=22,user='root',
-          password='password') 
-    # by key...
-    #conn = SshPluginConnector(host='127.0.0.1',port=22,
-    #       key=os.path.expanduser('~/.ssh/id_rsa'),
-    #       password='ssh_unlock_password') 
-    status, results = conn.exec_command("cat /etc/passwd")
-    print "status = " + str(status)
-    print "results = " + results
-    conn.put_file("/tmp/foo","/tmp/bar")
-    conn.get_file("/tmp/bar","/tmp/baz")
-    conn.unlink("/tmp/baz")
-    conn.close()
-    return status
-
-
-if __name__ == '__main__':
-    testing_main()
-
 

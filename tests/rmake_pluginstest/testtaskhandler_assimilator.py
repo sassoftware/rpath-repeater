@@ -4,6 +4,8 @@
 import testsuite
 testsuite.setup()
 import assimilator_plugin
+from rpath_repeater.utils.ssh import SshConnector
+from rpath_repeater.utils.assimilator import LinuxAssimilator
 from testtaskhandler import TestBase
 
 class AssimilatorTest(TestBase):
@@ -17,32 +19,40 @@ class AssimilatorTest(TestBase):
     baseNamespace = assimilator_plugin.ASSIMILATOR_JOB
     handlerClass = assimilator_plugin.AssimilatorHandler
 
-    HOST = '1.2.3.4'
+    HOST = '127.0.0.1'
     PORT = 22
 
     def _params(self, **kwargs):
         ''' 
         default parameters for mock tests, 
         we likely want to test key/pw auth seperately
-        '''
+	# FIXME: this needs to be mocked up somewhat
+	'''
+
         defaults = dict(
             host=AssimilatorTest.HOST,
             port=AssimilatorTest.PORT,
-            sshUser='user',
-            sshPassword='pass',
+            sshUser='root',
+            sshPassword='root_password',
             sshKey='',
             eventUuid='deadbeef',
+	    # FIXME: add flavor
         )   
         defaults.update(kwargs)
         return self.client.AssimilatorParams(**defaults)
 
-    def testBootstrap(self):
-        '''
-        test kicking off a bootstrap task
-        FIXME: reinstate tests once mocked up properly
-        '''
-        params = self._params()
-        self.client.bootstrap(params)
+    def testNoop(self):
+	# FIXME: add some mock tests here, until then
+	# see scripts/demo_assimilator.py
+        pass
+
+    #def testBootstrapViaClientLib(self):
+    #    '''
+    #    test kicking off a bootstrap task
+    #    FIXME: reinstate tests once mocked up properly
+    #    '''
+    #    params = self._params()
+    #    self.client.bootstrap(params)
 
         #expected_response = '<system/>'
 
