@@ -53,8 +53,7 @@ class UpdateJob(object):
         self._cfg.initializeFlavors()
         self._cfg.dbPath = ':memory:'
         self._cfg.flavor = [self._systemFlavor, ]
-#        self._cfg.readUrl('http://localhost.localdomain/conaryrc')
-        self._cfg.readUrl('http://dhcp224.eng.rpath.com/conaryrc')
+        self._cfg.readUrl('http://localhost.localdomain/conaryrc')
 
         self._client = conaryclient.ConaryClient(self._cfg)
 
@@ -182,7 +181,7 @@ class UpdateJob(object):
         self._newSystemModel = [ 'install %s=%s' % (x.name, x.version)
             for x in newTroveTups ]
 
-        self._newPollingManifest = [ x.asString()
+        self._newPollingManifest = [ x.asString(withTimestamp=True)
             for x in newTroveTups ]
 
         self._uJob = self.getUpdateJob(self._newSystemModel)
@@ -211,6 +210,7 @@ class UpdateJob(object):
 
         names = [ x[0] for x in self._updates ]
 
+        info = {}
         for trvCs in cs.iterNewTroveList():
             if trvCs.getName() not in names:
                 self.callback.debug('skipping %s since it was not in the '
@@ -234,12 +234,8 @@ class UpdateJob(object):
                 name = os.path.basename(path)
                 fileInfo = files.ThawFile(fileStream, pathId)
 
-                cfile = cs.getFileContents(pathId, fileId, compressed=False)
-                contents = cfile[1].get()
 
-                self._contents[nvf] = CapsuleContents(name, fileInfo,
-                    trove.Trove(trvCs).troveInfo.capsule.msi, nvf, contents,
-                    Servicing.operations.UPDATE)
+                info[nvf] = (pathId, fileId, name, fileInfo, trvCs)
 
                 break
 
@@ -247,6 +243,17 @@ class UpdateJob(object):
             else:
                 self._contents[nvf] = CapsuleContents(None, None, None, nvf,
                     None, Servicing.operations.UPDATE)
+
+        # Unpack contents sorted by fileId
+        for nvf, (pathId, fileId, name, fileInfo, trvCs) in \
+            sorted(info.iteritems(), cmp=lambda a, b: cmp(a[1][1], b[1][1])):
+
+            cfile = cs.getFileContents(pathId, fileId, compressed=False)
+            contents = cfile[1].get()
+
+            self._contents[nvf] = CapsuleContents(name, fileInfo,
+                trove.Trove(trvCs).troveInfo.capsule.msi, nvf, contents,
+                Servicing.operations.UPDATE)
 
         # Retrieve trove info for all delete jobs
         nvfs = []

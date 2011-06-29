@@ -220,13 +220,14 @@ class UpdateTask(WMITaskHandler):
         self.setData(data)
 
         if not results:
-            self.sendStatus(C.ERR_GENERIC, 'no results found')
+            system.callback.error('no results found')
             return
 
         for op, nvf, status in results:
-            code = C.OK
+            code = C.MSG_GENERIC
             if not status:
-                msg = 'no results found'
+                code = C.ERR_GENERIC
+                msg = 'failed with unknown error'
             else:
                 msg = status.get('status')
                 if status.get('exitCode') not in (None, '0'):
@@ -234,6 +235,7 @@ class UpdateTask(WMITaskHandler):
                     code = C.ERR_GENERIC
             self.sendStatus(code, '%s of %s %s' % (op, nvf, msg))
 
+        system.callback.done()
 
 class ConfigurationTask(WMITaskHandler):
     def _run(self, data):
