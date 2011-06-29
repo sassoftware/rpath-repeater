@@ -106,7 +106,7 @@ class Servicing(object):
         else:
             pkg.append(self.e.type('package'))
 
-        if capsule.nvf.name == 'rTIS:msi':
+        if capsule.nvf.name == 'rPathTools:msi':
             pkg.append(self.e.critical('true'))
         else:
             pkg.append(self.e.critical('false'))
