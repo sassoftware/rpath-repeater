@@ -12,8 +12,8 @@ class SshConnector(object):
 
     Usage: 
         sconn = SshConnector(host='foo.example.org',...)
-        code, output = sconn.exec_command('...')
-        sconn.get_file(remote,local) # or put_file(local,remote)
+        code, output = sconn.execCommand('...')
+        sconn.getFile(remote,local) # or putFile(local,remote)
         sconn.close()
 
     This module does not check known_hosts (or add machienes to known hosts)
@@ -21,22 +21,22 @@ class SshConnector(object):
     """
 
     def __init__(self, host=None, port=22, user='root', password='password', 
-		 key=None, client_class=paramiko.SSHClient, 
-         sftp_class=paramiko.SFTPClient):
-       self.host      = host
-       self.port      = port
-       self.user      = user
-       self.password  = password
-       self.key       = key
-       self.client_class = client_class
-       self.sftp_class = sftp_class
-       self.client     = self._gen_client()
+                 key=None, clientClass=paramiko.SSHClient, 
+                 sftpClass=paramiko.SFTPClient):
+       self.host        = host
+       self.port        = port
+       self.user        = user
+       self.password    = password
+       self.key         = key
+       self.clientClass = clientClass
+       self.sftpClass   = sftpClass
+       self.client      = self._genClient()
 
-    def _gen_client(self):
+    def _genClient(self):
        '''
        Get a SSHClient handle, allows auth by key or username/password
        '''
-       client = self.client_class()
+       client = self.clientClass()
        client.load_system_host_keys()
        # might want an 'ignore' policy that doesn't chirp to stderr later
        client.set_missing_host_key_policy(paramiko.WarningPolicy())
@@ -58,7 +58,7 @@ class SshConnector(object):
         '''SSH disconnect'''
         self.client.close()
 
-    def exec_command(self, cmd):
+    def execCommand(self, cmd):
         '''Runs a non-interactive command and returns both the exit code & output'''
         cmd = cmd + "; echo $?"
         sin, sout, serr = self.client.exec_command(cmd)
@@ -78,21 +78,21 @@ class SshConnector(object):
 
     def _sftp(self):
         '''Create a SFTP connection'''
-        return self.sftp_class.from_transport(self.client.get_transport())
+        return self.sftpClass.from_transport(self.client.get_transport())
 
-    def put_file(self, local_file, remote_file):
+    def putFile(self, localFile, remoteFile):
         '''place a file on the remote system'''
         with self._closing(self._sftp()) as sftp:
-            sftp.put(local_file, remote_file)
+            sftp.put(localFile, remoteFile)
 
-    def get_file(self, remote_file, local_file):
+    def getFile(self, remoteFile, localFile):
         '''download a remote file'''
         with self._closing(self._sftp()) as sftp:
-            sftp.get(remote_file, local_file)
+            sftp.get(remoteFile, localFile)
 
-    def unlink(self, remote_file):
+    def unlink(self, remoteFile):
         '''delete a remote file'''
         with self._closing(self._sftp()) as sftp:
-            sftp.unlink(remote_file)
+            sftp.unlink(remoteFile)
 
 

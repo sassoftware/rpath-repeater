@@ -135,8 +135,8 @@ class BootstrapTask(AssimilatorTaskHandler):
                     (data.p.host, errorSummary), errorDetails)
 
     def _bootstrap(self,host=None,port=None,user=None, 
-        password=None, key=None, uuid=None, flavor='RHEL5'):
-	# FIXME: make flavor a constant, add to AssimilatorParams
+        password=None, key=None, uuid=None, osFamily='RHEL5'):
+	# FIXME: make osFamily a constant, add to AssimilatorParams
         '''
         Guts of actual bootstrap code goes here...
         FIXME: finish this, add a utils/bootstrapper class that uses
@@ -147,7 +147,7 @@ class BootstrapTask(AssimilatorTaskHandler):
             password=password, key=key)
         conn.close()
 
-        asim = LinuxAssimilator(conn, flavor)
+        asim = LinuxAssimilator(conn, osFamily)
         asim.assimilate()
 
         outParams = dict(

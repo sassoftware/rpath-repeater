@@ -134,7 +134,7 @@ class AssimilatorTest(TestBase):
             sshPassword='root_password',
             sshKey='',
             eventUuid='deadbeef',
-	    # FIXME: add flavor
+            osFamily='EL6'
         )   
         defaults.update(kwargs)
         return self.client.AssimilatorParams(**defaults)
@@ -149,12 +149,12 @@ class AssimilatorTest(TestBase):
             user='root', 
             password='root_password_imaginary',
             key='',
-            client_class=MockSshClient, 
-            sftp_class=MockSftpClient,
+            clientClass=MockSshClient, 
+            sftpClass=MockSftpClient,
         )
-        flavor = 'EL6'
-        asim = LinuxAssimilator(conn, flavor)
-        rc, all_output = asim.assimilate()
+        osFamily = 'EL6'
+        asim = LinuxAssimilator(conn, osFamily)
+        rc, allOutput = asim.assimilate()
         #print "ASSIMILATOR OUTPUT : %s\n" % all_output
         self.failUnlessEqual(rc, 0, 'successful assimilator return code')
         # call more tests here, defined in classes above

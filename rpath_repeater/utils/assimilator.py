@@ -1,5 +1,5 @@
 # Copyright (c) 2011 rPath, Inc.
-# Assimilates different flavors of non-managed systems into an rBuilder
+# Assimilates different families of non-managed systems into an rBuilder
 # used by rmake_plugins/assimilator_plugin.py
 
 import exceptions
@@ -9,10 +9,10 @@ class LinuxAssimilator(object):
     """
     Assimiles a Linux system
     
-    ssh_conn = utils.SshConnection(...)
-    flavor = 'RHEL5' # FIXME: constant
+    sshConn = utils.SshConnection(...)
+    osFamily = 'EL5' # FIXME: constant
 
-    usage:  asim = LinuxAssimilator(ssh_conn, flavor)
+    usage:  asim = LinuxAssimilator(sshConn, osFamily)
             asim.assimilate()
     """
 
@@ -25,13 +25,13 @@ class LinuxAssimilator(object):
     SLES10_PAYLOAD = "/tmp/assimilator_SLES10_payload.tar"
     SLES11_PAYLOAD = "/tmp/assimilator_SLES11_payload.tar"
 
-    def __init__(self, ssh_connector, flavor):
-        self.ssh       = ssh_connector
-        self.flavor    = flavor
-        self.payload   = self._payload_for_flavor()
-        self.commands  = self._commands_for_flavor()
+    def __init__(self, sshConnector, osFamily):
+        self.ssh       = sshConnector
+        self.osFamily  = osFamily
+        self.payload   = self._payloadForFamily()
+        self.commands  = self._commandsForFamily()
 
-    def _payload_for_flavor(self):
+    def _payloadForFamily(self):
 	''' 
 	Determine the appropriate payload file to transfer to the remote 
 	system.  If the payload doesn't exist, we'll likely build it on 
@@ -43,18 +43,18 @@ class LinuxAssimilator(object):
 	    SLES10 = LinuxAssimilator.SLES10_PAYLOAD,
 	    SLES11 = LinuxAssimilator.SLES11_PAYLOAD,
 	)
-	payload = PAYLOAD_MAP.get(self.flavor, None)
+	payload = PAYLOAD_MAP.get(self.osFamily, None)
 	if payload is None:
-	    raise Exception("no payload for flavor: " + self.flavor)	
-	self._prepare_payload_if_needed(self.flavor, payload)
+	    raise Exception("no payload for family: " + self.osFamily)	
+	self._preparePayloadIfNeeded(self.osFamily, payload)
 	return payload
 
-    def _commands_for_flavor(self):
+    def _commandsForFamily(self):
 	'''
 	Once an assimilation payload has been deployed on a system
 	we have to run some commands to take it the rest of the
-	way with registration.  This is likely not flavor specific
-	but it might be, if it IS flavor specific the preferred way
+	way with registration.  This is likely not family specific
+	but it might be, if it IS family specific the preferred way
 	of handling it is a different bootstrap.sh in the payload.
 	'''
 	commands = []
@@ -63,31 +63,31 @@ class LinuxAssimilator(object):
 	     "sh /tmp/assimilator/bootstrap.sh")
 	return commands
 
-    def _prepare_payload_if_needed(self, flavor, payload):
+    def _preparePayloadIfNeeded(self, family, payload):
         '''
 	If the payload file does not exist yet on the worker,
 	we may build it.  QUESTION: what if we need to build a new 
 	payload version?  should we rebuild every so often based on dates?
         '''
 	if not os.path.exists(payload):
-            self._prepare_payload(flavor, payload)
+            self._preparePayload(family, payload)
             if not os.path.exists(payload):
                 raise Exception('payload preparation failed')
 
-    def _prepare_payload(self, flavor, payload):
+    def _preparePayload(self, family, payload):
 	'''
 	Build the assimilation payload on the worker if it does not 
 	already exist.
 	'''
         raise exceptions.NotImplementedError("worker can't build a payload yet`")
 
-    def run_cmd(self, cmd):
+    def runCmd(self, cmd):
 	''' 
 	Run command via SSH, logging into buffer
 	'''
 	output = "\n(running) %s:\n" % cmd
-	rc, cmd_output = self.ssh.exec_command(cmd)
-	output += "\n%s" % cmd_output
+	rc, cmdOutput = self.ssh.execCommand(cmd)
+	output += "\n%s" % cmdOutput
 	return rc, output
 
     def assimilate(self):
@@ -99,19 +99,19 @@ class LinuxAssimilator(object):
 	system is now enslaved.
 	'''
 
-	all_output = ""
+	allOutput = ""
 	# place the deploy tarball onto the system
-        self.ssh.put_file(self.payload, "/tmp/rpath_assimilator.tar")
+        self.ssh.putFile(self.payload, "/tmp/rpath_assimilator.tar")
 
         # run the series of assimilation commands
         for cmd in self.commands:
-	    rc, output = self.run_cmd(cmd)
-	    all_output += "\n%s" % output
+	    rc, output = self.runCmd(cmd)
+	    allOutput += "\n%s" % output
 	    if rc != 0:
 		raise Exception("Assimilator failed nonzero (%s, %s), " + 
-		    "thus far=\n%s" % (cmd, rc, all_output))
+		    "thus far=\n%s" % (cmd, rc, allOutput))
 
         # all commands successful
         self.ssh.close()
-        return (0, all_output)
+        return (0, allOutput)
 
