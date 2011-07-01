@@ -155,6 +155,10 @@ class AssimilatorTest(TestBase):
                 # do not attempt to create files on local
                 # filesystem if they don't exist
                 pass
+            def _versionFromRedHatRelease(self, output):
+                return 'EL5'
+
+    def _versionFromRedHatRelease(self, output):
 
         asim = SlightlyWeakenedAssimilator(conn)
         rc, allOutput = asim.assimilate()

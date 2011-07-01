@@ -4,6 +4,7 @@
 
 import exceptions
 import os
+import re
 
 class LinuxAssimilator(object):
     """
@@ -16,9 +17,8 @@ class LinuxAssimilator(object):
     """
 
     # paths that payloads are stored on the workers.  It is intended
-    # that the system will create them here if they do not exist
-    # (see prepare_payload function) by triggering a build from this
-    # module?   Probably should be more like /var/lib/...
+    # that they'll be fetched from the rbuilders if not present
+    # TODO: probably should be more like /var/lib/...
     EL5_PAYLOAD    = "/tmp/assimilator_EL5_payload.tar"
     EL6_PAYLOAD    = "/tmp/assimilator_EL6_payload.tar"
     SLES10_PAYLOAD = "/tmp/assimilator_SLES10_payload.tar"
@@ -26,7 +26,6 @@ class LinuxAssimilator(object):
 
     def __init__(self, sshConnector):
         self.ssh       = sshConnector
-        # FIXME/TODO: auto detect OS family
         self.osFamily  = self._discoverFamily()
         self.payload   = self._payloadForFamily()
         self.commands  = self._commandsForFamily()
@@ -44,14 +43,14 @@ class LinuxAssimilator(object):
                 raise Exception("unable to detect OS family")
 
     def _versionFromRedHatRelease(self, output):
-        '''Parse CentOS/RHEL version from /etc/redhat/release data'''
-        # TODO: finish
-        return 'EL5'
+        '''Parse CentOS/RHEL version from /etc/redhat-release data'''
+        matches = re.findall('\d+', output.split("\n")[0])
+        return "EL%s" % matches[0]
 
     def _versionFromSuseRelease(self, output):
-        '''Parse SuSE version'''
-        # TODO: finish
-        return 'SLES6'
+        '''Parse SuSE version from /etc/SuSE-release data'''
+        matches = re.findall('\d+', output.split("\n")[0])
+        return "SLES%s" % matches[0]
         
     def _payloadForFamily(self):
         ''' 
@@ -81,7 +80,8 @@ class LinuxAssimilator(object):
         '''
         commands = []
         commands.append("cd /tmp; tar -xf rpath_assimilator.tar")
-        commands.append("cd /tmp/assimilator; sh /tmp/assimilator/bootstrap.sh")
+        commands.append("cd /tmp/assimilator; " + \
+            "sh /tmp/assimilator/bootstrap.sh")
         return commands
 
     def _preparePayloadIfNeeded(self, family, payload):
@@ -95,10 +95,11 @@ class LinuxAssimilator(object):
 
     def _preparePayload(self, family, payload):
        '''
-       Build the assimilation payload on the worker if it does not 
-       already exist.
+       Retrieve the assimilation payload on the worker 
+       (from the rbuilder) if it does not already exist.
        '''
-       raise exceptions.NotImplementedError("worker can't build a payload yet`")
+       raise exceptions.NotImplementedError( \
+           "worker can't download a payload yet`")
 
     def runCmd(self, cmd):
        ''' 
