@@ -143,7 +143,7 @@ class BootstrapTask(AssimilatorTaskHandler):
 
         conn = SshConnector(host=host, port=port, user=user, 
             password=password, key=key)
- 
+
         asim = LinuxAssimilator(conn)
         try:
             rc, output = asim.assimilate()
