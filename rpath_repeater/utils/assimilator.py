@@ -27,10 +27,32 @@ class LinuxAssimilator(object):
     def __init__(self, sshConnector):
         self.ssh       = sshConnector
         # FIXME/TODO: auto detect OS family
-        self.osFamily  = 'EL6'
+        self.osFamily  = self._discoverFamily()
         self.payload   = self._payloadForFamily()
         self.commands  = self._commandsForFamily()
 
+    def _discoverFamily(self):
+        '''what kind of Linux OS is this?'''
+        rc, output = self.ssh.execCommand('cat /etc/redhat-release')
+        if rc == 0:
+            return self._versionFromRedHatRelease(output)
+        else:
+            rc, output = self.ssh.execCommand('cat /etc/SuSE-release')
+            if rc == 0:
+                return self._versionFromSuseRelease(output)
+            else:
+                raise Exception("unable to detect OS family")
+
+    def _versionFromRedHatRelease(self, output):
+        '''Parse CentOS/RHEL version from /etc/redhat/release data'''
+        # TODO: finish
+        return 'EL5'
+
+    def _versionFromSuseRelease(self, output):
+        '''Parse SuSE version'''
+        # TODO: finish
+        return 'SLES6'
+        
     def _payloadForFamily(self):
         ''' 
         Determine the appropriate payload file to transfer to the remote 
@@ -70,8 +92,6 @@ class LinuxAssimilator(object):
         '''
         if not os.path.exists(payload):
             self._preparePayload(family, payload)
-            if not os.path.exists(payload):
-                raise Exception('payload preparation failed')
 
     def _preparePayload(self, family, payload):
        '''
@@ -113,3 +133,4 @@ class LinuxAssimilator(object):
         # all commands successful
         self.ssh.close()
         return (0, allOutput)
+

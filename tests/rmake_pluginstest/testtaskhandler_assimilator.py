@@ -149,7 +149,14 @@ class AssimilatorTest(TestBase):
             clientClass=MockSshClient, 
             sftpClass=MockSftpClient,
         )
-        asim = LinuxAssimilator(conn)
+
+        class SlightlyWeakenedAssimilator(LinuxAssimilator):
+            def _preparePayload(self, family, payload):
+                # do not attempt to create files on local
+                # filesystem if they don't exist
+                pass
+
+        asim = SlightlyWeakenedAssimilator(conn)
         rc, allOutput = asim.assimilate()
         self.failUnlessEqual(rc, 0, 'successful assimilator return code')
         # call more tests here, defined in classes above
