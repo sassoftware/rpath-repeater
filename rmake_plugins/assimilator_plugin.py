@@ -118,8 +118,7 @@ class BootstrapTask(AssimilatorTaskHandler):
 
         # do actual boostraping heavy lifting:
         retVal, outParams = self._bootstrap(host=data.p.host, port=data.p.port, \
-            user=data.p.sshUser, password=data.p.sshPassword, key=data.p.sshKey, \
-            uuid=data.p.eventUuid)
+            sshAuth=data.p.sshAuth, uuid=data.p.eventUuid)
 
         # FIXME: return appropriate XML
         data.response = "<system/>"
@@ -135,22 +134,37 @@ class BootstrapTask(AssimilatorTaskHandler):
                 "Host %s bootstrap failed: %s" %
                     (data.p.host, errorSummary), errorDetails)
 
-    def _bootstrap(self,host=None,port=None,user=None, 
-        password=None, key=None, uuid=None):
+    def _bootstrap(self, host=None, port=None, sshAuth=None, uuid=None):
         '''
-        Guts of actual bootstrap code goes here...
+        Guts of actual bootstrap code...
         '''
 
-        conn = SshConnector(host=host, port=port, user=user, 
-            password=password, key=key)
+        sshConn = None
+        savedException = None
 
-        asim = LinuxAssimilator(conn)
-        try:
-            rc, output = asim.assimilate()
-        finally:
-            conn.close()
+        # try all provided SSH permutations
+        for auth in sshAuth:
+            user     = auth.get('sshUser', None)
+            password = auth.get('sshPassword', None)
+            key      = auth.get('sshKey', None)
+            try:
+                sshConn = SshConnector(host=host, port=port, 
+                    user=user, password=password, key=key)
+                break
+            except Exception, e:
+                savedException = e
 
+        # re-raise last error if we haven't connected on any attempts
+        if sshConn is None and savedException:
+            raise savedException
+
+        # all assimilation logic lives in the assimilator, feed it
+        # our first working SSH connection
+        asim = LinuxAssimilator(sshConn)
+        rc, output = asim.assimilate()
+        sshConn.close()
         outParams = {}
+
         if rc != 0:
             outParams = dict(
                 errorSummary = 'remote operations failed',

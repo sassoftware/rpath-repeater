@@ -120,8 +120,9 @@ class AssimilatorParams(_BaseSlotCompare):
     '''
     Information required to assimilate a Linux system via SSH
     '''
-    __slots__ = [ 'host', 'port', 'sshUser', 'sshPassword', 'sshKey', 
-        'eventUuid' ]
+    # sshAuth is a list of hashes to try, like so:
+    # [{ 'sshUser' : user, 'sshPassword' : pass, 'sshKey' : key_path_or_bytes }, {...}, ...]
+    __slots__ = [ 'host', 'port', 'sshAuth', 'eventUuid' ]
 
 class ManagementInterfaceParams(_BaseSlotCompare):
     """

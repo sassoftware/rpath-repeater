@@ -256,11 +256,15 @@ def main():
         password="password",
         domain=system)
     assimilatorParams = cli.AssimilatorParams(host=system, port=22,
-        sshUser='root',
-        sshPassword='root_password',
-        #sshKey=None,
-        #sshKey='/root/.ssh/id_rsa',
-        eventUuid=eventUuid)
+        eventUuid='eventUuid',
+        sshAuth = [{
+            'sshUser' : 'root',
+            'sshPassword' : 'root_password',
+            # sshKey='/root/.ssh/id_rsa',
+        }, {
+            'sshUser' : 'root',
+            'sshPassword' : 'password',
+        }])
 
     if 0:
         uuid, job = cli.register_cim(cimParams)
