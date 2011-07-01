@@ -158,8 +158,6 @@ class AssimilatorTest(TestBase):
             def _versionFromRedHatRelease(self, output):
                 return 'EL5'
 
-    def _versionFromRedHatRelease(self, output):
-
         asim = SlightlyWeakenedAssimilator(conn)
         rc, allOutput = asim.assimilate()
         self.failUnlessEqual(rc, 0, 'successful assimilator return code')
