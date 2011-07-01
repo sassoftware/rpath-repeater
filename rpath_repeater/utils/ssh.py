@@ -2,7 +2,6 @@
 # SSH node communication tools
 
 import paramiko
-from contextlib import contextmanager
 
 class SshConnector(object):
 
@@ -40,18 +39,20 @@ class SshConnector(object):
        client.load_system_host_keys()
        # might want an 'ignore' policy that doesn't chirp to stderr later
        client.set_missing_host_key_policy(paramiko.WarningPolicy())
-       if self.key:
+       if self.key and self.key != '':
            # try the ssh key, password protected keys are ok
            try:
                client.connect(self.host, port=self.port,
-                   password=self.password, key_filename=self.key)
+                   password=self.password, key_filename=self.key,
+                   allow_agent=True) # look_for_keys=True)
            except paramiko.PasswordRequiredException:
                # this won't retry the unlock password as your username/password
                raise Exception("invalid key password")
        else:
            # no key provided, try username/password
            client.connect(self.host, port=self.port, username=self.user,
-               password=self.password)
+               password=self.password, allow_agent=True)
+               # look_for_keys=True)
        return client
 
     def close(self):
@@ -68,31 +69,26 @@ class SshConnector(object):
         results = results[0:-2].strip()
         return (status, results)
 
-    @contextmanager
-    def _closing(self, thing):
-        '''Always close things'''
-        try:
-            yield thing
-        finally:
-            thing.close
-
     def _sftp(self):
         '''Create a SFTP connection'''
         return self.sftpClass.from_transport(self.client.get_transport())
 
     def putFile(self, localFile, remoteFile):
         '''place a file on the remote system'''
-        with self._closing(self._sftp()) as sftp:
-            sftp.put(localFile, remoteFile)
+        sftp = self._sftp()
+        sftp.put(localFile, remoteFile)
+        sftp.close()
 
     def getFile(self, remoteFile, localFile):
         '''download a remote file'''
-        with self._closing(self._sftp()) as sftp:
-            sftp.get(remoteFile, localFile)
+        sftp = self._sftp()
+        sftp.get(remoteFile, localFile)
+        sftp.close()
 
     def unlink(self, remoteFile):
         '''delete a remote file'''
-        with self._closing(self._sftp()) as sftp:
-            sftp.unlink(remoteFile)
+        sftp = self._sftp()
+        sftp.unlink(remoteFile)
+        sftp.close()
 
 

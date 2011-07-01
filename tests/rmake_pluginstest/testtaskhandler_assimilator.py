@@ -23,7 +23,7 @@ class MockStream(object):
         due to our implementation and the way we run commands
         the last line is an exit code
         '''
-        # TODO: this should vary based on the command, right?
+        # TODO: test the failure case?
         if self.should_pass:
             return "it worked\n0\n"
         else:
@@ -101,9 +101,7 @@ class MockSftpClient(object):
     @classmethod
     def tests_ok(cls, test):
         test.failUnless(cls.COUNT_PUT   > 0,  'puts a file')
-        # FIXME: -- decorator in SSHConnector not working?, needs to be fixed
-        #print "CLOSE COUNT = " + str(cls.COUNT_CLOSE)
-        #test.failUnless(cls.COUNT_CLOSE > 0,  'remembers to close')
+        test.failUnless(cls.COUNT_CLOSE > 0,  'remembers to close')
 
 
 class AssimilatorTest(TestBase):
@@ -134,7 +132,6 @@ class AssimilatorTest(TestBase):
             sshPassword='root_password',
             sshKey='',
             eventUuid='deadbeef',
-            osFamily='EL6'
         )   
         defaults.update(kwargs)
         return self.client.AssimilatorParams(**defaults)
@@ -152,10 +149,8 @@ class AssimilatorTest(TestBase):
             clientClass=MockSshClient, 
             sftpClass=MockSftpClient,
         )
-        osFamily = 'EL6'
-        asim = LinuxAssimilator(conn, osFamily)
+        asim = LinuxAssimilator(conn)
         rc, allOutput = asim.assimilate()
-        #print "ASSIMILATOR OUTPUT : %s\n" % all_output
         self.failUnlessEqual(rc, 0, 'successful assimilator return code')
         # call more tests here, defined in classes above
         MockSshClient.tests_ok(self)

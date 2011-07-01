@@ -58,7 +58,7 @@ class AssimilatorHandler(bfp.BaseHandler):
 
     @classmethod
     def initParams(cls, data):
-        return AssimilatorParams(**data.pop('sshParams', {}))
+        return AssimilatorParams(**data.pop('assimilatorParams', {}))
 
     @classmethod
     def _getArgs(cls, taskType, params, methodArguments, zoneAddresses):
@@ -107,18 +107,19 @@ class BootstrapTask(AssimilatorTaskHandler):
     def _run(self, data):
         '''
         Task entry point, including normal task boilerplate 
-        FIXME: refactor
         '''
+
+        if not data.p.port:
+            data.p.port = 22
 
         self.sendStatus(C.MSG_BOOTSTRAP_REQ,
             "Contacting host %s on port %d to bootstrap"
                 % (data.p.host, data.p.port))
-        p = data.p
 
         # do actual boostraping heavy lifting:
-        retVal, outParams = self._bootstrap(host=p.host, port=p.port, \
-            user=p.sshUser, password=p.sshPassword, key=p.sshKey, \
-            uuid=p.eventUuid)
+        retVal, outParams = self._bootstrap(host=data.p.host, port=data.p.port, \
+            user=data.p.sshUser, password=data.p.sshPassword, key=data.p.sshKey, \
+            uuid=data.p.eventUuid)
 
         # FIXME: return appropriate XML
         data.response = "<system/>"
@@ -135,25 +136,29 @@ class BootstrapTask(AssimilatorTaskHandler):
                     (data.p.host, errorSummary), errorDetails)
 
     def _bootstrap(self,host=None,port=None,user=None, 
-        password=None, key=None, uuid=None, osFamily='RHEL5'):
-	# FIXME: make osFamily a constant, add to AssimilatorParams
+        password=None, key=None, uuid=None):
         '''
         Guts of actual bootstrap code goes here...
-        FIXME: finish this, add a utils/bootstrapper class that uses
-        the utils.ssh.SshConnector
         '''
 
         conn = SshConnector(host=host, port=port, user=user, 
             password=password, key=key)
-        conn.close()
+ 
+        asim = LinuxAssimilator(conn)
+        try:
+            rc, output = asim.assimilate()
+        finally:
+            conn.close()
 
-        asim = LinuxAssimilator(conn, osFamily)
-        asim.assimilate()
+        outParams = {}
+        if rc != 0:
+            outParams = dict(
+                errorSummary = 'remote operations failed',
+                errorDetails = output
+            )
+        else:
+            output = dict()
 
-        outParams = dict(
-           errorSummary = '',
-           errorDetails = ''
-        )
-        return (1, outParams)
+        return (rc, outParams)
         
 

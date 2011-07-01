@@ -13,7 +13,6 @@
 
 import sys
 import time
-import os.path
 
 from conary.lib import util
 
@@ -258,7 +257,9 @@ def main():
         domain=system)
     assimilatorParams = cli.AssimilatorParams(host=system, port=22,
         sshUser='root',
-        sshKey=os.path.expanduser('~/.ssh/id_rsa'),
+        sshPassword='root_password',
+        #sshKey=None,
+        #sshKey='/root/.ssh/id_rsa',
         eventUuid=eventUuid)
 
     if 0:

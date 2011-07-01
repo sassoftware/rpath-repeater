@@ -9,11 +9,10 @@ class LinuxAssimilator(object):
     """
     Assimiles a Linux system
     
-    sshConn = utils.SshConnection(...)
-    osFamily = 'EL5' # FIXME: constant
-
-    usage:  asim = LinuxAssimilator(sshConn, osFamily)
-            asim.assimilate()
+    usage:
+        sshConn = utils.SshConnection(...)
+        asim = LinuxAssimilator(sshConn)
+        asim.assimilate()
     """
 
     # paths that payloads are stored on the workers.  It is intended
@@ -25,9 +24,10 @@ class LinuxAssimilator(object):
     SLES10_PAYLOAD = "/tmp/assimilator_SLES10_payload.tar"
     SLES11_PAYLOAD = "/tmp/assimilator_SLES11_payload.tar"
 
-    def __init__(self, sshConnector, osFamily):
+    def __init__(self, sshConnector):
         self.ssh       = sshConnector
-        self.osFamily  = osFamily
+        # FIXME/TODO: auto detect OS family
+        self.osFamily  = 'EL6'
         self.payload   = self._payloadForFamily()
         self.commands  = self._commandsForFamily()
 
