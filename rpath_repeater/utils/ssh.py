@@ -40,10 +40,11 @@ class SshConnector(object):
        # might want an 'ignore' policy that doesn't chirp to stderr later
        client.set_missing_host_key_policy(paramiko.WarningPolicy())
        if self.key and self.key != '':
+           self.key = paramiko.PKey(data=self.key)
            # try the ssh key, password protected keys are ok
            try:
                client.connect(self.host, port=self.port,
-                   password=self.password, key_filename=self.key,
+                   password=self.password, pkey=self.key,
                    allow_agent=True) # look_for_keys=True)
            except paramiko.PasswordRequiredException:
                # this won't retry the unlock password as your username/password

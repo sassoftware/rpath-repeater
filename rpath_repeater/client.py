@@ -255,17 +255,6 @@ def main():
         username="Administrator",
         password="password",
         domain=system)
-    assimilatorParams = cli.AssimilatorParams(host=system, port=22,
-        eventUuid='eventUuid',
-        sshAuth = [{
-            'sshUser' : 'root',
-            'sshPassword' : 'root_password',
-            # sshKey='/root/.ssh/id_rsa',
-        }, {
-            'sshUser' : 'root',
-            'sshPassword' : 'password',
-        }])
-
     if 0:
         uuid, job = cli.register_cim(cimParams)
     elif 0:
@@ -315,6 +304,27 @@ def main():
         ]
         uuid, job = cli.download_images(images)
     else:
+       
+        keyData = file("/root/.ssh/id_rsa.pub").read() 
+        assimilatorParams = cli.AssimilatorParams(host=system, port=22,
+            eventUuid='eventUuid',
+            sshAuth = [
+                           { 
+                               'sshUser'     : 'root', 
+                               'sshKey'      : keyData,
+                               'sshPassword' : 'letmein',
+                           },
+                           { 
+                               'sshUser'     : 'root', 
+                               'sshPassword' : 'wrong1' 
+                           },
+                           { 
+                               'sshUser'     : 'root', 
+                               'sshPassword' : 'wrong2' 
+                           },
+            ]
+        )
+
         uuid, job = cli.bootstrap(assimilatorParams,
             resultsLocation = resultsLocation,
             zone = zone)

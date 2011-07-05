@@ -86,9 +86,7 @@ class LinuxAssimilator(object):
 
     def _preparePayloadIfNeeded(self, family, payload):
         '''
-        If the payload file does not exist yet on the worker,
-        we may build it.  QUESTION: what if we need to build a new 
-        payload version?  should we rebuild every so often based on dates?
+        Decides whether to download the payload
         '''
         if not os.path.exists(payload):
             self._preparePayload(family, payload)
