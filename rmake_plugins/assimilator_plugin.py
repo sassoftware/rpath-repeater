@@ -141,6 +141,7 @@ class BootstrapTask(AssimilatorTaskHandler):
 
         sshConn = None
         savedException = None
+        import epdb; epdb.st()
 
         # try all provided SSH permutations
         for auth in sshAuth:
