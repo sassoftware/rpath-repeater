@@ -159,7 +159,7 @@ class AssimilatorTest(TestBase):
                 return 'EL5'
 
         asim = SlightlyWeakenedAssimilator(conn)
-        rc, allOutput = asim.assimilate()
+        rc, allOutput = asim.assimilate(['one.example.com','two.example.com'])
         self.failUnlessEqual(rc, 0, 'successful assimilator return code')
         # call more tests here, defined in classes above
         MockSshClient.tests_ok(self)

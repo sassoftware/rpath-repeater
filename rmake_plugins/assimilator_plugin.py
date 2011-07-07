@@ -50,6 +50,7 @@ class AssimilatorHandler(bfp.BaseHandler):
     This may change in the future if additional jobs are required.
     """
 
+    RegistrationTaskNS = ASSIMILATOR_TASK_BOOTSTRAP
     jobType = ASSIMILATOR_JOB
     firstState = 'sshCall' 
 
@@ -118,7 +119,7 @@ class BootstrapTask(AssimilatorTaskHandler):
 
         # do actual boostraping heavy lifting:
         retVal, outParams = self._bootstrap(host=data.p.host, port=data.p.port, \
-            sshAuth=data.p.sshAuth, uuid=data.p.eventUuid)
+            nodes=data.nodes, sshAuth=data.p.sshAuth, uuid=data.p.eventUuid)
 
         # xml doesn't contain much, this returns what the CIM task returns...
         data.response = "<system/>"
@@ -134,7 +135,7 @@ class BootstrapTask(AssimilatorTaskHandler):
                 "Host %s bootstrap failed: %s" %
                     (data.p.host, errorSummary), errorDetails)
 
-    def _bootstrap(self, host=None, port=None, sshAuth=None, uuid=None):
+    def _bootstrap(self, host=None, port=None, nodes=None, sshAuth=None, uuid=None):
         '''
         Guts of actual bootstrap code...
         '''
@@ -161,7 +162,7 @@ class BootstrapTask(AssimilatorTaskHandler):
         # all assimilation logic lives in the assimilator, feed it
         # our first working SSH connection
         asim = LinuxAssimilator(sshConn)
-        rc, output = asim.assimilate()
+        rc, output = asim.assimilate(nodes)
         sshConn.close()
         outParams = {}
 

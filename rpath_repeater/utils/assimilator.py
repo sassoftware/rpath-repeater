@@ -28,7 +28,6 @@ class LinuxAssimilator(object):
         self.ssh       = sshConnector
         self.osFamily  = self._discoverFamily()
         self.payload   = self._payloadForFamily()
-        self.commands  = self._commandsForFamily()
 
     def _discoverFamily(self):
         '''what kind of Linux OS is this?'''
@@ -70,7 +69,7 @@ class LinuxAssimilator(object):
         self._preparePayloadIfNeeded(self.osFamily, payload)
         return payload
 
-    def _commandsForFamily(self):
+    def _commands(self, node_addrs):
         '''
         Once an assimilation payload has been deployed on a system
         we have to run some commands to take it the rest of the
@@ -78,10 +77,11 @@ class LinuxAssimilator(object):
         but it might be, if it IS family specific the preferred way
         of handling it is a different bootstrap.sh in the payload.
         '''
+        node_list = ",".join(node_addrs)
         commands = []
         commands.append("cd /tmp; tar -xf rpath_assimilator.tar")
         commands.append("cd /tmp/assimilator; " + \
-            "sh /tmp/assimilator/bootstrap.sh")
+            "sh /tmp/assimilator/bootstrap.sh %s" % node_list)
         return commands
 
     def _preparePayloadIfNeeded(self, family, payload):
@@ -108,21 +108,24 @@ class LinuxAssimilator(object):
        output += "\n%s" % cmdOutput
        return rc, output
 
-    def assimilate(self):
+    def assimilate(self, node_addrs):
         '''
         An SSH connection has been passed in and we now know what payloads
         we want to deploy onto the system, and what post commands to run.
         Make it happen.  Returns (return_code, concatenated_output) as a 
         tuple. If there are no exceptions (and the tarball was correct) the
-        system is now enslaved.
+        system is now enslaved.   Node_addrs are rmake3 worker nodes.
         '''
+
 
         allOutput = ""
         # place the deploy tarball onto the system
         self.ssh.putFile(self.payload, "/tmp/rpath_assimilator.tar")
+        
+        commands  = self._commands(node_addrs)
 
         # run the series of assimilation commands
-        for cmd in self.commands:
+        for cmd in commands:
             rc, output = self.runCmd(cmd)
             allOutput += "\n%s" % output
             if rc != 0:
