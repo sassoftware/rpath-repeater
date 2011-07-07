@@ -334,7 +334,6 @@ def main():
             break
         time.sleep(1)
     print "Failed: %s" % job.status.failed
-    #import epdb; epdb.st()
 
 if __name__ == "__main__":
     main()

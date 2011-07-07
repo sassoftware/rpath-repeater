@@ -120,7 +120,7 @@ class BootstrapTask(AssimilatorTaskHandler):
         retVal, outParams = self._bootstrap(host=data.p.host, port=data.p.port, \
             sshAuth=data.p.sshAuth, uuid=data.p.eventUuid)
 
-        # FIXME: return appropriate XML
+        # xml doesn't contain much, this returns what the CIM task returns...
         data.response = "<system/>"
         self.setData(data)
 
@@ -141,7 +141,6 @@ class BootstrapTask(AssimilatorTaskHandler):
 
         sshConn = None
         savedException = None
-        import epdb; epdb.st()
 
         # try all provided SSH permutations
         for auth in sshAuth:
