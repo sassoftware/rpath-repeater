@@ -124,8 +124,14 @@ class Servicing(object):
     def c2d(node):
         return dict((x.tag, x) for x in node.iterchildren())
 
+    def _handle_unicode_header(self, fobj):
+        header = fobj.read(3)
+        if header != '\xef\xbb\xbf':
+            fobj.seek(0)
+        return fobj
+
     def iterpackageresults(self, fobj):
-        root = etree.parse(fobj).getroot()
+        root = etree.parse(self._handle_unicode_header(fobj)).getroot()
         updateJobs = self.c2d(root).get('updateJobs')
 
         for update in updateJobs.iterchildren():
@@ -147,7 +153,7 @@ class Servicing(object):
                 yield operation, trvSpec.text, status
 
     def iterconfigresults(self, fobj):
-        root = etree.parse(fobj).getroot()
+        root = etree.parse(self._handle_unicode_header(fobj)).getroot()
         updateJobs = self.c2d(root).get('updateJobs')
 
         for config in updateJobs.iterchildren():
