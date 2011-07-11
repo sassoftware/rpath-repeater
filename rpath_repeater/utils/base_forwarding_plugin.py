@@ -247,6 +247,7 @@ class BaseTaskHandler(plug_worker.TaskHandler):
             formatTrace(typ, value, tb, stream = out, withLocals = True)
             formatTrace(typ, value, tb, stream = sys.stderr, withLocals = True)
 
+            log.error(out.getvalue())
             self.sendStatus(C.ERR_GENERIC, "Error: %s" % (self.InterfaceName,
                 str(value)), out.getvalue())
 
