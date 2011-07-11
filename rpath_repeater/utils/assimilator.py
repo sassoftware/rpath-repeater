@@ -5,6 +5,7 @@
 import exceptions
 import os
 import re
+import subprocess
 
 class LinuxAssimilator(object):
     """
@@ -135,4 +136,120 @@ class LinuxAssimilator(object):
         # all commands successful
         self.ssh.close()
         return (0, allOutput)
+
+class LinuxAssimilatorBuilder(object):
+     """
+     Returns the assimilator payload needed to assimilate a platform, creating
+     if neccessary.
+
+     Usage:
+         lab = LinuxAssimilatorBuilder(platform='EL6')
+         path = lab.getAssimilator()
+     """
+     
+     # FIXME: modify OS detector to return a tuple of 
+     # (distro, major) so this code doesn't need to be continually
+     # modified
+     LABEL_MAP = {
+          'EL5'    : 'centos.rpath.com@rpath:centos-5-common',
+          'EL6'    : 'centos.rpath.com@rpath:centos-6-common',
+          'RHEL5'  : 'centos.rpath.com@rpath:rhel-5-common',
+          'RHEL6'  : 'centos.rpath.com@rpath:rhel-6-common',
+          'SLES10' : 'sles.rpath.com@rpath:sles-10-common',
+          'SLES11' : 'sles.rpath.com@rpath:sles-11-common',
+     }
+
+     # shell script to launch after extracting tarball
+     # FIXME: zoneAddress parameters probably not passed in 
+     # correctly as implemented right now
+     BOOTSTRAP_SH = '''
+# rPath Linux assimilation bootstrap script
+conary install conary sblim-sfcb-conary sblim-sfcb-schema-conary \
+    sblim-cmpi-network-conary openslp-conary info-sfcb
+rpath-register "$@"
+'''
+
+     def __init__(self, platform=None, forceRebuild=False):
+          '''Does not build the payload, just gets parameters ready'''
+          self.buildRoot = "/tmp/rpath_assimilate_%s_build" % platform
+          self.buildResult = "/tmp/rpath_assimilate_%s.tar" % platform 
+          self.groups = [
+              "group-rpath-tools",
+              "rpath-tools",
+          ]
+          supportedPlatforms = LinuxAssimilatorBuilder.LABEL_MAP.keys()
+          if platform not in supportedPlatforms:
+              raise Exception("unsupported platform %s" % platform)
+          self.rLabel = LinuxAssimilatorBuilder.LABEL_MAP[platform]
+          self.cmdFlags = "--no-deps --no-restart --no-interactive"
+          self.cmdRoot  = "--root %s" % self.buildRoot
+          self.cmdLabel = "--install-label %s" % self.rLabel
+          self.cmdGroups = " ".join(self.groups)
+          self.forceRebuild = forceRebuild
+
+     def getAssimilator(self):
+          '''Return the path to the assimilator, rebuilding if needed'''
+          if self._isStaleOrMissing():
+              self._buildTarball()
+          return self.buildResult
+
+     def _isStaleOrMissing(self):
+          '''Does the assimilator need a rebuild?'''
+          if not os.path.exists(self.buildResult):
+              return 1
+          if self.forceRebuild:
+              os.unlink(self.buildResult)
+              return 1
+          # FIXME: add staleness detection code
+          # here, which will delete the file & buildRoot
+          return 0
+
+     def _buildTarball(self):
+          '''Builds assimilator on the worker node'''
+          # create build directory
+          try: 
+              os.makedirs(self.buildRoot)
+          except OSError:
+              pass
+
+          # run conary to extract contents inside build root
+          cmd = "conary update %s %s %s %s" % (self.cmdFlags, self.cmdRoot, 
+              self.cmdLabel, self.cmdGroups)
+          # print "XDEBUG: cmd=%s" % cmd
+          rc = subprocess.call(cmd, shell=True)
+          if rc != 0:
+              # no exception because return codes seem unreliable?
+              print "conary failed: %s, %s" % (cmd, rc)
+
+          # create bootstrap script in /tmp
+          tmp = os.path.join(self.buildRoot, 'tmp')
+          try:
+              os.makedirs(tmp)
+          except OSError:
+              pass
+          bootstrap = os.path.join(tmp, 'bootstrap.sh')
+          # print "XDEBUG: bootstrap file=%s" % bootstrap
+          bootstrapFh = open(bootstrap, 'w+')
+          bootstrapFh.write(LinuxAssimilatorBuilder.BOOTSTRAP_SH)
+          bootstrapFh.close()
+ 
+          # tar up data and return the path
+          working = os.getcwd()
+          os.chdir(self.buildRoot)
+          cmd = "tar cvf %s *" % (self.buildResult)
+          # print "XDEBUG: cmd=%s" % cmd
+          rc = subprocess.call(cmd, shell=True)
+          if rc != 0:
+              raise Exception("tar failed: %s" % cmd)
+          if not os.path.exists(self.buildResult):
+              raise Exception("creation failed")
+          os.chdir(working)
+          return self.buildResult
+
+if __name__ == '__main__':
+    # sample test build...
+    # FIXME: OS detector code needs to understand how to detect CentOS vs RHEL
+    builder = LinuxAssimilatorBuilder(platform='EL5', forceRebuild=True)
+    print builder.getAssimilator()
+  
 
