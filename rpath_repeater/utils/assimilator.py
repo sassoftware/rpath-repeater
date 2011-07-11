@@ -17,24 +17,24 @@ class LinuxAssimilator(object):
         asim.assimilate()
     """
 
-    # paths that payloads are stored on the workers.  It is intended
-    # that they'll be fetched from the rbuilders if not present
-    # TODO: probably should be more like /var/lib/...
-    EL5_PAYLOAD    = "/tmp/assimilator_EL5_payload.tar"
-    EL6_PAYLOAD    = "/tmp/assimilator_EL6_payload.tar"
-    SLES10_PAYLOAD = "/tmp/assimilator_SLES10_payload.tar"
-    SLES11_PAYLOAD = "/tmp/assimilator_SLES11_payload.tar"
-
     def __init__(self, sshConnector):
         self.ssh       = sshConnector
         self.osFamily  = self._discoverFamily()
-        self.payload   = self._payloadForFamily()
+        self.builder   = LinuxAssimilatorBuilder(osFamily=self.osFamily)
+        self.payload   = self._makePayload()
+
+    def _makePayload(self):
+        '''what tarball to deploy? stubbed out for easier mock testing'''
+        return self.builder.getAssimilator()
 
     def _discoverFamily(self):
         '''what kind of Linux OS is this?'''
         rc, output = self.ssh.execCommand('cat /etc/redhat-release')
         if rc == 0:
-            return self._versionFromRedHatRelease(output)
+            if output.find("Red Hat") != -1:
+                return self._versionFromRedHatRelease(output)
+            else:
+                return self._versionFromCentOSRelease(output)
         else:
             rc, output = self.ssh.execCommand('cat /etc/SuSE-release')
             if rc == 0:
@@ -43,33 +43,20 @@ class LinuxAssimilator(object):
                 raise Exception("unable to detect OS family")
 
     def _versionFromRedHatRelease(self, output):
-        '''Parse CentOS/RHEL version from /etc/redhat-release data'''
+        '''Parse RHEL version from /etc/redhat-release data'''
         matches = re.findall('\d+', output.split("\n")[0])
-        return "EL%s" % matches[0]
+        return ('RHEL', matches[0])
+
+    def _versionFromCentOSRelease(self, output):
+        '''Parse CentOS version from /etc/redhat-release data'''
+        matches = re.findall('\d+', output.split("\n")[0])
+        return ('CentOS', matches[0])
 
     def _versionFromSuseRelease(self, output):
         '''Parse SuSE version from /etc/SuSE-release data'''
         matches = re.findall('\d+', output.split("\n")[0])
-        return "SLES%s" % matches[0]
+        return ('SLES', matches[0])
         
-    def _payloadForFamily(self):
-        ''' 
-        Determine the appropriate payload file to transfer to the remote 
-        system.  If the payload doesn't exist, we'll likely build it on 
-        the worker.  Raises an error for unsupported payloads.
-        '''
-        PAYLOAD_MAP = dict(
-            EL5    = LinuxAssimilator.EL5_PAYLOAD,
-            EL6    = LinuxAssimilator.EL6_PAYLOAD,
-            SLES10 = LinuxAssimilator.SLES10_PAYLOAD,
-            SLES11 = LinuxAssimilator.SLES11_PAYLOAD,
-        )
-        payload = PAYLOAD_MAP.get(self.osFamily, None)
-        if payload is None:
-            raise Exception("no payload for family: " + self.osFamily)	
-        self._preparePayloadIfNeeded(self.osFamily, payload)
-        return payload
-
     def _commands(self, node_addrs):
         '''
         Once an assimilation payload has been deployed on a system
@@ -80,25 +67,9 @@ class LinuxAssimilator(object):
         '''
         node_list = ",".join(node_addrs)
         commands = []
-        commands.append("cd /tmp; tar -xf rpath_assimilator.tar")
-        commands.append("cd /tmp/assimilator; " + \
-            "sh /tmp/assimilator/bootstrap.sh %s" % node_list)
+        commands.append("cd /; tar -xf /tmp/rpath_assimilator.tar")
+        commands.append("sh /tmp/bootstrap.sh %s" % node_list)
         return commands
-
-    def _preparePayloadIfNeeded(self, family, payload):
-        '''
-        Decides whether to download the payload
-        '''
-        if not os.path.exists(payload):
-            self._preparePayload(family, payload)
-
-    def _preparePayload(self, family, payload):
-       '''
-       Retrieve the assimilation payload on the worker 
-       (from the rbuilder) if it does not already exist.
-       '''
-       raise exceptions.NotImplementedError( \
-           "worker can't download a payload yet`")
 
     def runCmd(self, cmd):
        ''' 
@@ -118,7 +89,6 @@ class LinuxAssimilator(object):
         system is now enslaved.   Node_addrs are rmake3 worker nodes.
         '''
 
-
         allOutput = ""
         # place the deploy tarball onto the system
         self.ssh.putFile(self.payload, "/tmp/rpath_assimilator.tar")
@@ -130,8 +100,8 @@ class LinuxAssimilator(object):
             rc, output = self.runCmd(cmd)
             allOutput += "\n%s" % output
             if rc != 0:
-                raise Exception("Assimilator failed nonzero (%s, %s), " + 
-                    "thus far=\n%s" % (cmd, rc, allOutput))
+                raise Exception("Assimilator failed nonzero (%s, %s), thus far=%s"  
+                    % (cmd, rc, allOutput))
 
         # all commands successful
         self.ssh.close()
@@ -143,21 +113,10 @@ class LinuxAssimilatorBuilder(object):
      if neccessary.
 
      Usage:
-         lab = LinuxAssimilatorBuilder(platform='EL6')
+         lab = LinuxAssimilatorBuilder(['CentOS','5'])
          path = lab.getAssimilator()
      """
      
-     # FIXME: modify OS detector to return a tuple of 
-     # (distro, major) so this code doesn't need to be continually
-     # modified
-     LABEL_MAP = {
-          'EL5'    : 'centos.rpath.com@rpath:centos-5-common',
-          'EL6'    : 'centos.rpath.com@rpath:centos-6-common',
-          'RHEL5'  : 'centos.rpath.com@rpath:rhel-5-common',
-          'RHEL6'  : 'centos.rpath.com@rpath:rhel-6-common',
-          'SLES10' : 'sles.rpath.com@rpath:sles-10-common',
-          'SLES11' : 'sles.rpath.com@rpath:sles-11-common',
-     }
 
      # shell script to launch after extracting tarball
      # FIXME: zoneAddress parameters probably not passed in 
@@ -169,23 +128,28 @@ conary install conary sblim-sfcb-conary sblim-sfcb-schema-conary \
 rpath-register "$@"
 '''
 
-     def __init__(self, platform=None, forceRebuild=False):
+     def __init__(self, osFamily=None, forceRebuild=False):
           '''Does not build the payload, just gets parameters ready'''
-          self.buildRoot = "/tmp/rpath_assimilate_%s_build" % platform
-          self.buildResult = "/tmp/rpath_assimilate_%s.tar" % platform 
+          platDir = "-".join(osFamily)
+          self.buildRoot = "/tmp/rpath_assimilate_%s_build" % platDir
+          self.buildResult = "/tmp/rpath_assimilate_%s.tar" % platDir 
           self.groups = [
               "group-rpath-tools",
               "rpath-tools",
           ]
-          supportedPlatforms = LinuxAssimilatorBuilder.LABEL_MAP.keys()
-          if platform not in supportedPlatforms:
-              raise Exception("unsupported platform %s" % platform)
-          self.rLabel = LinuxAssimilatorBuilder.LABEL_MAP[platform]
+          self.rLabel = self._install_label(osFamily)
           self.cmdFlags = "--no-deps --no-restart --no-interactive"
           self.cmdRoot  = "--root %s" % self.buildRoot
           self.cmdLabel = "--install-label %s" % self.rLabel
           self.cmdGroups = " ".join(self.groups)
           self.forceRebuild = forceRebuild
+     
+     def _install_label(self, osFamily):
+         '''Where do the conary packages come from?'''
+         make, model = osFamily
+         make = make.lower()
+         model = model.lower()
+         return "%s.rpath.com@rpath:%s-%s-common" % (make, make, model)
 
      def getAssimilator(self):
           '''Return the path to the assimilator, rebuilding if needed'''
@@ -248,8 +212,11 @@ rpath-register "$@"
 
 if __name__ == '__main__':
     # sample test build...
-    # FIXME: OS detector code needs to understand how to detect CentOS vs RHEL
-    builder = LinuxAssimilatorBuilder(platform='EL5', forceRebuild=True)
+    # FIXME: tests need to use this same platform convention
+    builder = LinuxAssimilatorBuilder(
+        osFamily=['CentOS','5'],
+        forceRebuild=True
+    )
     print builder.getAssimilator()
   
 

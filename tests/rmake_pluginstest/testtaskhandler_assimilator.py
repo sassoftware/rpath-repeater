@@ -151,12 +151,8 @@ class AssimilatorTest(TestBase):
         )
 
         class SlightlyWeakenedAssimilator(LinuxAssimilator):
-            def _preparePayload(self, family, payload):
-                # do not attempt to create files on local
-                # filesystem if they don't exist
-                pass
-            def _versionFromRedHatRelease(self, output):
-                return 'EL5'
+            def _versionFromCentOSRelease(self, output):
+                return ['CentOS','5']
 
         asim = SlightlyWeakenedAssimilator(conn)
         rc, allOutput = asim.assimilate(['one.example.com','two.example.com'])

@@ -320,7 +320,7 @@ def main():
                            },
                            { 
                                'sshUser'     : 'root', 
-                               'sshPassword' : 'wrong2' 
+                               'sshPassword' : 'password' 
                            },
             ]
         )
