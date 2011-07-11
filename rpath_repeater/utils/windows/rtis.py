@@ -346,13 +346,21 @@ class rTIS(object):
         for line in fh: pass
         self.callback.info(line)
 
-
     def start(self):
         """
         Start the rTIS service.
         """
 
-        return self._wmi.serviceStart(self._service_name)
+        status = self._wmi.serviceStart(self._service_name)
+        assert status == 'Success'
+
+        # Now wait for the service to actually start.
+        state = None
+        statusKey = 'Running'
+        while state != 'running':
+            result = self._query(self._wmi.registryGetKey, self._params_keypath,
+                                 statusKey, raiseErrors=False)
+            state = result[0]
 
     def wait(self, allowReboot=True, reportStatus=None):
         """
