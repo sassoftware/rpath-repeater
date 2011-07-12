@@ -351,6 +351,14 @@ class rTIS(object):
 
         fh = self._smb.pathopen(logPath, Servicing.LOGFILE)
         for line in fh: pass
+
+        # Trim timestamp from line since we log timestamps further
+        # up the stack.
+        line = line.strip().split()
+        if len(line) > 2:
+            line = line[2:]
+        line = ' '.join(line)
+
         self.callback.info(line)
 
     def start(self):
