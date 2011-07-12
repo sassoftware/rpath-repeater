@@ -18,6 +18,7 @@ from wmiclient import WMIFileNotFoundError
 
 from rpath_repeater.utils.windows.callbacks import BaseCallback
 from rpath_repeater.utils.windows.errors import NotEnoughSpaceError
+from rpath_repeater.utils.windows.errors import ServiceFailedToStartError
 
 class Servicing(object):
     """
@@ -363,10 +364,15 @@ class rTIS(object):
         # Now wait for the service to actually start.
         state = None
         statusKey = 'Running'
+        start = time.time()
         while state != 'running':
             result = self._query(self._wmi.registryGetKey, self._params_keypath,
                                  statusKey, raiseErrors=False)
             state = result[0]
+
+            if time.time() - start > 30:
+                raise (ServiceFailedToStartError, 'The rPath Tools Installer '
+                    'service failed to start.')
 
     def wait(self, allowReboot=True, reportStatus=None):
         """
