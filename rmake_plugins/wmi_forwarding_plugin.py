@@ -220,7 +220,8 @@ class UpdateTask(WMITaskHandler):
         self.setData(data)
 
         if not results:
-            system.callback.error('no results found')
+            system.callback.info('no updates to apply')
+            system.callback.done()
             return
 
         for op, nvf, status in results:
