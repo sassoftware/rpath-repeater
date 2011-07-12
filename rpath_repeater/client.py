@@ -308,6 +308,7 @@ def main():
         keyData = file("/root/.ssh/id_rsa.pub").read() 
         assimilatorParams = cli.AssimilatorParams(host=system, port=22,
             eventUuid='eventUuid',
+            caCert=file("/srv/rbuilder/pki/hg_ca.crt").read(),
             sshAuth = [
                            { 
                                'sshUser'     : 'root', 

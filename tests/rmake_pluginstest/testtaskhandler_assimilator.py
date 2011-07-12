@@ -156,6 +156,7 @@ class AssimilatorTest(TestBase):
 
         asim = SlightlyWeakenedAssimilator(
             sshConnector=conn,
+            caCert='imaginary cert contents here',
             zoneAddresses=['one.example.com:8443','two.example.com:8443']
         )
         rc, allOutput = asim.assimilate()
