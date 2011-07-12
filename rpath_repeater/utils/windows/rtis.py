@@ -521,14 +521,13 @@ class rTIS(object):
 
             if f.msi:
                 pkgDir = self._smb.pathjoin(jobDir, f.msi.productCode())
-
-                # Make sure there is enough space to copy the file.
                 self._smb.mkdir(pkgDir)
 
             if not f.content:
                 continue
-            # FIXME: Add in FS size checks, unfortunately gzip files don't
-            #        have size
+
+            # Make sure there is enough available space to store the MSI plus
+            # some overhead.
             stat = os.statvfs(pkgDir)
             fsSize = stat[statvfs.F_BFREE] * stat[statvfs.F_BSIZE]
             fsize = f.info.contents.size()

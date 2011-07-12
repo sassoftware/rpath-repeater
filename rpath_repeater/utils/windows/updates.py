@@ -97,6 +97,9 @@ class UpdateJob(object):
     def __contains__(self, name):
         return name in [ x[0] for x in self._updates ]
 
+    def __len__(self):
+        return len(self._updates)
+
     @property
     def system_model(self):
         return self._newSystemModel
@@ -198,7 +201,8 @@ class UpdateJob(object):
         Get all of the capsule contents required to complete the update.
         """
 
-        assert self._updates
+        if not self._updates:
+            return {}
 
         if self._contents:
             return self._contents
