@@ -608,7 +608,6 @@ class rTIS(object):
         # Set rTIS to use the job directory that we just created.
         self.commands = jobId
 
-        import epdb; epdb.st()
         # Start rTIS
         self.start()
 
