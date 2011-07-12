@@ -18,6 +18,7 @@ from wmiclient import WMIFileNotFoundError
 
 from rpath_repeater.utils.windows.callbacks import BaseCallback
 from rpath_repeater.utils.windows.errors import NotEnoughSpaceError
+from rpath_repeater.utils.windows.errors import ServiceFailedToStartError
 
 class Servicing(object):
     """
@@ -124,8 +125,14 @@ class Servicing(object):
     def c2d(node):
         return dict((x.tag, x) for x in node.iterchildren())
 
+    def _handle_unicode_header(self, fobj):
+        header = fobj.read(3)
+        if header != '\xef\xbb\xbf':
+            fobj.seek(0)
+        return fobj
+
     def iterpackageresults(self, fobj):
-        root = etree.parse(fobj).getroot()
+        root = etree.parse(self._handle_unicode_header(fobj)).getroot()
         updateJobs = self.c2d(root).get('updateJobs')
 
         for update in updateJobs.iterchildren():
@@ -147,7 +154,7 @@ class Servicing(object):
                 yield operation, trvSpec.text, status
 
     def iterconfigresults(self, fobj):
-        root = etree.parse(fobj).getroot()
+        root = etree.parse(self._handle_unicode_header(fobj)).getroot()
         updateJobs = self.c2d(root).get('updateJobs')
 
         for config in updateJobs.iterchildren():
@@ -346,13 +353,26 @@ class rTIS(object):
         for line in fh: pass
         self.callback.info(line)
 
-
     def start(self):
         """
         Start the rTIS service.
         """
 
-        return self._wmi.serviceStart(self._service_name)
+        status = self._wmi.serviceStart(self._service_name)
+        assert status.output[0] == 'Success'
+
+        # Now wait for the service to actually start.
+        state = None
+        statusKey = 'Running'
+        start = time.time()
+        while state != 'running':
+            result = self._query(self._wmi.registryGetKey, self._params_keypath,
+                                 statusKey, raiseErrors=False)
+            state = result[0]
+
+            if time.time() - start > 30:
+                raise (ServiceFailedToStartError, 'The rPath Tools Installer '
+                    'service failed to start.')
 
     def wait(self, allowReboot=True, reportStatus=None):
         """
@@ -474,6 +494,11 @@ class rTIS(object):
         Coordinate with rTIS on the remote machine to install updates.
         """
 
+        # If there are no updates in the update job, don't bother trying
+        # to apply.
+        if len(updJob) == 0:
+            return []
+
         # Set the remote system model to match the desired state.
         self.system_model = updJob.system_model
 
@@ -501,14 +526,13 @@ class rTIS(object):
 
             if f.msi:
                 pkgDir = self._smb.pathjoin(jobDir, f.msi.productCode())
-
-                # Make sure there is enough space to copy the file.
                 self._smb.mkdir(pkgDir)
 
             if not f.content:
                 continue
-            # FIXME: Add in FS size checks, unfortunately gzip files don't
-            #        have size
+
+            # Make sure there is enough available space to store the MSI plus
+            # some overhead.
             stat = os.statvfs(pkgDir)
             fsSize = stat[statvfs.F_BFREE] * stat[statvfs.F_BSIZE]
             fsize = f.info.contents.size()
@@ -584,6 +608,7 @@ class rTIS(object):
         # Set rTIS to use the job directory that we just created.
         self.commands = jobId
 
+        import epdb; epdb.st()
         # Start rTIS
         self.start()
 

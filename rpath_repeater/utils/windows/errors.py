@@ -9,3 +9,6 @@ class UpdateError(BaseException):
 
 class NotEnoughSpaceError(BaseException):
     pass
+
+class ServiceFailedToStartError(BaseException):
+    pass

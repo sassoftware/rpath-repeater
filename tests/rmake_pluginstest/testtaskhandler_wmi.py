@@ -244,7 +244,7 @@ class WmiTest(TestBase):
 """)
 
     def testConfiguration(self):
-        #raise testsuite.SkipTestException('need to mock more')
+        raise testsuite.SkipTestException('need to mock more')
         params = self._wmiParams()
         configuration = '<values><foo>bar</foo></values>'
 
@@ -252,7 +252,7 @@ class WmiTest(TestBase):
         key = ('registry', 'setkey', self.K.rtisPath, 'Commands', command)
         self._data[key] = ''
 
-        self._data[('service', 'start', 'rPath Tools Installer Service')] = ''
+        self._data[('service', 'start', 'rPath Tools Installer Service')] = 'Success'
 
         self.client.configuration_wmi(params, configuration=configuration)
 
