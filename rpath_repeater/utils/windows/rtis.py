@@ -355,8 +355,8 @@ class rTIS(object):
         # Trim timestamp from line since we log timestamps further
         # up the stack.
         line = line.strip().split()
-        if len(line) > 2:
-            line = line[2:]
+        if len(line) > 3:
+            line = line[3:]
         line = ' '.join(line)
 
         self.callback.info(line)
