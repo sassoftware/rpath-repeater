@@ -117,9 +117,9 @@ class BootstrapTask(AssimilatorTaskHandler):
             "Contacting host %s on port %d to bootstrap"
                 % (data.p.host, data.p.port))
 
-        # do actual boostraping heavy lifting:
         retVal, outParams = self._bootstrap(host=data.p.host, port=data.p.port, \
-            nodes=data.nodes, sshAuth=data.p.sshAuth, uuid=data.p.eventUuid)
+            nodes=data.nodes, sshAuth=data.p.sshAuth, uuid=data.p.eventUuid, \
+            caCert=data.p.caCert)
 
         # xml doesn't contain much, this returns what the CIM task returns...
         data.response = "<system/>"
@@ -135,7 +135,8 @@ class BootstrapTask(AssimilatorTaskHandler):
                 "Host %s bootstrap failed: %s" %
                     (data.p.host, errorSummary), errorDetails)
 
-    def _bootstrap(self, host=None, port=None, nodes=None, sshAuth=None, uuid=None):
+    def _bootstrap(self, host=None, port=None, nodes=None, 
+        sshAuth=None, caCert=None, uuid=None):
         '''
         Guts of actual bootstrap code...
         '''
@@ -161,7 +162,11 @@ class BootstrapTask(AssimilatorTaskHandler):
 
         # all assimilation logic lives in the assimilator, feed it
         # our first working SSH connection
-        asim = LinuxAssimilator(sshConnector=sshConn, zoneAddresses=nodes)
+        asim = LinuxAssimilator(
+            sshConnector=sshConn, 
+            zoneAddresses=nodes,
+            caCert=caCert
+        )
         rc, output = asim.assimilate()
         sshConn.close()
         outParams = {}

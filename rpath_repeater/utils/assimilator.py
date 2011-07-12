@@ -13,18 +13,20 @@ class LinuxAssimilator(object):
     
     usage:
         sshConn = utils.SshConnection(...)
-        asim = LinuxAssimilator(sshConn)
+        asim = LinuxAssimilator(sshConnector=sshConn, zoneAddresses=rus_hosts_with_ports)
         asim.assimilate()
     """
 
-    def __init__(self, sshConnector=None, zoneAddresses=None):
-        self.ssh       = sshConnector
-        self.osFamily  = self._discoverFamily()
-        self.builder   = LinuxAssimilatorBuilder(
-            osFamily        = self.osFamily,
-            zoneAddresses   = zoneAddresses
+    def __init__(self, sshConnector=None, zoneAddresses=None, caCert=None):
+        self.ssh           = sshConnector
+        self.osFamily      = self._discoverFamily()
+        self.zoneAddresses = zoneAddresses
+        self.caCert        = caCert
+        self.builder = LinuxAssimilatorBuilder(
+            osFamily = self.osFamily,
+            caCert   = caCert
         )
-        self.payload   = self._makePayload()
+        self.payload       = self._makePayload()
 
     def _makePayload(self):
         '''what tarball to deploy? stubbed out for easier mock testing'''
@@ -69,8 +71,9 @@ class LinuxAssimilator(object):
         of handling it is a different bootstrap.sh in the payload.
         '''
         commands = []
+        addrs = " ".join(self.zoneAddresses)
         commands.append("cd /; tar -xf /tmp/rpath_assimilator.tar")
-        commands.append("sh /usr/share/bin/rpath_bootstrap.sh")
+        commands.append("python /usr/share/bin/rpath_bootstrap.py %s" % addrs)
         return commands
 
     def runCmd(self, cmd):
@@ -124,16 +127,66 @@ class LinuxAssimilatorBuilder(object):
      # FIXME: zoneAddress parameters probably not passed in 
      # correctly as implemented right now
      BOOTSTRAP_SCRIPT = '''
+#!/usr/bin/python
 # rPath Linux assimilation bootstrap script
-conary update conary sblim-sfcb-conary sblim-sfcb-schema-conary \
-sblim-cmpi-network-conary sblim-cmpi-base-conary openslp-conary info-sfcb \
-m2crypto-conary --no-deps
-/etc/rc.d/init.d/sfcb-conary start
-rpath-register "$@"
+
+import subprocess
+import sys
+import os
+import time
+
+print "- updating packages"
+cmd = "conary update conary sblim-sfcb-conary sblim-sfcb-schema-conary"
+cmd = cmd + " sblim-cmpi-network-conary sblim-cmpi-base-conary"
+cmd = cmd + " m2crypto-conary openslp-conary info-sfcb --no-deps"
+print cmd
+rc = subprocess.call(cmd, shell=True)
+
+print "- configuring zones"
+try:
+    os.makedirs("/etc/conary/rpath-tools/config.d")
+except OSError:
+    pass
+fd = open("/etc/conary/rpath-tools/config.d/directMethod", "w+")
+fd.write("directMethod []")
+for zoneAddr in sys.argv[1:]:
+    fd.write("directMethod %s" % zoneAddr)
+fd.close()
+
+print "- computing cert location"
+cmd = 'openssl x509 -in /etc/conary/rpath-tools/certs/rbuilder-hg.pem  -noout -hash'
+sslpath = os.popen(cmd).read().strip()
+
+print "- linking certs"
+cmd = "ln -s /etc/conary/rpath-tools/certs/rbuilder-hg.pem"
+cmd = cmd + " /etc/conary/rpath-tools/certs/%s.0" % sslpath
+print cmd
+rc = subprocess.call(cmd, shell=True)
+if rc != 0:
+   raise Exception("command failed: %s" % cmd)
+
+print "- (re)starting CIM"
+cmd = "/etc/rc.d/init.d/sfcb-conary restart"
+print cmd
+rc = subprocess.call(cmd, shell=True)
+
+print "- waiting 5 seconds for CIM to come online"
+time.sleep(5)
+
+print "- registering"
+cmd = "rpath-register"
+rc = subprocess.call(cmd, shell=True)
+print cmd
+if not rc == 0:
+   raise Exception("rpath-register failed")
+
+sys.exit(0)
 '''
 
-     def __init__(self, osFamily=None, zoneAddresses=None, forceRebuild=False):
+     def __init__(self, osFamily=None, caCert=None, forceRebuild=False):
          '''Does not build the payload, just gets parameters ready'''
+         if osFamily is None or caCert is None:
+            raise Exception("osFamily and caCert are required")
          platDir = "-".join(osFamily)
          self.buildRoot = "/tmp/rpath_assimilate_%s_build" % platDir
          self.buildResult = "/tmp/rpath_assimilate_%s.tar" % platDir 
@@ -144,7 +197,7 @@ rpath-register "$@"
              "m2crypto-conary", # not in group-rpath-tools, this is a bug
              "pywbem-conary" # looks like we need this too?
          ]
-         self.zoneAddresses = zoneAddresses
+         self.caCert = caCert
          self.rLabel = self._install_label(osFamily)
          self.cmdFlags = "--no-deps --no-restart --no-interactive"
          self.cmdRoot  = "--root %s" % self.buildRoot
@@ -152,7 +205,7 @@ rpath-register "$@"
          self.cmdGroups = " ".join(self.groups)
          self.forceRebuild = forceRebuild
          self.config = "--config \"includeConfigFile http://localhost/conaryrc\""
-     
+
      def _install_label(self, osFamily):
          '''Where do the conary packages come from?'''
          make, model = osFamily
@@ -178,6 +231,7 @@ rpath-register "$@"
           return 0
 
      def _writeFileInBuildRoot(self, path, filename, contents):
+          '''Create a file inside of the tarball build root'''
           buildPath = os.path.join(self.buildRoot, path)
           try:
               os.makedirs(buildPath)
@@ -194,30 +248,25 @@ rpath-register "$@"
 
           rpath_bootstrap.sh -- the bootstrap script
           assimilator -- sets the install label path for the system
-          directMethod -- sets the zone addresses
 
           TODO: add default to --no-deps
           TODO: write CIM cert
           '''
           self._writeFileInBuildRoot(
-              'usr/share/bin', 'rpath_bootstrap.sh',
+              'usr/share/bin', 'rpath_bootstrap.py',
               LinuxAssimilatorBuilder.BOOTSTRAP_SCRIPT,
           )
           self._writeFileInBuildRoot(
               'etc/conary/config.d', 'assimilator',
               "installLabelPath %s\n" % self.rLabel
           )
-          dmConfig = "directMethod []\n"
-          for addr in self.zoneAddresses:
-              dmConfig = dmConfig + "directMethod %s\n" % addr
           self._writeFileInBuildRoot(
-              'etc/conary/rpath_tools/config.d', 'directMethod',
-              dmConfig
+              'etc/conary/rpath-tools/certs', 'rbuilder-hg.pem',
+              self.caCert
           )
 
      def _buildTarball(self):
           '''Builds assimilator on the worker node'''
-          # create build directory
           try: 
               os.makedirs(self.buildRoot)
           except OSError:
@@ -247,7 +296,7 @@ if __name__ == '__main__':
     # sample test build of just the tarball ...
     builder = LinuxAssimilatorBuilder(
         osFamily=['CentOS','5'],
-        zoneAddresses=['dhcp244.eng.rpath.com:8443'],
+        caCert=file("/srv/rbuilder/pki/hg_ca.crt").read(),
         forceRebuild=True
     )
     print builder.getAssimilator()
