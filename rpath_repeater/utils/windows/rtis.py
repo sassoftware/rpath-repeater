@@ -494,6 +494,11 @@ class rTIS(object):
         Coordinate with rTIS on the remote machine to install updates.
         """
 
+        # If there are no updates in the update job, don't bother trying
+        # to apply.
+        if len(updJob) == 0:
+            return []
+
         # Set the remote system model to match the desired state.
         self.system_model = updJob.system_model
 
