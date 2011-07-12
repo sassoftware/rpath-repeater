@@ -154,8 +154,11 @@ class AssimilatorTest(TestBase):
             def _versionFromCentOSRelease(self, output):
                 return ['CentOS','5']
 
-        asim = SlightlyWeakenedAssimilator(conn)
-        rc, allOutput = asim.assimilate(['one.example.com','two.example.com'])
+        asim = SlightlyWeakenedAssimilator(
+            sshConnector=conn,
+            zoneAddresses=['one.example.com:8443','two.example.com:8443']
+        )
+        rc, allOutput = asim.assimilate()
         self.failUnlessEqual(rc, 0, 'successful assimilator return code')
         # call more tests here, defined in classes above
         MockSshClient.tests_ok(self)
