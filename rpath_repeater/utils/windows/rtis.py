@@ -359,7 +359,7 @@ class rTIS(object):
         """
 
         status = self._wmi.serviceStart(self._service_name)
-        assert status == 'Success'
+        assert status.output[0] == 'Success'
 
         # Now wait for the service to actually start.
         state = None
@@ -608,6 +608,7 @@ class rTIS(object):
         # Set rTIS to use the job directory that we just created.
         self.commands = jobId
 
+        import epdb; epdb.st()
         # Start rTIS
         self.start()
 
