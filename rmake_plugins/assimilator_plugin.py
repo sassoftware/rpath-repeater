@@ -161,8 +161,8 @@ class BootstrapTask(AssimilatorTaskHandler):
 
         # all assimilation logic lives in the assimilator, feed it
         # our first working SSH connection
-        asim = LinuxAssimilator(sshConn)
-        rc, output = asim.assimilate(nodes)
+        asim = LinuxAssimilator(sshConnector=sshConn, zoneAddresses=nodes)
+        rc, output = asim.assimilate()
         sshConn.close()
         outParams = {}
 

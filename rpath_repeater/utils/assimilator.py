@@ -17,10 +17,13 @@ class LinuxAssimilator(object):
         asim.assimilate()
     """
 
-    def __init__(self, sshConnector):
+    def __init__(self, sshConnector=None, zoneAddresses=None):
         self.ssh       = sshConnector
         self.osFamily  = self._discoverFamily()
-        self.builder   = LinuxAssimilatorBuilder(osFamily=self.osFamily)
+        self.builder   = LinuxAssimilatorBuilder(
+            osFamily        = self.osFamily,
+            zoneAddresses   = zoneAddresses
+        )
         self.payload   = self._makePayload()
 
     def _makePayload(self):
@@ -57,7 +60,7 @@ class LinuxAssimilator(object):
         matches = re.findall('\d+', output.split("\n")[0])
         return ('SLES', matches[0])
         
-    def _commands(self, node_addrs):
+    def _commands(self):
         '''
         Once an assimilation payload has been deployed on a system
         we have to run some commands to take it the rest of the
@@ -65,10 +68,9 @@ class LinuxAssimilator(object):
         but it might be, if it IS family specific the preferred way
         of handling it is a different bootstrap.sh in the payload.
         '''
-        node_list = ",".join(node_addrs)
         commands = []
         commands.append("cd /; tar -xf /tmp/rpath_assimilator.tar")
-        commands.append("sh /tmp/bootstrap.sh %s" % node_list)
+        commands.append("sh /usr/share/bin/rpath_bootstrap.sh")
         return commands
 
     def runCmd(self, cmd):
@@ -80,7 +82,7 @@ class LinuxAssimilator(object):
        output += "\n%s" % cmdOutput
        return rc, output
 
-    def assimilate(self, node_addrs):
+    def assimilate(self):
         '''
         An SSH connection has been passed in and we now know what payloads
         we want to deploy onto the system, and what post commands to run.
@@ -93,7 +95,7 @@ class LinuxAssimilator(object):
         # place the deploy tarball onto the system
         self.ssh.putFile(self.payload, "/tmp/rpath_assimilator.tar")
         
-        commands  = self._commands(node_addrs)
+        commands  = self._commands()
 
         # run the series of assimilation commands
         for cmd in commands:
@@ -121,28 +123,35 @@ class LinuxAssimilatorBuilder(object):
      # shell script to launch after extracting tarball
      # FIXME: zoneAddress parameters probably not passed in 
      # correctly as implemented right now
-     BOOTSTRAP_SH = '''
+     BOOTSTRAP_SCRIPT = '''
 # rPath Linux assimilation bootstrap script
-conary install conary sblim-sfcb-conary sblim-sfcb-schema-conary \
-    sblim-cmpi-network-conary openslp-conary info-sfcb
+conary update conary sblim-sfcb-conary sblim-sfcb-schema-conary \
+sblim-cmpi-network-conary sblim-cmpi-base-conary openslp-conary info-sfcb \
+m2crypto-conary --no-deps
+/etc/rc.d/init.d/sfcb-conary start
 rpath-register "$@"
 '''
 
-     def __init__(self, osFamily=None, forceRebuild=False):
-          '''Does not build the payload, just gets parameters ready'''
-          platDir = "-".join(osFamily)
-          self.buildRoot = "/tmp/rpath_assimilate_%s_build" % platDir
-          self.buildResult = "/tmp/rpath_assimilate_%s.tar" % platDir 
-          self.groups = [
-              "group-rpath-tools",
-              "rpath-tools",
-          ]
-          self.rLabel = self._install_label(osFamily)
-          self.cmdFlags = "--no-deps --no-restart --no-interactive"
-          self.cmdRoot  = "--root %s" % self.buildRoot
-          self.cmdLabel = "--install-label %s" % self.rLabel
-          self.cmdGroups = " ".join(self.groups)
-          self.forceRebuild = forceRebuild
+     def __init__(self, osFamily=None, zoneAddresses=None, forceRebuild=False):
+         '''Does not build the payload, just gets parameters ready'''
+         platDir = "-".join(osFamily)
+         self.buildRoot = "/tmp/rpath_assimilate_%s_build" % platDir
+         self.buildResult = "/tmp/rpath_assimilate_%s.tar" % platDir 
+         self.groups = [
+             "rpath-models",
+             "group-rpath-tools",
+             "rpath-tools",
+             "m2crypto-conary", # not in group-rpath-tools, this is a bug
+             "pywbem-conary" # looks like we need this too?
+         ]
+         self.zoneAddresses = zoneAddresses
+         self.rLabel = self._install_label(osFamily)
+         self.cmdFlags = "--no-deps --no-restart --no-interactive"
+         self.cmdRoot  = "--root %s" % self.buildRoot
+         self.cmdLabel = "--install-label %s" % self.rLabel
+         self.cmdGroups = " ".join(self.groups)
+         self.forceRebuild = forceRebuild
+         self.config = "--config \"includeConfigFile http://localhost/conaryrc\""
      
      def _install_label(self, osFamily):
          '''Where do the conary packages come from?'''
@@ -168,6 +177,44 @@ rpath-register "$@"
           # here, which will delete the file & buildRoot
           return 0
 
+     def _writeFileInBuildRoot(self, path, filename, contents):
+          buildPath = os.path.join(self.buildRoot, path)
+          try:
+              os.makedirs(buildPath)
+          except OSError:
+              pass
+          filePath = os.path.join(buildPath, filename)
+          handle = open(filePath, "w+") 
+          handle.write(contents)
+          handle.close()
+
+     def _writeConfigFiles(self):
+          '''
+          Create config files for conary & registration
+
+          rpath_bootstrap.sh -- the bootstrap script
+          assimilator -- sets the install label path for the system
+          directMethod -- sets the zone addresses
+
+          TODO: add default to --no-deps
+          TODO: write CIM cert
+          '''
+          self._writeFileInBuildRoot(
+              'usr/share/bin', 'rpath_bootstrap.sh',
+              LinuxAssimilatorBuilder.BOOTSTRAP_SCRIPT,
+          )
+          self._writeFileInBuildRoot(
+              'etc/conary/config.d', 'assimilator',
+              "installLabelPath %s\n" % self.rLabel
+          )
+          dmConfig = "directMethod []\n"
+          for addr in self.zoneAddresses:
+              dmConfig = dmConfig + "directMethod %s\n" % addr
+          self._writeFileInBuildRoot(
+              'etc/conary/rpath_tools/config.d', 'directMethod',
+              dmConfig
+          )
+
      def _buildTarball(self):
           '''Builds assimilator on the worker node'''
           # create build directory
@@ -177,44 +224,30 @@ rpath-register "$@"
               pass
 
           # run conary to extract contents inside build root
-          cmd = "conary update %s %s %s %s" % (self.cmdFlags, self.cmdRoot, 
-              self.cmdLabel, self.cmdGroups)
-          # print "XDEBUG: cmd=%s" % cmd
+          cmd = "conary update %s %s %s %s %s" % (self.cmdFlags, self.cmdRoot, 
+              self.cmdLabel, self.cmdGroups, self.config)
           rc = subprocess.call(cmd, shell=True)
           if rc != 0:
               # no exception because return codes seem unreliable?
               print "conary failed: %s, %s" % (cmd, rc)
 
-          # create bootstrap script in /tmp
-          tmp = os.path.join(self.buildRoot, 'tmp')
-          try:
-              os.makedirs(tmp)
-          except OSError:
-              pass
-          bootstrap = os.path.join(tmp, 'bootstrap.sh')
-          # print "XDEBUG: bootstrap file=%s" % bootstrap
-          bootstrapFh = open(bootstrap, 'w+')
-          bootstrapFh.write(LinuxAssimilatorBuilder.BOOTSTRAP_SH)
-          bootstrapFh.close()
- 
+          self._writeConfigFiles()
+
           # tar up data and return the path
           working = os.getcwd()
           os.chdir(self.buildRoot)
           cmd = "tar cvf %s *" % (self.buildResult)
-          # print "XDEBUG: cmd=%s" % cmd
           rc = subprocess.call(cmd, shell=True)
-          if rc != 0:
+          if rc != 0 or not os.path.exists(self.buildResult):
               raise Exception("tar failed: %s" % cmd)
-          if not os.path.exists(self.buildResult):
-              raise Exception("creation failed")
           os.chdir(working)
           return self.buildResult
 
 if __name__ == '__main__':
-    # sample test build...
-    # FIXME: tests need to use this same platform convention
+    # sample test build of just the tarball ...
     builder = LinuxAssimilatorBuilder(
         osFamily=['CentOS','5'],
+        zoneAddresses=['dhcp244.eng.rpath.com:8443'],
         forceRebuild=True
     )
     print builder.getAssimilator()
