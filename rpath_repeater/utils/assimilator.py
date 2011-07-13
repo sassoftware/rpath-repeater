@@ -13,7 +13,8 @@ class LinuxAssimilator(object):
     
     usage:
         sshConn = utils.SshConnection(...)
-        asim = LinuxAssimilator(sshConnector=sshConn, zoneAddresses=rus_hosts_with_ports)
+        asim = LinuxAssimilator(sshConnector=sshConn, caCert=str, 
+            zoneAddresses=rus_hosts_with_ports)
         asim.assimilate()
     """
 
@@ -185,8 +186,10 @@ sys.exit(0)
 
      def __init__(self, osFamily=None, caCert=None, forceRebuild=False):
          '''Does not build the payload, just gets parameters ready'''
-         if osFamily is None or caCert is None:
-            raise Exception("osFamily and caCert are required")
+         if osFamily is None:
+            raise Exception("osFamily is required")
+         if caCert is None:
+            raise Exception("caCert is required")
          platDir = "-".join(osFamily)
          self.buildRoot = "/tmp/rpath_assimilate_%s_build" % platDir
          self.buildResult = "/tmp/rpath_assimilate_%s.tar" % platDir 

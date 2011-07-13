@@ -122,7 +122,7 @@ class AssimilatorParams(_BaseSlotCompare):
     '''
     # sshAuth is a list of hashes to try, like so:
     # [{ 'sshUser' : user, 'sshPassword' : pass, 'sshKey' : key_path_or_bytes }, {...}, ...]
-    # caCert are the bytes of rbuilder's /srv/rbuilder/pki/hg_ca.crt
+    # caCert are the contents of the cert
     __slots__ = [ 'host', 'port', 'caCert', 'sshAuth', 'eventUuid' ]
 
 class ManagementInterfaceParams(_BaseSlotCompare):
