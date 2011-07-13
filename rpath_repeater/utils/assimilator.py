@@ -324,7 +324,7 @@ sys.exit(0)
           cmd = "conary update %s %s %s %s %s" % (self.cmdFlags, self.cmdRoot, 
               self.cmdLabel, self.cmdGroups, self.config)
           print "XDEBUG: cmd=%s\n" % cmd 
-          rc = subprocess.call(cmd, shell=True)
+          subprocess.call(cmd, shell=True)
 
           self._writeConfigFiles(digestVersion)
           tar = tarfile.TarFile(self.buildResult, 'w')
