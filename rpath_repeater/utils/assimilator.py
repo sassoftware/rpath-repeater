@@ -6,6 +6,12 @@ import exceptions
 import os
 import re
 import subprocess
+import hashlib
+import shutil
+import tarfile
+from conary.conaryclient import ConaryClient
+from conary.conarycfg import ConaryConfiguration
+from conary.versions import Label
 
 class LinuxAssimilator(object):
     """
@@ -217,24 +223,51 @@ sys.exit(0)
          return "%s.rpath.com@rpath:%s-%s-common" % (make, make, model)
 
      def getAssimilator(self):
-          '''Return the path to the assimilator, rebuilding if needed'''
-          if self._isStaleOrMissing():
-              self._buildTarball()
+          '''
+          Return the path to the assimilator tarball for transferring
+          to the remote client, rebuilding if needed.  Supports building
+          for multiple flavors (saving as different filenames)
+          '''
+          (digestVersion, should_rebuild) = self._makeRebuildDecision()
+          if should_rebuild:
+              self._buildTarball(digestVersion)
           return self.buildResult
 
-     def _isStaleOrMissing(self):
-          '''Does the assimilator need a rebuild?'''
-          if not os.path.exists(self.buildResult):
-              return 1
-          if self.forceRebuild:
-              os.unlink(self.buildResult)
-              return 1
-          # FIXME: add staleness detection code
-          # here, which will delete the file & buildRoot
-          return 0
+     def _lastDigestVersion(self):
+          '''
+          What digest version corresponds to the last time the tarball
+          was built?  Returns None if unable to determine.  If this version
+          does not match the current digest version we will rebuild
+          the tarball.
+          '''
+          digestFn = os.path.join(self.buildRoot, 'var/spool/rpath/assimilator.digest')
+          if not os.path.exists(digestFn):
+              return None
+          digestFile = open(digestFn)
+          data = digestFile.read().strip()
+          digestFile.close()
+          return data
+
+     def _makeRebuildDecision(self):
+          '''
+          Does the assimilator payload need a rebuild?  Returns a tuple
+          of the current digest version and True/False answering that
+          question.
+          '''
+          pm = PayloadMath(label=self.rLabel, troves=self.groups)
+          digestVersion = pm.digestVersion()
+          if self.forceRebuild or not os.path.exists(self.buildResult):
+              return (digestVersion, True)
+          lastDigestVersion = self._lastDigestVersion()
+          if lastDigestVersion is None or lastDigestVersion != digestVersion:
+              return (digestVersion, True)
+          return (digestVersion, False)
 
      def _writeFileInBuildRoot(self, path, filename, contents):
-          '''Create a file inside of the tarball build root'''
+          '''
+          Create a file inside of the tarball build root
+          Adding intermediate paths as needed.
+          '''
           buildPath = os.path.join(self.buildRoot, path)
           try:
               os.makedirs(buildPath)
@@ -245,7 +278,7 @@ sys.exit(0)
           handle.write(contents)
           handle.close()
 
-     def _writeConfigFiles(self):
+     def _writeConfigFiles(self, digestVersion):
           '''
           Create config files for conary & registration
 
@@ -267,41 +300,87 @@ sys.exit(0)
               'etc/conary/rpath-tools/certs', 'rbuilder-hg.pem',
               self.caCert
           )
+          self._writeFileInBuildRoot(
+               'var/spool/rpath', 'assimilator.digest',
+               digestVersion,
+          )
 
-     def _buildTarball(self):
-          '''Builds assimilator on the worker node'''
+     def _buildTarball(self, digestVersion):
+          '''
+          Builds assimilator tarball on the worker node
+          '''
+
+          # if buildroot already exists, unlink it
+          # then create empty buildroot
+          shutil.rmtree(self.buildRoot, ignore_errors=True)
           try: 
               os.makedirs(self.buildRoot)
           except OSError:
               pass
 
           # run conary to extract contents inside build root
+          # conary will return failure on no-updates so we'll ignore
+          # the return code.
           cmd = "conary update %s %s %s %s %s" % (self.cmdFlags, self.cmdRoot, 
               self.cmdLabel, self.cmdGroups, self.config)
-          rc = subprocess.call(cmd, shell=True)
-          if rc != 0:
-              # no exception because return codes seem unreliable?
-              print "conary failed: %s, %s" % (cmd, rc)
+          print "XDEBUG: cmd=%s\n" % cmd 
+          subprocess.call(cmd, shell=True)
 
-          self._writeConfigFiles()
-
-          # tar up data and return the path
-          working = os.getcwd()
-          os.chdir(self.buildRoot)
-          cmd = "tar cvf %s *" % (self.buildResult)
-          rc = subprocess.call(cmd, shell=True)
-          if rc != 0 or not os.path.exists(self.buildResult):
-              raise Exception("tar failed: %s" % cmd)
-          os.chdir(working)
+          self._writeConfigFiles(digestVersion)
+          tar = tarfile.TarFile(self.buildResult, 'w')
+          tar.add(self.buildRoot, '/')
           return self.buildResult
 
+class PayloadMath(object):
+    '''
+    Helps decides when the payload needs to rebuilt by computing
+    a hash representing all of the packages contained within it.
+    Plus the source code of the BOOTSTRAP_SCRIPT.  Zone addresses
+    are not included as they are passed as arguments to the bootstrap
+    script.
+    '''
+
+    def __init__(self, label=None, troves=[]):
+        self.conaryCfg = ConaryConfiguration(False)
+        self.conaryCfg.initializeFlavors()
+        self.conaryCfg.dbPath = ':memory:'
+        self.conaryCfg.readUrl('http://localhost/conaryrc')
+        self.conaryClient = ConaryClient(self.conaryCfg)
+        self.troves       = troves
+        self.label        = Label(label)
+        self.repos        = self.conaryClient.repos  
+        self.matched      = self._allMatchingTroves()               
+
+    def _allMatchingTroves(self):
+        ''' 
+        Returns matched troves (name, version, label) sorted by
+        name (first priority) and then version (second).
+        '''
+        results = []
+        for name in self.troves:
+            matches = self.repos.findTrove(self.label, (name, None, None))
+            results.extend(matches)        
+        results.sort(key= lambda x: x[1])
+        results.sort(key = lambda x: x[0])
+        return results
+
+    def digestVersion(self):
+        '''
+        compute a hash of required trove names/versions identifying the
+        current value of the set at this point in time
+        '''
+        longstr = ";".join(["%s=%s" % (m[0], m[1]) for m in self.matched])
+        hasher = hashlib.sha512()
+        hasher.update(longstr)
+        hasher.update(LinuxAssimilatorBuilder.BOOTSTRAP_SCRIPT)
+        return hasher.hexdigest()
+
 if __name__ == '__main__':
+ 
     # sample test build of just the tarball ...
     builder = LinuxAssimilatorBuilder(
         osFamily=['CentOS','5'],
         caCert=file("/srv/rbuilder/pki/hg_ca.crt").read(),
-        forceRebuild=True
+        forceRebuild=True, # False
     )
     print builder.getAssimilator()
-  
-
