@@ -91,19 +91,18 @@ class LinuxAssimilator(object):
         commands = []
         addrs = " ".join(self.zoneAddresses)
         commands.append("cd /; tar -xf /tmp/rpath_assimilator.tar")
-        script = "python /usr/share/bin/rpath_bootstrap.py"
-        commands.append("%s %s %s > /var/log/rpath_bootstrap.log 2>&1" % 
-            (script, self.eventUuid, addrs))
+        script = "/usr/conary/bin/python /usr/share/bin/rpath_bootstrap.py"
+        commands.append("%s %s %s" % (script, self.eventUuid, addrs))
         return commands
 
     def runCmd(self, cmd):
-       ''' 
-       Run command via SSH, logging into buffer
-       '''
-       output = "\n(running) %s:\n" % cmd
-       rc, cmdOutput = self.ssh.execCommand(cmd)
-       output += "\n%s" % cmdOutput
-       return rc, output
+        ''' 
+        Run command via SSH, logging into buffer
+        '''
+        output = "\n(running) %s:\n" % cmd
+        rc, cmdOutput = self.ssh.execCommand(cmd)
+        output += "\n%s" % cmdOutput
+        return rc, output
 
     def assimilate(self):
         '''
@@ -133,41 +132,63 @@ class LinuxAssimilator(object):
         return (0, allOutput)
 
 class LinuxAssimilatorBuilder(object):
-     """
-     Returns the assimilator payload needed to assimilate a platform, creating
-     if neccessary.
+    """
+    Returns the assimilator payload needed to assimilate a platform, creating
+    if neccessary.
 
-     Usage:
-         lab = LinuxAssimilatorBuilder(['CentOS','5'])
-         path = lab.getAssimilator()
-     """
+    Usage:
+        lab = LinuxAssimilatorBuilder(['CentOS','5'])
+        path = lab.getAssimilator()
+    """
      
 
-     # shell script to launch after extracting tarball
-     # FIXME: zoneAddress parameters probably not passed in 
-     # correctly as implemented right now
-     BOOTSTRAP_SCRIPT = '''
-#!/usr/bin/python
+    # shell script to launch after extracting tarball
+    # FIXME: zoneAddress parameters probably not passed in 
+    # correctly as implemented right now
+    BOOTSTRAP_SCRIPT = '''
+#!/usr/conary/bin/python
+
 # rPath Linux assimilation bootstrap script
 # usage: rpath_bootstrap.py eventUuid zoneAddress zoneAddress ...
+
 import subprocess
 import sys
 import os
 import time
+import logging
 
-print "- running tag scripts"
-cmd = "sh /var/spool/tmp/assimilate_tags.sh"
-print cmd
-cmd = subprocess.call(cmd, shell=True)
+logger = logging.getLogger('bootstrap')
+logger.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(levelname)s : %(message)s')
+handler = logging.FileHandler('/var/log/bootstrap.log')
+logger.addHandler(handler)
+handler.setFormatter(formatter)
 
-print "- updating packages"
+def runCmd(cmd, must_succeed=False):
+    logger.info("(command): %s" % cmd)
+    p = subprocess.Popen(cmd, shell=True, 
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    out, err = p.communicate()
+    if out and out != "" and out !="\\n":
+        logger.info(out)
+    rc = p.returncode
+    if rc != 0:
+        if err and err !="" and err !="\\n":
+            logger.error(err)   
+        logger.error("command failed (rc=%s)" % rc)
+        if must_succeed:
+            sys.exit(rc)
+
+logger.info("processing tag scripts")
+runCmd("sh /var/spool/tmp/assimilate_tags.sh", must_succeed=True)
+
+logger.info("updating packages")
 cmd = "conary update conary sblim-sfcb-conary sblim-sfcb-schema-conary"
 cmd = cmd + " sblim-cmpi-network-conary sblim-cmpi-base-conary"
 cmd = cmd + " m2crypto-conary openslp-conary info-sfcb --no-deps"
-print cmd
-rc = subprocess.call(cmd, shell=True)
+runCmd(cmd)
 
-print "- configuring zones"
+logger.info("configuring zones")
 try:
     os.makedirs("/etc/conary/rpath-tools/config.d")
 except OSError:
@@ -178,213 +199,204 @@ for zoneAddr in sys.argv[2:]:
     fd.write("directMethod %s\\n" % zoneAddr)
 fd.close()
 
-print "- computing cert location"
+logger.info("computing cert location")
 cmd = 'openssl x509 -in /etc/conary/rpath-tools/certs/rbuilder-hg.pem  -noout -hash'
 sslpath = os.popen(cmd).read().strip()
-
-print "- linking certs"
+logger.info("linking certs")
 cmd = "ln -s /etc/conary/rpath-tools/certs/rbuilder-hg.pem"
 cmd = cmd + " /etc/conary/rpath-tools/certs/%s.0" % sslpath
-print cmd
-rc = subprocess.call(cmd, shell=True)
+runCmd(cmd)
 
-print "- (re)starting CIM"
-cmd = "/etc/rc.d/init.d/sfcb-conary restart"
-print cmd
-rc = subprocess.call(cmd, shell=True)
+logger.info("(re)starting CIM")
+runCmd("/etc/rc.d/init.d/sfcb-conary restart")
 
-print "- waiting 5 seconds for CIM to come online"
+logger.info("waiting 5 seconds for CIM to come online")
 time.sleep(5)
 
-print "- registering"
-cmd = "rpath-register --event-uuid=%s" % sys.argv[1]
-rc = subprocess.call(cmd, shell=True)
-print cmd
-if not rc == 0:
-   raise Exception("rpath-register failed")
+logger.info("registering")
+runCmd("rpath-register --event-uuid=%s" % sys.argv[1], must_succeed=True)
 
 sys.exit(0)
 '''
 
-     def __init__(self, osFamily=None, caCert=None, flavor='x86', forceRebuild=False):
-         '''Does not build the payload, just gets parameters ready'''
-         if osFamily is None:
-            raise Exception("osFamily is required")
-         if caCert is None:
-            raise Exception("caCert is required")
-         platDir = "-".join(osFamily)
-         self.osFamily = osFamily
-         self.flavor = flavor
-         self.buildRoot = "/tmp/rpath_assimilate_%s_%s_build" % (platDir, flavor)
-         self.buildResult = "/tmp/rpath_assimilate_%s_%s.tar" % (platDir, flavor) 
-         self.groups = [
-             "rpath-models",
-             "group-rpath-tools",
-             "rpath-tools",
-             "m2crypto-conary", # not in group-rpath-tools, this is a bug
-             "pywbem-conary" # looks like we need this too?
-         ]
-         self.caCert = caCert
-         self.rLabel = self._install_label(osFamily)
-         #self.cmdFlags = "--no-deps --no-restart --no-interactive"
-         #self.cmdRoot  = "--root %s" % self.buildRoot
-         #self.cmdLabel = "--install-label %s" % self.rLabel
-         #self.cmdGroups = " ".join(self.groups)
-         self.forceRebuild = forceRebuild
-         #self.config = "--config \"includeConfigFile http://localhost/conaryrc\""
-         self.conaryClient = self._conaryClient()
+    def __init__(self, osFamily=None, caCert=None, flavor='x86', forceRebuild=False):
+        '''Does not build the payload, just gets parameters ready'''
+        if osFamily is None:
+           raise Exception("osFamily is required")
+        if caCert is None:
+           raise Exception("caCert is required")
+        platDir = "-".join(osFamily)
+        self.osFamily = osFamily
+        self.flavor = flavor
+        self.buildRoot = "/tmp/rpath_assimilate_%s_%s_build" % (platDir, flavor)
+        self.buildResult = "/tmp/rpath_assimilate_%s_%s.tar" % (platDir, flavor) 
+        self.groups = [
+            "rpath-models",
+            "group-rpath-tools",
+            "rpath-tools",
+            "m2crypto-conary", # not in group-rpath-tools, this is a bug
+            "pywbem-conary" # looks like we need this too?
+        ]
+        self.caCert = caCert
+        self.rLabel = self._install_label(osFamily)
+        #self.cmdFlags = "--no-deps --no-restart --no-interactive"
+        #self.cmdRoot  = "--root %s" % self.buildRoot
+        #self.cmdLabel = "--install-label %s" % self.rLabel
+        #self.cmdGroups = " ".join(self.groups)
+        self.forceRebuild = forceRebuild
+        #self.config = "--config \"includeConfigFile http://localhost/conaryrc\""
+        self.conaryClient = self._conaryClient()
 
-     def _conaryClient(self):
-         '''
-         Return a conary client handle that will download packages
-         into the buildroot, not resolving deps, and is otherwise
-         appropriate for running on a rmake worker node.
-         '''
-         try:
-             os.makedirs(self.buildRoot)
-         except:
-             # make extra sure it's here first (FIXME)
-             pass
+    def _conaryClient(self):
+        '''
+        Return a conary client handle that will download packages
+        into the buildroot, not resolving deps, and is otherwise
+        appropriate for running on a rmake worker node.
+        '''
+        try:
+            os.makedirs(self.buildRoot)
+        except:
+            # make extra sure it's here first (FIXME)
+            pass
 
-         conaryCfg = ConaryConfiguration(False)
-         conaryCfg.flavor = [deps.parseFlavor("is: %s" % self.flavor)]
-         conaryCfg.initializeFlavors()
-         # conaryCfg.dbPath=':memory'
-         conaryCfg.readUrl('http://localhost/conaryrc')
-         conaryCfg.root = self.buildRoot
-         conaryCfg.autoResolve = False
-         conaryCfg.configLine('trustedKeys []')
-         conaryCfg.configLine('trustThreshold 0')
+        conaryCfg = ConaryConfiguration(False)
+        conaryCfg.flavor = [deps.parseFlavor("is: %s" % self.flavor)]
+        conaryCfg.initializeFlavors()
+        # conaryCfg.dbPath=':memory'
+        conaryCfg.readUrl('http://localhost/conaryrc')
+        conaryCfg.root = self.buildRoot
+        conaryCfg.autoResolve = False
+        conaryCfg.configLine('trustedKeys []')
+        conaryCfg.configLine('trustThreshold 0')
          
-         return ConaryClient(conaryCfg)
+        return ConaryClient(conaryCfg)
 
-     def _install_label(self, osFamily):
-         '''Where do the conary packages come from?'''
-         make, model = osFamily
-         make = make.lower()
-         model = model.lower()
-         return "%s.rpath.com@rpath:%s-%s-common" % (make, make, model)
+    def _install_label(self, osFamily):
+        '''Where do the conary packages come from?'''
+        make, model = osFamily
+        make = make.lower()
+        model = model.lower()
+        return "%s.rpath.com@rpath:%s-%s-common" % (make, make, model)
 
-     def getAssimilator(self):
-         '''
-         Return the path to the assimilator tarball for transferring
-         to the remote client, rebuilding if needed.  Supports building
-         for multiple flavors (saving as different filenames)
-         '''
-         (digestVersion, shouldRebuild, trovesNeeded) = self._makeRebuildDecision()
-         if shouldRebuild:
-             self._buildTarball(digestVersion, trovesNeeded)
-         return self.buildResult
+    def getAssimilator(self):
+        '''
+        Return the path to the assimilator tarball for transferring
+        to the remote client, rebuilding if needed.  Supports building
+        for multiple flavors (saving as different filenames)
+        '''
+        (digestVersion, shouldRebuild, trovesNeeded) = self._makeRebuildDecision()
+        if shouldRebuild:
+            self._buildTarball(digestVersion, trovesNeeded)
+        return self.buildResult
 
-     def _downloadConaryPackages(self, trovesNeeded):
- 
-         #os.mkdir(os.path.join(fsRoot, 'root'))
-         #def localCB(msg):
-         #    print msg
-         util.mkdirChain(os.path.dirname(self.conaryClient.db.dbpath))
-         #  self.conaryClient.setUpdateCallback(UpdateCallback(localCB))
-         job = self.conaryClient.newUpdateJob()
-         jobTups = [(n, (None, None), (v, f), True)
-                 for (n, v, f) in trovesNeeded]
-         #print jobTups
-         tagScriptPath=os.path.join(self.buildRoot, 'var/spool/tmp')
-         util.mkdirChain(tagScriptPath)
-         tagScriptFile=os.path.join(tagScriptPath, 'assimilate_tags.sh')
-         self.conaryClient.prepareUpdateJob(job, jobTups, resolveDeps=False)
-         self.conaryClient.applyUpdate(job, tagScript=tagScriptFile)
-         self.conaryClient.close()
+    def _downloadConaryPackages(self, trovesNeeded):
 
-     def _lastDigestVersion(self):
-         '''
-         What digest version corresponds to the last time the tarball
-         was built?  Returns None if unable to determine.  If this version
-         does not match the current digest version we will rebuild
-         the tarball.
-         '''
-         digestFn = os.path.join(self.buildRoot, 'var/spool/rpath/assimilator.digest')
-         if not os.path.exists(digestFn):
-             return None
-         digestFile = open(digestFn)
-         data = digestFile.read().strip()
-         digestFile.close()
-         return data
+        #os.mkdir(os.path.join(fsRoot, 'root'))
+        #def localCB(msg):
+        #    print msg
+        util.mkdirChain(os.path.dirname(self.conaryClient.db.dbpath))
+        #  self.conaryClient.setUpdateCallback(UpdateCallback(localCB))
+        job = self.conaryClient.newUpdateJob()
+        jobTups = [(n, (None, None), (v, f), True)
+                for (n, v, f) in trovesNeeded]
+        #print jobTups
+        tagScriptPath=os.path.join(self.buildRoot, 'var/spool/tmp')
+        util.mkdirChain(tagScriptPath)
+        tagScriptFile=os.path.join(tagScriptPath, 'assimilate_tags.sh')
+        self.conaryClient.prepareUpdateJob(job, jobTups, resolveDeps=False)
+        self.conaryClient.applyUpdate(job, tagScript=tagScriptFile)
+        self.conaryClient.close()
 
-     def _makeRebuildDecision(self):
-         '''
-         Does the assimilator payload need a rebuild?  Returns a tuple
-         of the current digest version and True/False answering that
-         question.
-         '''
-         pm = PayloadCalculator(client=self.conaryClient, label=self.rLabel, 
-             troves=self.groups, flavor=self.flavor)
-         digestVersion = pm.digestVersion()
-         trovesNeeded  = pm.matched
-         if self.forceRebuild or not os.path.exists(self.buildResult):
-             return (digestVersion, True, trovesNeeded)
-         lastDigestVersion = self._lastDigestVersion()
-         if lastDigestVersion is None or lastDigestVersion != digestVersion:
-             return (digestVersion, True, trovesNeeded)
-         return (digestVersion, False, trovesNeeded)
+    def _lastDigestVersion(self):
+        '''
+        What digest version corresponds to the last time the tarball
+        was built?  Returns None if unable to determine.  If this version
+        does not match the current digest version we will rebuild
+        the tarball.
+        '''
+        digestFn = os.path.join(self.buildRoot, 'var/spool/rpath/assimilator.digest')
+        if not os.path.exists(digestFn):
+            return None
+        digestFile = open(digestFn)
+        data = digestFile.read().strip()
+        digestFile.close()
+        return data
 
-     def _writeFileInBuildRoot(self, path, filename, contents):
-         '''
-         Create a file inside of the tarball build root
-         Adding intermediate paths as needed.
-         '''
-         buildPath = os.path.join(self.buildRoot, path)
-         util.mkdirChain(buildPath)
-         filePath = os.path.join(buildPath, filename)
-         handle = open(filePath, "w+") 
-         handle.write(contents)
-         handle.close()
+    def _makeRebuildDecision(self):
+        '''
+        Does the assimilator payload need a rebuild?  Returns a tuple
+        of the current digest version and True/False answering that
+        question.
+        '''
+        pm = PayloadCalculator(client=self.conaryClient, label=self.rLabel, 
+            troves=self.groups, flavor=self.flavor)
+        digestVersion = pm.digestVersion()
+        trovesNeeded  = pm.matched
+        if self.forceRebuild or not os.path.exists(self.buildResult):
+            return (digestVersion, True, trovesNeeded)
+        lastDigestVersion = self._lastDigestVersion()
+        if lastDigestVersion is None or lastDigestVersion != digestVersion:
+            return (digestVersion, True, trovesNeeded)
+        return (digestVersion, False, trovesNeeded)
 
-     def _writeConfigFiles(self, digestVersion):
-         '''
-         Create config files for conary & registration
+    def _writeFileInBuildRoot(self, path, filename, contents):
+        '''
+        Create a file inside of the tarball build root
+        Adding intermediate paths as needed.
+        '''
+        buildPath = os.path.join(self.buildRoot, path)
+        util.mkdirChain(buildPath)
+        filePath = os.path.join(buildPath, filename)
+        handle = open(filePath, "w+") 
+        handle.write(contents)
+        handle.close()
 
-         rpath_bootstrap.sh -- the bootstrap script
-         assimilator -- sets the install label path for the system
+    def _writeConfigFiles(self, digestVersion):
+        '''
+        Create config files for conary & registration
 
-         TODO: add default to --no-deps
-         TODO: write CIM cert
-         '''
-         self._writeFileInBuildRoot(
-             'usr/share/bin', 'rpath_bootstrap.py',
-             LinuxAssimilatorBuilder.BOOTSTRAP_SCRIPT,
-         )
-         self._writeFileInBuildRoot(
-             'etc/conary/config.d', 'assimilator',
-             "installLabelPath %s\n" % self.rLabel
-         )
-         self._writeFileInBuildRoot(
-             'etc/conary/rpath-tools/certs', 'rbuilder-hg.pem',
-             self.caCert
-         )
-         self._writeFileInBuildRoot(
-              'var/spool/rpath', 'assimilator.digest',
-              digestVersion,
-         )
+        rpath_bootstrap.sh -- the bootstrap script
+        assimilator -- sets the install label path for the system
 
-     def _buildTarball(self, digestVersion, trovesNeeded):
-         '''
-         Builds assimilator tarball on the worker node
-         '''
+        TODO: add default to --no-deps
+        '''
+        self._writeFileInBuildRoot(
+            'usr/share/bin', 'rpath_bootstrap.py',
+            LinuxAssimilatorBuilder.BOOTSTRAP_SCRIPT,
+        )
+        self._writeFileInBuildRoot(
+            'etc/conary/config.d', 'assimilator',
+            "installLabelPath %s\n" % self.rLabel
+        )
+        self._writeFileInBuildRoot(
+            'etc/conary/rpath-tools/certs', 'rbuilder-hg.pem',
+            self.caCert
+        )
+        self._writeFileInBuildRoot(
+            'var/spool/rpath', 'assimilator.digest',
+            digestVersion,
+        )
 
-         # if buildroot already exists, unlink it
-         # then create empty buildroot
-         shutil.rmtree(self.buildRoot, ignore_errors=True)
-         try: 
-             os.makedirs(self.buildRoot)
-         except OSError:
-             pass
+    def _buildTarball(self, digestVersion, trovesNeeded):
+        '''
+        Builds assimilator tarball on the worker node
+        '''
 
-         self._downloadConaryPackages(trovesNeeded)
+        # if buildroot already exists, unlink it
+        # then create empty buildroot
+        shutil.rmtree(self.buildRoot, ignore_errors=True)
+        try: 
+            os.makedirs(self.buildRoot)
+        except OSError:
+            pass
 
-         self._writeConfigFiles(digestVersion)
-         tar = tarfile.TarFile(self.buildResult, 'w')
-         tar.add(self.buildRoot, '/')
-         tar.close()
-         return self.buildResult
+        self._downloadConaryPackages(trovesNeeded)
+
+        self._writeConfigFiles(digestVersion)
+        tar = tarfile.TarFile(self.buildResult, 'w')
+        tar.add(self.buildRoot, '/')
+        tar.close()
+        return self.buildResult
 
 class PayloadCalculator(object):
     '''

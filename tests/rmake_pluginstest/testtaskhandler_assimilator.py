@@ -154,6 +154,10 @@ class AssimilatorTest(TestBase):
             def _versionFromCentOSRelease(self, output):
                 return ['CentOS','5']
 
+            def _makePayload(self):
+                # just to prevent an attempt to build it
+                return "/etc/hosts"
+
         asim = SlightlyWeakenedAssimilator(
             sshConnector=conn,
             caCert='imaginary cert contents here',
