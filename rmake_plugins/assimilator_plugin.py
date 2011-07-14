@@ -165,6 +165,7 @@ class BootstrapTask(AssimilatorTaskHandler):
         asim = LinuxAssimilator(
             sshConnector=sshConn, 
             zoneAddresses=nodes,
+            eventUuid=uuid,
             caCert=caCert
         )
         rc, output = asim.assimilate()

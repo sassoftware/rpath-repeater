@@ -27,11 +27,14 @@ class LinuxAssimilator(object):
         asim.assimilate()
     """
 
-    def __init__(self, sshConnector=None, zoneAddresses=None, caCert=None):
+    def __init__(self, sshConnector=None, zoneAddresses=None, 
+        caCert=None, eventUuid=-1):
+
         self.ssh                   = sshConnector
         self.osFamily, self.flavor = self._discoverFamilyAndFlavor()
         self.zoneAddresses         = zoneAddresses
         self.caCert                = caCert
+        self.eventUuid             = eventUuid
         self.builder = LinuxAssimilatorBuilder(
             osFamily = self.osFamily,
             caCert   = caCert,
@@ -88,7 +91,9 @@ class LinuxAssimilator(object):
         commands = []
         addrs = " ".join(self.zoneAddresses)
         commands.append("cd /; tar -xf /tmp/rpath_assimilator.tar")
-        commands.append("python /usr/share/bin/rpath_bootstrap.py %s" % addrs)
+        script = "python /usr/share/bin/rpath_bootstrap.py"
+        commands.append("%s %s %s > /var/log/rpath_bootstrap.log 2>&1" % 
+            (script, self.eventUuid, addrs))
         return commands
 
     def runCmd(self, cmd):
@@ -144,7 +149,7 @@ class LinuxAssimilatorBuilder(object):
      BOOTSTRAP_SCRIPT = '''
 #!/usr/bin/python
 # rPath Linux assimilation bootstrap script
-
+# usage: rpath_bootstrap.py eventUuid zoneAddress zoneAddress ...
 import subprocess
 import sys
 import os
@@ -169,7 +174,7 @@ except OSError:
     pass
 fd = open("/etc/conary/rpath-tools/config.d/directMethod", "w+")
 fd.write("directMethod []\\n")
-for zoneAddr in sys.argv[1:]:
+for zoneAddr in sys.argv[2:]:
     fd.write("directMethod %s\\n" % zoneAddr)
 fd.close()
 
@@ -192,7 +197,7 @@ print "- waiting 5 seconds for CIM to come online"
 time.sleep(5)
 
 print "- registering"
-cmd = "rpath-register"
+cmd = "rpath-register --event-uuid=%s" % sys.argv[1]
 rc = subprocess.call(cmd, shell=True)
 print cmd
 if not rc == 0:
@@ -289,7 +294,7 @@ sys.exit(0)
          self.conaryClient.applyUpdate(job, tagScript=tagScriptFile)
          self.conaryClient.close()
 
-     def _getDigestVersion(self):
+     def _lastDigestVersion(self):
          '''
          What digest version corresponds to the last time the tarball
          was built?  Returns None if unable to determine.  If this version
