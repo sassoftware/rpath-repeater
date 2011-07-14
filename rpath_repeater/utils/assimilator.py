@@ -156,7 +156,7 @@ import os
 import time
 
 print "- running tag scripts"
-cmd = "/var/spool/tmp/assimilate_tags.sh"
+cmd = "sh /var/spool/tmp/assimilate_tags.sh"
 print cmd
 cmd = subprocess.call(cmd, shell=True)
 
