@@ -2,6 +2,7 @@
 # SSH node communication tools
 
 import paramiko
+import logging
 
 class SshConnector(object):
 
@@ -22,6 +23,13 @@ class SshConnector(object):
     def __init__(self, host=None, port=22, user='root', password='password', 
                  key=None, clientClass=paramiko.SSHClient, 
                  sftpClass=paramiko.SFTPClient):
+       ''' 
+       Represents one attempt to connect to a system.
+       Password is only used if sshKey is not provided or sshKey is locked
+       in which case it acts as a password unlock key.
+
+       Alternative ssh client classes can be passed in for testing.
+       '''
        self.host        = host
        self.port        = port
        self.user        = user
@@ -30,12 +38,22 @@ class SshConnector(object):
        self.clientClass = clientClass
        self.sftpClass   = sftpClass
        self.client      = self._genClient()
+       if self.user is None:
+           self.user = 'root'
+       
 
     def _genClient(self):
        '''
        Get a SSHClient handle, allows auth by key or username/password
        '''
        client = self.clientClass()
+       # try to avoid stdout spewage from Paramiko
+
+       logger = paramiko.util.logging.getLogger()
+       logger.setLevel(logging.CRITICAL)
+
+       client.set_log_channel(None)
+
        client.load_system_host_keys()
        # might want an 'ignore' policy that doesn't chirp to stderr later
        client.set_missing_host_key_policy(paramiko.WarningPolicy())

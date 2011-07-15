@@ -99,9 +99,9 @@ class LinuxAssimilator(object):
         ''' 
         Run command via SSH, logging into buffer
         '''
-        output = "\n(running) %s:\n" % cmd
+        output = "\n%s\n" % cmd
         rc, cmdOutput = self.ssh.execCommand(cmd)
-        output += "\n%s" % cmdOutput
+        output += "%s\n" % cmdOutput
         return rc, output
 
     def assimilate(self):
@@ -124,8 +124,8 @@ class LinuxAssimilator(object):
             rc, output = self.runCmd(cmd)
             allOutput += "\n%s" % output
             if rc != 0:
-                raise Exception("Assimilator failed nonzero (%s, %s), thus far=%s"  
-                    % (cmd, rc, allOutput))
+                self.ssh.close()
+                return (rc, allOutput)
 
         # all commands successful
         self.ssh.close()
@@ -161,9 +161,12 @@ import socket
 logger = logging.getLogger('bootstrap')
 logger.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s - %(levelname)s : %(message)s')
+formatter2 = logging.Formatter('%(message)s')
 handler = logging.FileHandler('/var/log/bootstrap.log')
 logger.addHandler(handler)
+logger.addHandler(handler2)
 handler.setFormatter(formatter)
+handler2.setFormatter(formatter2)
 
 def runCmd(cmd, must_succeed=False):
     logger.info("(command): %s" % cmd)
@@ -381,10 +384,14 @@ sys.exit(0)
             'usr/share/bin', 'rpath_bootstrap.py',
             LinuxAssimilatorBuilder.BOOTSTRAP_SCRIPT,
         )
+        assimConfig = "installLabelPath %s\n" % self.rLabel
+        assimConfig = assimConfig + "ignoreDependencies abi soname file \
+             trove user group cil java python perl ruby php rpm rpmlib\n"
         self._writeFileInBuildRoot(
             'etc/conary/config.d', 'assimilator',
-            "installLabelPath %s\n" % self.rLabel
+            assimConfig
         )
+        
         self._writeFileInBuildRoot(
             'etc/conary/rpath-tools/certs', 'rbuilder-hg.pem',
             self.caCert

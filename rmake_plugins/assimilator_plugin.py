@@ -172,14 +172,17 @@ class BootstrapTask(AssimilatorTaskHandler):
         sshConn.close()
         outParams = {}
 
+        # GUI only shows last line, so not sending
+        for line in output.split("\n"):
+            if line != "":
+                self.sendStatus(C.MSG_GENERIC, line)
+        import epdb; epdb.serve()
+
         if rc != 0:
             outParams = dict(
-                errorSummary = 'remote operations failed',
+                errorSummary = "remote operations failed, see /var/log/bootstrap.log on remote" % output,
                 errorDetails = output
             )
-        else:
-            output = dict()
-
         return (rc, outParams)
         
 
