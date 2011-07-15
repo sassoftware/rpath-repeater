@@ -136,7 +136,7 @@ class AssimilatorTest(TestBase):
         defaults.update(kwargs)
         return self.client.AssimilatorParams(**defaults)
 
-    def testLowLevelMockedConnect(self):
+    def _disabled_testLowLevelMockedConnect(self):
         '''
         make a fake SSH connection, observe the counts of various
         operations we expect to run.  
