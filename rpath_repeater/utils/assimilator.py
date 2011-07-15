@@ -149,13 +149,14 @@ class LinuxAssimilatorBuilder(object):
 #!/usr/conary/bin/python
 
 # rPath Linux assimilation bootstrap script
-# usage: rpath_bootstrap.py eventUuid zoneAddress zoneAddress ...
+# usage: rpath_bootstrap.py eventUuid worker:port worker:port ...
 
 import subprocess
 import sys
 import os
 import time
 import logging
+import socket
 
 logger = logging.getLogger('bootstrap')
 logger.setLevel(logging.INFO)
@@ -181,6 +182,13 @@ def runCmd(cmd, must_succeed=False):
 
 logger.info("processing tag scripts")
 runCmd("sh /var/spool/tmp/assimilate_tags.sh", must_succeed=True)
+
+logger.info("configuring conaryProxy")
+proxyFile = open('/etc/conary/config.d/rpath-tools-conaryProxy','w')
+# using the worker node address
+server, port = sys.argv[2].split(":")
+proxyFile.write("conaryProxy https://%s\\n" % server)
+proxyFile.close()
 
 logger.info("updating packages")
 cmd = "conary update conary sblim-sfcb-conary sblim-sfcb-schema-conary"
@@ -208,10 +216,19 @@ cmd = cmd + " /etc/conary/rpath-tools/certs/%s.0" % sslpath
 runCmd(cmd)
 
 logger.info("(re)starting CIM")
-runCmd("/etc/rc.d/init.d/sfcb-conary restart")
+runCmd("service sfcb-conary restart")
 
-logger.info("waiting 5 seconds for CIM to come online")
-time.sleep(5)
+logger.info("waiting for CIM to come online")
+s = socket.socket()
+socket_ok = False
+for x in range(0,5):
+    try:
+        s.connect(('127.0.0.1', 5989))
+        socket_ok=True
+    except Exception, e:
+        time.sleep(2)
+if not socket_ok:
+    logger.error('CIM wait timeout exceeded, registration failure expected')
 
 logger.info("registering")
 runCmd("rpath-register --event-uuid=%s" % sys.argv[1], must_succeed=True)
@@ -376,7 +393,7 @@ sys.exit(0)
             'var/spool/rpath', 'assimilator.digest',
             digestVersion,
         )
-
+ 
     def _buildTarball(self, digestVersion, trovesNeeded):
         '''
         Builds assimilator tarball on the worker node
