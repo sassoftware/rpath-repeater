@@ -3,7 +3,7 @@
 #
 
 from rpath_repeater.utils.base_forwarding_plugin import BaseException
-from rpath_repeater.utils.base_forwarding_plugin import AuthenticationError
+from rpath_repeater.utils.base_forwarding_plugin import AuthenticationError  # pyflakes=ignore
 
 class UpdateError(BaseException):
     pass
