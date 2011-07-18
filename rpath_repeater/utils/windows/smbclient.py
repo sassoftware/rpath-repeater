@@ -51,7 +51,7 @@ class SMBClient(object):
         # Older mount.cifs don't seem to support passing the user via an
         # environment variable
         self._mount_cmd = [ 'sudo', '/bin/mount', '-n', '-t', 'cifs', '-o',
-            'user=%(user)s,password=%(password)s',
+            'user=%(user)s,password=%(password)s,forcedirectio',
             '//%%(host)s/%s$' % self._driveLetter ]
         self._mount_env = dict(PASSWD=self._authInfo.password)
 
@@ -146,6 +146,7 @@ class SMBClient(object):
     def pathopen(self, *paths, **kwargs):
         mode = kwargs.get('mode', 'r')
         path = self.pathjoin(*paths)
+
         return open(path, mode)
 
     def getWindowsPath(self, *paths):

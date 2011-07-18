@@ -9,18 +9,22 @@ Representation of a Windows system.
 from rmake3.lib import uuid
 
 from wmiclient import WMIClient
+from wmiclient import WMIAccessDeniedError
 
 from rpath_repeater.utils.windows import errors
 from rpath_repeater.utils.windows.rtis import rTIS
 from rpath_repeater.utils.windows.updates import UpdateJob
 from rpath_repeater.utils.windows.inventory import Inventory
 from rpath_repeater.utils.windows.smbclient import SMBClient
+from rpath_repeater.utils.windows.errors import AuthenticationError
 from rpath_repeater.utils.windows.callbacks import RepeaterWMICallback
 
 def cleanup(func):
     def wrapper(self, *args, **kwargs):
         try:
             res = func(self, *args, **kwargs)
+	except WMIAccessDeniedError, e:
+            raise AuthenticationError, str(e)
         finally:
             self.smb.close()
         return res
@@ -40,8 +44,11 @@ class WindowsSystem(object):
         self.rtis = rTIS(self.wmi, self.smb, callback=self.callback)
         self.inventory = Inventory(self.wmi, callback=self.callback)
 
-        self.rtis.setup()
-        self.inventory.setup()
+        try:
+            self.rtis.setup()
+            self.inventory.setup()
+        except WMIAccessDeniedError, e:
+            raise AuthenticationError, str(e)
 
     @cleanup
     def register(self):
