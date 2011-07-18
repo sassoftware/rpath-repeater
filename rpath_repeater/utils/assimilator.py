@@ -385,8 +385,9 @@ sys.exit(0)
             LinuxAssimilatorBuilder.BOOTSTRAP_SCRIPT,
         )
         assimConfig = "installLabelPath %s\n" % self.rLabel
-        assimConfig = assimConfig + "ignoreDependencies abi soname file \
-             trove user group cil java python perl ruby php rpm rpmlib\n"
+        assimConfig = assimConfig + "ignoreDependencies abi soname file" + \
+             " trove userinfo groupinfo CIL java python perl ruby php rpm" + \
+             " rpmlib\n"
         self._writeFileInBuildRoot(
             'etc/conary/config.d', 'assimilator',
             assimConfig
