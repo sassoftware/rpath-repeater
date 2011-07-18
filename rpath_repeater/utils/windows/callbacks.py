@@ -63,9 +63,11 @@ class RepeaterWMICallback(WMICallback, BaseCallback):
 
     def info(self, msg):
         self._log(Codes.MSG_GENERIC, msg)
+        self._logger.info(msg)
 
     def error(self, msg):
         self._log(Codes.ERR_GENERIC, msg)
+        self._logger.error(msg)
 
     def debug(self, msg):
         msg = self._prependHost(msg)
