@@ -14,6 +14,7 @@ from conary.conaryclient import ConaryClient
 from conary.conarycfg import ConaryConfiguration
 from conary.versions import Label
 from conary.deps import deps
+from rpath_repeater.codes import Codes as C
 #from conary.callbacks import UpdateCallback
 
 class LinuxAssimilator(object):
@@ -28,8 +29,9 @@ class LinuxAssimilator(object):
     """
 
     def __init__(self, sshConnector=None, zoneAddresses=None, 
-        caCert=None, eventUuid=-1):
+        caCert=None, status=None, eventUuid=-1):
 
+        self._status               = status
         self.ssh                   = sshConnector
         self.osFamily, self.flavor = self._discoverFamilyAndFlavor()
         self.zoneAddresses         = zoneAddresses
@@ -38,9 +40,15 @@ class LinuxAssimilator(object):
         self.builder = LinuxAssimilatorBuilder(
             osFamily = self.osFamily,
             caCert   = caCert,
-            flavor   = self.flavor
+            flavor   = self.flavor,
+            status   = self.status
         )
         self.payload       = self._makePayload()
+
+    def status(self, code, msg):
+       '''Share a status message'''
+       if self._status:
+           self._status(code, msg)
 
     def _makePayload(self):
         '''what tarball to deploy? stubbed out for easier mock testing'''
@@ -48,10 +56,12 @@ class LinuxAssimilator(object):
 
     def _discoverFamilyAndFlavor(self):
         '''what kind of Linux OS is this?'''
+        self.status(C.MSG_GENERIC, 'detecting flavor')
         rc, output = self.ssh.execCommand('uname -a')
         flavor = 'x86'
         if output.find("x86_64") != -1:
             flavor = 'x86_64'
+        self.status(C.MSG_GENERIC, 'detecting release')
         rc, output = self.ssh.execCommand('cat /etc/redhat-release')
         if rc == 0:
             if output.find("Red Hat") != -1:
@@ -115,6 +125,7 @@ class LinuxAssimilator(object):
 
         allOutput = ""
         # place the deploy tarball onto the system
+        self.status(C.MSG_GENERIC, 'deploying payload')
         self.ssh.putFile(self.payload, "/tmp/rpath_assimilator.tar")
         
         commands  = self._commands()
@@ -240,8 +251,11 @@ runCmd("rpath-register --event-uuid=%s" % sys.argv[1], must_succeed=True)
 sys.exit(0)
 '''
 
-    def __init__(self, osFamily=None, caCert=None, flavor='x86', forceRebuild=False):
+    def __init__(self, osFamily=None, caCert=None, 
+        flavor='x86', status=None, forceRebuild=False):
+
         '''Does not build the payload, just gets parameters ready'''
+        self._status = status    
         if osFamily is None:
            raise Exception("osFamily is required")
         if caCert is None:
@@ -260,13 +274,13 @@ sys.exit(0)
         ]
         self.caCert = caCert
         self.rLabel = self._install_label(osFamily)
-        #self.cmdFlags = "--no-deps --no-restart --no-interactive"
-        #self.cmdRoot  = "--root %s" % self.buildRoot
-        #self.cmdLabel = "--install-label %s" % self.rLabel
-        #self.cmdGroups = " ".join(self.groups)
         self.forceRebuild = forceRebuild
-        #self.config = "--config \"includeConfigFile http://localhost/conaryrc\""
         self.conaryClient = self._conaryClient()
+
+    def status(self, code, msg):
+       ''' Share a status message'''
+       if self._status:
+           self._status(code, msg)
 
     def _conaryClient(self):
         '''
@@ -419,6 +433,7 @@ sys.exit(0)
         self._downloadConaryPackages(trovesNeeded)
 
         self._writeConfigFiles(digestVersion)
+        self.status(C.MSG_GENERIC, 'building archive')
         tar = tarfile.TarFile(self.buildResult, 'w')
         tar.add(self.buildRoot, '/')
         tar.close()

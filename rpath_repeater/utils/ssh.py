@@ -3,6 +3,7 @@
 
 import paramiko
 import logging
+from rpath_repeater.codes import Codes as C
 
 class SshConnector(object):
 
@@ -21,7 +22,7 @@ class SshConnector(object):
     """
 
     def __init__(self, host=None, port=22, user='root', password='password', 
-                 key=None, clientClass=paramiko.SSHClient, 
+                 key=None, status=None, clientClass=paramiko.SSHClient, 
                  sftpClass=paramiko.SFTPClient):
        ''' 
        Represents one attempt to connect to a system.
@@ -37,10 +38,14 @@ class SshConnector(object):
        self.key         = key
        self.clientClass = clientClass
        self.sftpClass   = sftpClass
-       self.client      = self._genClient()
+       self._status    = status 
        if self.user is None:
            self.user = 'root'
-       
+       self.client      = self._genClient()
+      
+    def status(self, code, msg):
+       if self._status:
+           self._status(code, msg)
 
     def _genClient(self):
        '''
@@ -61,6 +66,7 @@ class SshConnector(object):
            self.key = paramiko.PKey(data=self.key)
            # try the ssh key, password protected keys are ok
            try:
+               self.status(C.MSG_GENERIC, 'attempting SSH with key')
                client.connect(self.host, port=self.port,
                    password=self.password, pkey=self.key,
                    allow_agent=True) # look_for_keys=True)
@@ -69,6 +75,7 @@ class SshConnector(object):
                raise Exception("invalid key password")
        else:
            # no key provided, try username/password
+           self.status(C.MSG_GENERIC, 'attempting SSH with password')
            client.connect(self.host, port=self.port, username=self.user,
                password=self.password, allow_agent=True)
                # look_for_keys=True)

@@ -151,7 +151,8 @@ class BootstrapTask(AssimilatorTaskHandler):
             key      = auth.get('sshKey', None)
             try:
                 sshConn = SshConnector(host=host, port=port, 
-                    user=user, password=password, key=key)
+                    user=user, password=password, key=key, 
+                    status=self.sendStatus)
                 break
             except Exception, e:
                 savedException = e
@@ -166,16 +167,12 @@ class BootstrapTask(AssimilatorTaskHandler):
             sshConnector=sshConn, 
             zoneAddresses=nodes,
             eventUuid=uuid,
-            caCert=caCert
+            caCert=caCert,
+            status=self.sendStatus
         )
         rc, output = asim.assimilate()
         sshConn.close()
         outParams = {}
-
-        # GUI only shows last line, so not sending
-        for line in output.split("\n"):
-            if line != "":
-                self.sendStatus(C.MSG_GENERIC, line)
 
         if rc != 0:
             outParams = dict(
