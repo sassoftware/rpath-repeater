@@ -176,11 +176,10 @@ class BootstrapTask(AssimilatorTaskHandler):
         for line in output.split("\n"):
             if line != "":
                 self.sendStatus(C.MSG_GENERIC, line)
-        import epdb; epdb.serve()
 
         if rc != 0:
             outParams = dict(
-                errorSummary = "remote operations failed, see /var/log/bootstrap.log on remote" % output,
+                errorSummary = "Error on remote, see /var/log/bootstrap.log",
                 errorDetails = output
             )
         return (rc, outParams)
