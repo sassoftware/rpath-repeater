@@ -3,6 +3,7 @@
 #
 
 from rpath_repeater.utils.base_forwarding_plugin import BaseException
+from rpath_repeater.utils.base_forwarding_plugin import AuthenticationError
 
 class UpdateError(BaseException):
     pass
