@@ -123,7 +123,9 @@ class AssimilatorParams(_BaseSlotCompare):
     # sshAuth is a list of hashes to try, like so:
     # [{ 'sshUser' : user, 'sshPassword' : pass, 'sshKey' : key_path_or_bytes }, {...}, ...]
     # caCert are the contents of the cert
-    __slots__ = [ 'host', 'port', 'caCert', 'sshAuth', 'eventUuid' ]
+    # platformLabels is a pickled hash of platforms (eg: centos-5 to labels to use
+    #    when building the payload)
+    __slots__ = [ 'host', 'port', 'caCert', 'sshAuth', 'platformLabels', 'eventUuid' ]
 
 class ManagementInterfaceParams(_BaseSlotCompare):
     """

@@ -4,6 +4,7 @@
 # username/password or SSH key, and then pushing a registration
 # tarball (RPM?) onto it.  May learn other tricks later.
 
+import cPickle
 from rmake3.core import types
 from rmake3.core import handler
 from rpath_repeater.models import AssimilatorParams
@@ -12,12 +13,18 @@ from rpath_repeater.utils import base_forwarding_plugin as bfp
 from rpath_repeater.utils.ssh import SshConnector
 from rpath_repeater.utils.assimilator import LinuxAssimilator
 
+from conary.lib import cfg as cny_cfg
+from conary.lib import cfgtypes as ct
+
 # various plugin boilerplate...
 XML = bfp.XML
 ASSIMILATOR_JOB = bfp.PREFIX + '.assimilatorplugin'
 ASSIMILATOR_TASK_BOOTSTRAP = ASSIMILATOR_JOB + '.bootstrap'
 AssimilatorData = types.slottype('AssimilatorData', 
     'p nodes response') # where p is a AssimilatorParam
+
+class AssimilatorConfig(cny_cfg.ConfigFile):
+    platformLabel = (ct.CfgDict(ct.CfgString), None)
 
 ###########################################################################    
 
@@ -30,8 +37,11 @@ class AssimilatorPlugin(bfp.BaseForwardingPlugin):
     SSH plugin is only used if CIM is unreachable, and the only role of 
     the SSH plugin is to install the CIM plugin.
     """
+    PLUGIN_CONFIG = None
 
     def dispatcher_pre_setup(self, dispatcher):
+        cfg = self.populateConfigFromOptions(AssimilatorConfig())
+        AssimilatorPlugin.PLUGIN_CONFIG = cfg
         handler.registerHandler(AssimilatorHandler)
     
     @classmethod
@@ -74,6 +84,8 @@ class AssimilatorHandler(bfp.BaseHandler):
         self.setStatus(C.MSG_START, "Initiating SSH call")
         self.initCall()
         self.sshParams = self.initParams(self.data)
+        cfg = AssimilatorPlugin.PLUGIN_CONFIG 
+        self.sshParams.platformLabels = cPickle.dumps(cfg.platformLabel)
         self.eventUuid = self.sshParams.eventUuid
 
         if not self.zone:
@@ -117,9 +129,10 @@ class BootstrapTask(AssimilatorTaskHandler):
             "Contacting host %s on port %d to bootstrap"
                 % (data.p.host, data.p.port))
 
+        platformLabels = cPickle.loads(data.p.platformLabels)
         retVal, outParams = self._bootstrap(host=data.p.host, port=data.p.port, \
             nodes=data.nodes, sshAuth=data.p.sshAuth, uuid=data.p.eventUuid, \
-            caCert=data.p.caCert)
+            caCert=data.p.caCert, platformLabels=platformLabels)
 
         # xml doesn't contain much, this returns what the CIM task returns...
         data.response = "<system/>"
@@ -136,7 +149,7 @@ class BootstrapTask(AssimilatorTaskHandler):
                     (data.p.host, errorSummary), errorDetails)
 
     def _bootstrap(self, host=None, port=None, nodes=None, 
-        sshAuth=None, caCert=None, uuid=None):
+        sshAuth=None, caCert=None, uuid=None, platformLabels=None):
         '''
         Guts of actual bootstrap code...
         '''
@@ -168,6 +181,7 @@ class BootstrapTask(AssimilatorTaskHandler):
             zoneAddresses=nodes,
             eventUuid=uuid,
             caCert=caCert,
+            platformLabels=platformLabels,
             status=self.sendStatus
         )
         rc, output = asim.assimilate()

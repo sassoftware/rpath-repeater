@@ -29,19 +29,21 @@ class LinuxAssimilator(object):
     """
 
     def __init__(self, sshConnector=None, zoneAddresses=None, 
-        caCert=None, status=None, eventUuid=-1):
+        caCert=None, status=None, platformLabels=None, eventUuid=-1):
 
         self._status               = status
         self.ssh                   = sshConnector
+        self.platformLabels        = platformLabels
         self.osFamily, self.flavor = self._discoverFamilyAndFlavor()
         self.zoneAddresses         = zoneAddresses
         self.caCert                = caCert
         self.eventUuid             = eventUuid
         self.builder = LinuxAssimilatorBuilder(
-            osFamily = self.osFamily,
-            caCert   = caCert,
-            flavor   = self.flavor,
-            status   = self.status
+            osFamily       = self.osFamily,
+            caCert         = caCert,
+            flavor         = self.flavor,
+            status         = self.status,
+            platformLabels = platformLabels
         )
         self.payload       = self._makePayload()
 
@@ -252,7 +254,7 @@ sys.exit(0)
 '''
 
     def __init__(self, osFamily=None, caCert=None, 
-        flavor='x86', status=None, forceRebuild=False):
+        flavor='x86', status=None, forceRebuild=False, platformLabels=None):
 
         '''Does not build the payload, just gets parameters ready'''
         self._status = status    
@@ -263,6 +265,7 @@ sys.exit(0)
         platDir = "-".join(osFamily)
         self.osFamily = osFamily
         self.flavor = flavor
+        self.platformLabels = platformLabels
         self.buildRoot = "/tmp/rpath_assimilate_%s_%s_build" % (platDir, flavor)
         self.buildResult = "/tmp/rpath_assimilate_%s_%s.tar" % (platDir, flavor) 
         self.groups = [
@@ -311,7 +314,11 @@ sys.exit(0)
         make, model = osFamily
         make = make.lower()
         model = model.lower()
-        return "%s.rpath.com@rpath:%s-%s-common" % (make, make, model)
+        combined = "%s-%s" % (make, model)
+        label = self.platformLabels.get(combined, None)
+        if label is None:
+           raise Exception("'pluginOption assimilator_plugin platformLabel %s <LABEL>' is not configured in rmake3 server config" % combined)
+        return label
 
     def getAssimilator(self):
         '''
