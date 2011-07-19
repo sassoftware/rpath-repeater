@@ -4,7 +4,6 @@
 # username/password or SSH key, and then pushing a registration
 # tarball (RPM?) onto it.  May learn other tricks later.
 
-import cPickle
 from rmake3.core import types
 from rmake3.core import handler
 from rpath_repeater.models import AssimilatorParams
@@ -85,7 +84,7 @@ class AssimilatorHandler(bfp.BaseHandler):
         self.initCall()
         self.sshParams = self.initParams(self.data)
         cfg = AssimilatorPlugin.PLUGIN_CONFIG 
-        self.sshParams.platformLabels = cPickle.dumps(cfg.platformLabel)
+        self.sshParams.platformLabels = cfg.platformLabel.items()
         self.eventUuid = self.sshParams.eventUuid
 
         if not self.zone:
@@ -129,7 +128,7 @@ class BootstrapTask(AssimilatorTaskHandler):
             "Contacting host %s on port %d to bootstrap"
                 % (data.p.host, data.p.port))
 
-        platformLabels = cPickle.loads(data.p.platformLabels)
+        platformLabels = dict(data.p.platformLabels)
         retVal, outParams = self._bootstrap(host=data.p.host, port=data.p.port, \
             nodes=data.nodes, sshAuth=data.p.sshAuth, uuid=data.p.eventUuid, \
             caCert=data.p.caCert, platformLabels=platformLabels)
