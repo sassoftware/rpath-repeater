@@ -15,7 +15,6 @@ from conary.conarycfg import ConaryConfiguration
 from conary.versions import Label
 from conary.deps import deps
 from rpath_repeater.codes import Codes as C
-#from conary.callbacks import UpdateCallback
 
 class LinuxAssimilator(object):
     """
@@ -470,14 +469,11 @@ class PayloadCalculator(object):
         Returns matched troves (name, version, label) sorted by
         name (first priority) and then version (second).
         '''
-        results = []
-        for name in self.troves:
-            matches = self.repos.findTrove(self.labels, (name, None, None),
-                defaultFlavor=deps.parseFlavor("is: %s" % self.flavor))
-            results.extend(matches)        
-        results.sort(key= lambda x: x[1])
-        results.sort(key = lambda x: x[0])
-        return results
+        troves = [ (name, None, None) for name in self.troves ] 
+        results = self.repos.findTroves(self.labels, troves,
+            defaultFlavor=deps.parseFlavor("is: %s" % self.flavor))
+        withVersions = [x[0] for x in results.values()]
+        return withVersions
 
     def digestVersion(self):
         '''
