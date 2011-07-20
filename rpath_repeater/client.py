@@ -308,7 +308,15 @@ def main():
         keyData = file("/root/.ssh/id_rsa.pub").read() 
         assimilatorParams = cli.AssimilatorParams(host=system, port=22,
             eventUuid='eventUuid',
+            # normally filled in by rBuilder
             caCert=file("/srv/rbuilder/pki/hg_ca.crt").read(),
+            # normally filled in by plugin
+            platformLabels={
+                'centos-5' : [ 'jules.eng.rpath.com@rpath:centos-5-stable',
+                               'centos.rpath.com@rpath:centos-5-common' ],
+                'sles-11'  : [ 'jules.eng.rpath.com@rpath:sles-11-stable', 
+                               'sles.rpath.com@rpath:sles-11-common' ]
+            },
             sshAuth = [
                            { 
                                'sshUser'     : 'root', 

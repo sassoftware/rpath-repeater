@@ -276,7 +276,7 @@ sys.exit(0)
             "pywbem-conary" # looks like we need this too?
         ]
         self.caCert = caCert
-        self.rLabel = self._install_label(osFamily)
+        self.rLabels = self._install_labels(osFamily)
         self.forceRebuild = forceRebuild
         self.conaryClient = self._conaryClient()
 
@@ -309,16 +309,16 @@ sys.exit(0)
          
         return ConaryClient(conaryCfg)
 
-    def _install_label(self, osFamily):
+    def _install_labels(self, osFamily):
         '''Where do the conary packages come from?'''
         make, model = osFamily
         make = make.lower()
         model = model.lower()
         combined = "%s-%s" % (make, model)
-        label = self.platformLabels.get(combined, None)
-        if label is None:
+        labels = self.platformLabels.get(combined, None)
+        if labels is None:
            raise Exception("'pluginOption assimilator_plugin platformLabel %s <LABEL>' is not configured in rmake3 server config" % combined)
-        return label
+        return labels
 
     def getAssimilator(self):
         '''
@@ -370,7 +370,7 @@ sys.exit(0)
         of the current digest version and True/False answering that
         question.
         '''
-        pm = PayloadCalculator(client=self.conaryClient, label=self.rLabel, 
+        pm = PayloadCalculator(client=self.conaryClient, labels=self.rLabels, 
             troves=self.groups, flavor=self.flavor)
         digestVersion = pm.digestVersion()
         trovesNeeded  = pm.matched
@@ -406,7 +406,9 @@ sys.exit(0)
             'usr/share/bin', 'rpath_bootstrap.py',
             LinuxAssimilatorBuilder.BOOTSTRAP_SCRIPT,
         )
-        assimConfig = "installLabelPath %s\n" % self.rLabel
+        assimConfig = ""
+        for label in self.rLabels:
+            assimConfig = assimConfig + "installLabelPath %s\n" % label
         assimConfig = assimConfig + "ignoreDependencies abi soname file" + \
              " trove userinfo groupinfo CIL java python perl ruby php rpm" + \
              " rpmlib\n"
@@ -455,10 +457,10 @@ class PayloadCalculator(object):
     script.
     '''
 
-    def __init__(self, client=None, label=None, troves=[], flavor='x86'):
+    def __init__(self, client=None, labels=None, troves=[], flavor='x86'):
         self.conaryClient = client
         self.troves       = troves
-        self.label        = Label(label)
+        self.labels       = [ Label(label) for label in labels ]
         self.flavor       = flavor # string 
         self.repos        = self.conaryClient.repos  
         self.matched      = self._allMatchingTroves()               
@@ -470,7 +472,7 @@ class PayloadCalculator(object):
         '''
         results = []
         for name in self.troves:
-            matches = self.repos.findTrove(self.label, (name, None, None),
+            matches = self.repos.findTrove(self.labels, (name, None, None),
                 defaultFlavor=deps.parseFlavor("is: %s" % self.flavor))
             results.extend(matches)        
         results.sort(key= lambda x: x[1])
