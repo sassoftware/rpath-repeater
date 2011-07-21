@@ -472,7 +472,7 @@ class PayloadCalculator(object):
         troves = [ (name, None, None) for name in self.troves ] 
         results = self.repos.findTroves(self.labels, troves,
             defaultFlavor=deps.parseFlavor("is: %s" % self.flavor))
-        withVersions = [x[0] for x in results.values()]
+        withVersions = [sorted(x)[-1] for x in results.values()]
         return withVersions
 
     def digestVersion(self):
