@@ -209,6 +209,7 @@ proxyFile.close()
 logger.info("updating packages")
 cmd = "conary update conary sblim-sfcb-conary sblim-sfcb-schema-conary"
 cmd = cmd + " sblim-cmpi-network-conary sblim-cmpi-base-conary"
+cmd = cmd + " conary-cim cmpi-bindings-conary iconfig"
 cmd = cmd + " m2crypto-conary openslp-conary info-sfcb --no-deps"
 runCmd(cmd)
 
