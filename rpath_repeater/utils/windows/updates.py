@@ -194,6 +194,18 @@ class UpdateJob(object):
             for update in job:
                 self._updates.append(update)
 
+        # Move critical packages to the begining of the update job. rTIS.NET is
+        # currently hard coded to look for critical packages at index 0.
+        msis = [ x for x in self.CRITICAL_PACKAGES ]
+        names = [ x[0] for x in self._updates ]
+        if set(msis) & set(names):
+            for msi in msis:
+                if msi not in names:
+                    continue
+                idx = names.index(msi)
+                names.insert(0, names.pop(idx))
+                self._updates.insert(0, self._updates.pop(idx))
+
         return self._newSystemModel
 
     def getFileContents(self):
