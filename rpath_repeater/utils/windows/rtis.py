@@ -374,9 +374,19 @@ class rTIS(object):
         statusKey = 'Running'
         start = time.time()
         while state != 'running':
-            result = self._query(self._wmi.registryGetKey, self._params_keypath,
-                                 statusKey, raiseErrors=False)
-            state = result[0]
+            try:
+                result = self._query(self._wmi.registryGetKey,
+                                     self._params_keypath,
+                                     statusKey, raiseErrors=True)
+                state = result[0]
+
+            # FIXME: There should be a better way
+            # If we are updating rTIS as the first job, the key that we are
+            # polling could go away. Ignore missing keys. Yes this means that
+            # we could just end up waiting for 30s if there is an error, but
+            # it's better than failing.
+            except WMIFileNotFoundError:
+                pass
 
             if time.time() - start > 30:
                 raise (ServiceFailedToStartError, 'The rPath Tools Installer '
