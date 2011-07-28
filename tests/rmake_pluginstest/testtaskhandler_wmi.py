@@ -3,13 +3,14 @@
 import testsuite
 testsuite.setup()
 
-import os
 import uuid
-from conary.lib import util
+
+import wmiclient
 
 import wmi_forwarding_plugin
 
 from testtaskhandler import TestBase
+
 
 class WmiTest(TestBase):
     # These cannot be defined in setUp, they are needed in the base class
@@ -18,34 +19,34 @@ class WmiTest(TestBase):
     handlerClass = wmi_forwarding_plugin.WmiHandler
 
     class K:
+        rtisPath = 'SOFTWARE\\rPath\\rTIS.NET\\parameters'
+        inventoryPath = 'SOFTWARE\\rPath\\rTIS.NET\\inventory'
+        conaryPath = 'SOFTWARE\\rPath\\rTIS.NET\\conary'
+
         baseBoardManufacturer = ('registry', 'getkey',
             'HARDWARE\\DESCRIPTION\\System\\BIOS', 'BaseBoardManufacturer')
-        getStatusTuple = ('service', 'getstatus', 'rPath Tools Install Service')
+        getStatusTuple = ('service', 'getstatus', 'rPath Tools Installer Service')
         biosMajorRelease = ('registry', 'getkey',
             'HARDWARE\\DESCRIPTION\\System\\BIOS', 'BiosMajorRelease')
         biosMinorRelease = ('registry', 'getkey',
             'HARDWARE\\DESCRIPTION\\System\\BIOS', 'BiosMinorRelease')
-        generatedUuid = ('registry', 'getkey', 'SOFTWARE\\rPath\\inventory',
-            'generated_uuid')
-        setGeneratedUuid =  ('registry', 'setkey',
-            'SOFTWARE\\rPath\\inventory', 'generated_uuid', "feeddeadbeef")
-        localUuid = ('registry', 'getkey', 'SOFTWARE\\rPath\\inventory',
-            'local_uuid')
-        setLocalUuid = ('registry', 'setkey', 'SOFTWARE\\rPath\\inventory',
-            'local_uuid', '6947ee3b-4776-e11b-5d98-5b8284d4f810')
+        generatedUuid = ('registry', 'getkey', inventoryPath, 'generated_uuid')
+        setGeneratedUuid =  ('registry', 'setkey', inventoryPath, 'generated_uuid', "feeddeadbeef")
+        localUuid = ('registry', 'getkey', inventoryPath, 'local_uuid')
+        setLocalUuid = ('registry', 'setkey', inventoryPath, 'local_uuid', '6947ee3b-4776-e11b-5d98-5b8284d4f810')
         computerName = ('registry', 'getkey',
             'SYSTEM\\CurrentControlSet\\Control\\ComputerName\\ActiveComputerName',
             'ComputerName')
-        pollingManifest = ('registry', 'getkey', 'SOFTWARE\\rPath\\conary',
-            'polling_manifest')
-        manifest = ('registry', 'getkey', 'SOFTWARE\\rPath\\conary',
-            'manifest')
-        systemModel = ('registry', 'getkey', 'SOFTWARE\\rPath\\conary',
-            'system_model')
+        pollingManifest = ('registry', 'getkey', conaryPath, 'polling_manifest')
+        manifest = ('registry', 'getkey', conaryPath, 'manifest')
         queryNetwork = ('query', 'network')
         queryUUID = ('query', 'uuid')
-        running = ('registry', 'getkey', 'SYSTEM\\CurrentControlSet\\Services\\rPath Tools Install Service\\Parameters', 'Running')
-        setRoot = ('registry', 'setkey', 'SYSTEM\\CurrentControlSet\\Services\\rPath Tools Install Service\\Parameters', 'Root', 'C:\\Program Files\\rPath\\Updates')
+        appData = ('registry', 'getkey', 'SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Folders', 'Common AppData')
+        systemModel = ('registry', 'getkey', conaryPath, 'system_model')
+        running = ('registry', 'getkey', rtisPath, 'Running')
+        setRoot = ('registry', 'setkey', rtisPath, 'Root', 'C:\\Program Files\\rPath\\Updates')
+        getFlavor = ('registry', 'getkey', 'SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment', 'PROCESSOR_ARCHITECTURE')
+
     class MultiChoice(object):
         def __init__(self, choices):
             self._counter = 0
@@ -69,76 +70,74 @@ class WmiTest(TestBase):
         K.computerName: "my very own computer\n",
         K.localUuid: "6947ee3b-4776-e11b-5d98-5b8284d4f810\n",
         K.generatedUuid: "feeddeadbeef",
-        K.pollingManifest: """
-            group-foo=/conary.rpath.com@rpl:2/123.45:1-2-3[is: x86]
-            group-bar=/conary.rpath.com@rpl:2/923.45:9-2-3[is: x86_64]
-""",
-        K.manifest: """
-            group-foo=/conary.rpath.com@rpl:2/1-2-3[is: x86]
-            group-bar=/conary.rpath.com@rpl:2/9-2-3[is: x86_64]
-""",
-        K.systemModel: """
-            install 'group-foo=conary.rpath.com@rpl:2[is: x86]'
-            install 'group-bar=conary.rpath.com@rpl:2[is: x86_64]'
-""",
+        K.pollingManifest: [
+            'group-foo=/conary.rpath.com@rpl:2/123.45:1-2-3[is: x86]',
+            'group-bar=/conary.rpath.com@rpl:2/923.45:9-2-3[is: x86_64]'
+        ],
+        K.manifest: [
+            'group-foo=/conary.rpath.com@rpl:2/123.45:1-2-3[is: x86]',
+            'group-bar=/conary.rpath.com@rpl:2/123.45:9-2-3[is: x86_64]'
+        ],
+        K.systemModel: [
+            'install group-foo=conary.rpath.com@rpl:2/123.45:1-2-3[is: x86]',
+            'install group-bar=conary.rpath.com@rpl:2/123.45:1-4-2[is: x86_64]'
+        ],
         K.queryNetwork: "65539, 172.16.175.218, 255.255.240.0, ENG-E1DA0E00778, eng.rpath.com",
         K.queryUUID: "6947ee3b-4776-e11b-5d98-5b8284d4f810",
         K.running: "stopped",
         K.setRoot: 'bla',
+        K.appData: 'ProgramData',
+        K.getFlavor: 'x64',
     }
 
-    class WmiClient(wmi_forwarding_plugin.WMITaskHandler.WmiClientFactory):
-        QuerySleepInterval = 0.1
+    class WMICommand(object):
         _data = {}
-        def _wmiCall(self, cmd):
-            cmd = WmiTest.parseCommandLine(cmd)
-            key = tuple(cmd.args)
+
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def execute(self, *cmd):
+            key = tuple(cmd)
             val = self._data.get(key)
             if val is None:
                 raise Exception("mock me!", key)
             if isinstance(val, WmiTest.MultiChoice):
                 val = val.get()
-            if not isinstance(val, tuple):
-                return 0, val
-            return val
-
-        def _doMount(self):
-            return 0
-
-        def _doUnmount(self):
-            util.rmtree(self._rootDir)
-            os.mkdir(self._rootDir)
-            return 0
+            if not isinstance(val, (tuple, list)):
+                val = [val, ]
+            return wmiclient.WMICResults(None, 0, val, None)
 
     class CommandLine(object):
         def __init__(self, options, args):
             self.options = options
             self.args = args
 
-    @classmethod
-    def parseCommandLine(cls, cmd):
-        options = {}
-        oname = None
-        args = []
-        for a in cmd[1:]:
-            if oname is not None:
-                options[oname] = a
-                oname = None
-                continue
-            if a.startswith('--'):
-                oname = a[2:]
-                continue
-            args.append(a)
-        return cls.CommandLine(options, args)
+    def setUp(self):
+        TestBase.setUp(self)
+        import socket
+        self.mock(socket, 'gethostbyaddr', lambda a: (None, None, (a, )))
+
+        import wmiclient
+        self.mock(wmiclient, 'InteractiveCommand', self.WMICommand)
+
+        from rpath_repeater.utils.windows.rtis import rTIS
+        self.mock(rTIS, 'setup', lambda a: None)
+
+        from rpath_repeater.utils.windows.inventory import Inventory
+        self.mock(Inventory, 'setup', lambda a: None)
+
+        from rpath_repeater.utils.windows.smbclient import SMBClient
+        def mount(selfish):
+            selfish._rootdir = self.workDir
+        self.mock(SMBClient, '_mount', mount)
 
     def getClassOverrides(self, namespace):
-        wmiClientClass = self.WmiClient
-        wmiClientClass._data.clear()
-        wmiClientClass._data.update(self._defaultData)
+        WMICommandClass = self.WMICommand
+        WMICommandClass._data.clear()
+        WMICommandClass._data.update(self._defaultData)
         # Here we allow individual tests to override some of the data
-        self._data = wmiClientClass._data
-        return dict(WmiClientFactory=wmiClientClass,
-            _createGeneratedUuid=lambda x: 'feeddeadbeef')
+        self._data = WMICommandClass._data
+        return dict(_createGeneratedUuid=lambda x: 'feeddeadbeef')
 
     def _wmiParams(self, **kwargs):
         defaults = dict(
@@ -154,12 +153,11 @@ class WmiTest(TestBase):
         self.client.register_wmi(params)
         self.failUnlessEqual(
             [ (x.status.code, x.status.text) for x in self.results.register ],
-            [
-                (105, 'Contacting host 1.2.3.4 to validate credentials'),
-                (110, 'Gathering and/or generating UUIDs'),
-                (110, 'Stored UUIDs on Windows system'),
-                (200, 'Registration Complete for 1.2.3.4'),
-            ])
+            [(101, '1.2.3.4: '),
+             (110, '1.2.3.4: Registering System'),
+             (110, '1.2.3.4: Registration Complete'),
+             (200, '1.2.3.4: ')]
+            )
 
         taskData = self.results.register[-1].task_data.thaw()
         self.assertXMLEquals(taskData.object.response, """
@@ -175,10 +173,12 @@ class WmiTest(TestBase):
         self.client.poll_wmi(params)
         self.failUnlessEqual(
             [ (x.status.code, x.status.text) for x in self.results.poll ],
-            [
-                (101, 'Contacting host 1.2.3.4 on port 8135 to Poll it for info'),
-                (200, 'Host 1.2.3.4 has been polled'),
-            ])
+            [(101, '1.2.3.4: '),
+             (110, '1.2.3.4: Polling System'),
+             (110, '1.2.3.4: Retrieving polling manifest'),
+             (110, '1.2.3.4: Polling Complete'),
+             (200, '1.2.3.4: ')]
+            )
         taskData = self.results.poll[-1].task_data.thaw()
         self.assertXMLEquals(taskData.object.response, """
 <system>
@@ -226,6 +226,7 @@ class WmiTest(TestBase):
             self.client.shutdown_wmi, params)
 
     def testUpdate(self):
+        raise testsuite.SkipTestException("Need to mock conaryclient")
         self._data[self.K.getStatusTuple] = self.MultiChoice([
             "some stuff", 'Service Not Active\n', "some more stuff"])
         params = self._wmiParams()
@@ -233,7 +234,6 @@ class WmiTest(TestBase):
             "group-top2=/conary.rpath.com@rpl:2/2-2-2" ]
         self.client.update_wmi(params, sources=sources)
         lastTask = self.results.update[-1]
-        raise testsuite.SkipTestException("Need to mock conaryclient")
         self.failIf(lastTask.status.detail, lastTask.status.detail)
         self.failUnlessEqual(
             [ (x.status.code, x.status.text) for x in self.results.update ],
@@ -244,15 +244,15 @@ class WmiTest(TestBase):
 """)
 
     def testConfiguration(self):
+        raise testsuite.SkipTestException('need to mock more')
         params = self._wmiParams()
         configuration = '<values><foo>bar</foo></values>'
 
-        command = 'update=job-%s' % uuid.UUID(int=self.client._counter+1)
-        key = ('registry', 'setkey', 'SYSTEM\\CurrentControlSet\\Services\\'
-            'rPath Tools Install Service\\Parameters', 'Commands', command)
+        command = 'job-%s' % uuid.UUID(int=self.client._counter+1)
+        key = ('registry', 'setkey', self.K.rtisPath, 'Commands', command)
         self._data[key] = ''
 
-        self._data[('service', 'start', 'rPath Tools Install Service')] = ''
+        self._data[('service', 'start', 'rPath Tools Installer Service')] = 'Success'
 
         self.client.configuration_wmi(params, configuration=configuration)
 

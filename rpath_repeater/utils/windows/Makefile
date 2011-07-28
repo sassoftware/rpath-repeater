@@ -1,4 +1,5 @@
-# Copyright (c) 2010 rPath, Inc.
+#
+# Copyright (c) 2006-2010 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -11,25 +12,17 @@
 # full details.
 #
 
-class Codes(object):
-    # 100
-    MSG_START = 101
-    MSG_CALL = 102
-    MSG_NEW_TASK = 103
-    MSG_REGISTRATION_REQ = 104
-    MSG_CREDENTIALS_VALIDATION = 105
-    MSG_PROBE = 106
-    MSG_GENERIC = 110
-    MSG_BOOTSTRAP_REQ = 111
+python_files =  $(wildcard *.py)
 
-    # 200
-    OK = 200
-    OK_1 = 201
+SUBDIRS =
 
-    # 400
-    ERR_AUTHENTICATION = 401
-    ERR_NOT_FOUND = 404
-    ERR_METHOD_NOT_ALLOWED = 405
-    ERR_ZONE_MISSING = 420
-    ERR_BAD_ARGS = 421
-    ERR_GENERIC = 430
+all: default-subdirs default-all
+
+install: all install-subdirs pyfiles-install default-install
+
+dist: default-dist
+
+clean: clean-subdirs default-clean
+
+include ../../../Make.rules
+include ../../../Make.defs
