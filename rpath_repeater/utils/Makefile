@@ -14,7 +14,7 @@
 
 python_files =  $(wildcard *.py)
 
-SUBDIRS =
+SUBDIRS = windows
 
 all: default-subdirs default-all
 
