@@ -206,6 +206,38 @@ class UpdateJob(object):
                 names.insert(0, names.pop(idx))
                 self._updates.insert(0, self._updates.pop(idx))
 
+        # Remove anything that is not an MSI or a trove that contains an MSI.
+        # NOTE: We do all of this work here to avoid creating a changeset that
+        #       contains the WIM and IsoKit.
+        components = [ (x[0], x[2][0], x[2][1]) for x in self._updates
+            if ':' in x[0] and x[2][0] ]
+
+        pkgNames = {}
+        for job in self._updates:
+            pkgNames.setdefault(job[0].split(':')[0], list()).append(job)
+
+        toRemove = {}
+        troves = self._client.repos.getTroves(components)
+        for nvf, trv in itertools.izip(components, troves):
+            if trv.troveInfo.capsule.type() != 'msi':
+                toRemove.setdefault(nvf[0].split(':')[0], list()).append(nvf)
+
+        for name, nvfs in toRemove.iteritems():
+            # If we are removing all components except for the package,
+            # remove the package as well.
+            if len(nvfs) == len(pkgNames[name]) - 1:
+                for job in pkgNames[name]:
+                    self._updates.remove(job)
+                for nvf in nvfs:
+                    components.remove(nvf)
+
+            # Remove just the non msi component
+            else:
+                for nvf in nvfs:
+                    idx = components.index(nvf)
+                    components.pop(idx)
+                    self._updates.pop(idx)
+
         return self._newSystemModel
 
     def getFileContents(self):
