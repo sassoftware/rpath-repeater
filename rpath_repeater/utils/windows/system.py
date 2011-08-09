@@ -23,9 +23,10 @@ def cleanup(func):
     def wrapper(self, *args, **kwargs):
         try:
             res = func(self, *args, **kwargs)
-	except WMIAccessDeniedError, e:
+        except WMIAccessDeniedError, e:
             raise AuthenticationError, str(e)
         finally:
+            self.wmi.close()
             self.smb.close()
         return res
     return wrapper
