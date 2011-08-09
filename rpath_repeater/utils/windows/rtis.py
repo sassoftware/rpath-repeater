@@ -349,8 +349,13 @@ class rTIS(object):
         if not self._smb.pathexists(logPath, Servicing.LOGFILE):
             return
 
+        line = None
         fh = self._smb.pathopen(logPath, Servicing.LOGFILE)
         for line in fh: pass
+
+        # Empty file.
+        if line is None:
+            return
 
         # Trim timestamp from line since we log timestamps further
         # up the stack.
