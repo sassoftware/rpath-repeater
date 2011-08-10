@@ -55,7 +55,7 @@ class SMBClient(object):
             '//%%(host)s/%s$' % self._driveLetter ]
         self._mount_env = dict(PASSWD=self._authInfo.password)
 
-        self._umount_cmd = [ '/bin/umount', ]
+        self._umount_cmd = [ '/bin/umount', '-n', ]
 
     def close(self):
         if self._mounted:
@@ -98,6 +98,8 @@ class SMBClient(object):
         except Exception:
             self._rootdir = None
             raise
+
+        self._mounted = True
 
     def _umount(self):
         if not self._rootdir:
