@@ -107,6 +107,9 @@ class WmiTest(TestBase):
                 val = [val, ]
             return wmiclient.WMICResults(None, 0, val, None)
 
+        def close(self):
+            pass
+
     class CommandLine(object):
         def __init__(self, options, args):
             self.options = options
