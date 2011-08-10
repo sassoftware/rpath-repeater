@@ -108,7 +108,7 @@ class SMBClient(object):
         self.callback.info('unmounting windows share')
 
         try:
-            self._runCmd(self._umount_cmd)
+            self._runCmd(self._umount_cmd + [ self._rootdir, ])
         finally:
             self._rootdir = None
 
