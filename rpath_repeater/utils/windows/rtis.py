@@ -372,6 +372,11 @@ class rTIS(object):
         """
 
         status = self._wmi.serviceStart(self._service_name)
+
+        if len(status.output) != 1:
+            raise (ServiceFailedToStartError, 'The rPath Tools Installer '
+                'service failed to start, please try again.')
+
         assert status.output[0] == 'Success'
 
         # Now wait for the service to actually start.
