@@ -20,6 +20,18 @@ from rpath_repeater.utils.windows.callbacks import BaseCallback
 from rpath_repeater.utils.windows.errors import NotEnoughSpaceError
 from rpath_repeater.utils.windows.errors import ServiceFailedToStartError
 
+def _filter(func):
+    """
+    Filter out empty strings from a list of results.
+    """
+    def wrapper(self, *args, **kwargs):
+        result = func(self, *args, **kwargs)
+        if not result:
+            return result
+        return [ x for x in result if x != '' ]
+    return wrapper
+
+
 class Servicing(object):
     """
     Class for parsing and generating servicing.xml.
@@ -236,6 +248,7 @@ class rTIS(object):
             self.manifest = ''
             self.polling_manifest = ''
 
+    @_filter
     def _get_system_model(self):
         self.callback.info('Retrieving current system model')
         result = self._query(self._wmi.registryGetKey, self._conary_keypath,
@@ -249,6 +262,7 @@ class rTIS(object):
 
     system_model = property(_get_system_model, _set_system_model)
 
+    @_filter
     def _get_manifest(self):
         self.callback.info('Retrieving current system manifest')
         result = self._query(self._wmi.registryGetKey, self._conary_keypath,
@@ -263,6 +277,7 @@ class rTIS(object):
 
     manifest = property(_get_manifest, _set_manifest)
 
+    @_filter
     def _get_polling_manifest(self):
         self.callback.info('Retrieving polling manifest')
         result = self._query(self._wmi.registryGetKey, self._conary_keypath,
@@ -276,6 +291,7 @@ class rTIS(object):
 
     polling_manifest = property(_get_polling_manifest, _set_polling_manifest)
 
+    @_filter
     def _get_commands(self):
         self.callback.info('Retrieving commands')
         result = self._query(self._wmi.registryGetKey, self._params_keypath,
