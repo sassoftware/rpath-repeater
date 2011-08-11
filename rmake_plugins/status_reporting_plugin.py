@@ -99,7 +99,7 @@ class NodeReportingPlugin(plug_dispatcher.DispatcherPlugin):
         return ipv4, ipv6
 
     def postResults(self, data):
-        path = "/api/inventory/management_nodes"
+        path = "/api/v1/inventory/management_nodes"
         host = "localhost"
         port = 80
         headers = {

@@ -27,12 +27,15 @@ from rpath_repeater import models
 class RepeaterClient(object):
     __WMI_PLUGIN_NS = 'com.rpath.sputnik.wmiplugin'
     __CIM_PLUGIN_NS = 'com.rpath.sputnik.cimplugin'
+    # FIXME: the following is probably unused
+    __ASSIMILATOR_PLUGIN_NS = 'com.rpath.sputnik.assimilatorplugin'
     __LAUNCH_PLUGIN_NS = 'com.rpath.sputnik.launchplugin'
     __MGMT_IFACE_PLUGIN_NS = 'com.rpath.sputnik.interfacedetectionplugin'
     __IMAGE_UPLOAD_PLUGIN_NS = 'com.rpath.sputnik.imageuploadplugin'
 
     CimParams = models.CimParams
     WmiParams = models.WmiParams
+    AssimilatorParams = models.AssimilatorParams
     ManagementInterfaceParams = models.ManagementInterfaceParams
     URL = models.URL
     ResultsLocation = models.ResultsLocation
@@ -72,6 +75,9 @@ class RepeaterClient(object):
 
     def _launchRmakeJob(self, namespace, params):
         data = FrozenImmutableDict(params)
+        return self._createRmakeJob(namespace, data)
+
+    def _createRmakeJob(self, namespace, data):
         job = RmakeJob(RmakeUuid.uuid4(), namespace, owner='nobody',
                        data=data,
                        ).freeze()
@@ -106,6 +112,15 @@ class RepeaterClient(object):
     def register_wmi(self, wmiParams, resultsLocation=None, zone=None):
         method = 'register'
         return self._wmiCallDispatcher(method, wmiParams, resultsLocation, zone)
+
+    def bootstrap(self, assimilatorParams, resultsLocation=None, zone=None):
+        '''this will only be valid for Linux, and adopts an unmanaged system'''
+        params = self._callParams('bootstrap', resultsLocation, zone)
+        assert isinstance(assimilatorParams, self.AssimilatorParams)
+        if assimilatorParams.port is None:
+            assimilatorParams.port = 22
+        params['assimilatorParams'] = assimilatorParams.toDict()
+        return self._launchRmakeJob(self.__ASSIMILATOR_PLUGIN_NS, params)
 
     def shutdown_cim(self, cimParams, resultsLocation=None, zone=None):
         method = 'shutdown'
@@ -273,7 +288,7 @@ def main():
                 'group-windemo-appliance=/windemo.eng.rpath.com@rpath:windemo-1-devel/1-2-1[]',
             ],
             )
-    else:
+    elif 0:
         headers = {'X-rBuilder-OutputToken' : 'aaa'}
         images = [
             cli.ImageFile(url=cli.makeUrl('http://george.rdu.rpath.com/CentOS/5.5/isos/x86_64/CentOS-5.5-x86_64-bin-1of8.iso'),
@@ -288,13 +303,46 @@ def main():
                     headers=headers)),
         ]
         uuid, job = cli.download_images(images)
+    else:
+       
+        keyData = file("/root/.ssh/id_rsa.pub").read() 
+        assimilatorParams = cli.AssimilatorParams(host=system, port=22,
+            eventUuid='eventUuid',
+            # normally filled in by rBuilder
+            caCert=file("/srv/rbuilder/pki/hg_ca.crt").read(),
+            # normally filled in by plugin
+            platformLabels={
+                'centos-5' : [ 'jules.eng.rpath.com@rpath:centos-5-stable',
+                               'centos.rpath.com@rpath:centos-5-common' ],
+                'sles-11'  : [ 'jules.eng.rpath.com@rpath:sles-11-stable', 
+                               'sles.rpath.com@rpath:sles-11-common' ]
+            },
+            sshAuth = [
+                           { 
+                               'sshUser'     : 'root', 
+                               'sshKey'      : keyData,
+                               'sshPassword' : 'letmein',
+                           },
+                           { 
+                               'sshUser'     : 'root', 
+                               'sshPassword' : 'wrong1' 
+                           },
+                           { 
+                               'sshUser'     : 'root', 
+                               'sshPassword' : 'password' 
+                           },
+            ]
+        )
+
+        uuid, job = cli.bootstrap(assimilatorParams,
+            resultsLocation = resultsLocation,
+            zone = zone)
     while 1:
         job = cli.getJob(uuid)
         if job.status.final:
             break
         time.sleep(1)
     print "Failed: %s" % job.status.failed
-    #import epdb; epdb.st()
 
 if __name__ == "__main__":
     main()
