@@ -29,7 +29,6 @@ class RepeaterClient(object):
     __CIM_PLUGIN_NS = 'com.rpath.sputnik.cimplugin'
     __LAUNCH_PLUGIN_NS = 'com.rpath.sputnik.launchplugin'
     __MGMT_IFACE_PLUGIN_NS = 'com.rpath.sputnik.interfacedetectionplugin'
-    __IMAGE_UPLOAD_PLUGIN_NS = 'com.rpath.sputnik.imageuploadplugin'
 
     CimParams = models.CimParams
     WmiParams = models.WmiParams
@@ -38,7 +37,6 @@ class RepeaterClient(object):
     ResultsLocation = models.ResultsLocation
     Image = models.Image
     ImageFile = models.ImageFile
-    ImageMetadata = models.ImageMetadata
 
     @classmethod
     def makeUrl(cls, url, headers=None):
@@ -196,25 +194,6 @@ class RepeaterClient(object):
 
         return (uuid, job.thaw())
 
-    def download_images(self, image, statusReportURL, putFilesURL):
-        """
-        """
-        params = dict(
-            putFilesURL = putFilesURL,
-            statusReportURL = statusReportURL,
-            image=image)
-        data = FrozenImmutableDict(params)
-        job = RmakeJob(RmakeUuid.uuid4(), self.__IMAGE_UPLOAD_PLUGIN_NS,
-                       owner='nobody',
-                       data=data,
-                       ).freeze()
-
-        uuid = job.job_uuid
-        job = self.client.createJob(job)
-
-        return (uuid, job.thaw())
-
-
     def getJob(self, uuid):
         return self.client.getJob(uuid).thaw()
 
@@ -273,21 +252,6 @@ def main():
                 'group-windemo-appliance=/windemo.eng.rpath.com@rpath:windemo-1-devel/1-2-1[]',
             ],
             )
-    else:
-        headers = {'X-rBuilder-OutputToken' : 'aaa'}
-        images = [
-            cli.ImageFile(url=cli.makeUrl('http://george.rdu.rpath.com/CentOS/5.5/isos/x86_64/CentOS-5.5-x86_64-bin-1of8.iso'),
-                destination=cli.makeUrl('http://localhost:1234/uploadImage/1',
-                    headers=headers),
-                progress=cli.makeUrl('http://localhost:1234/foo/1',
-                    headers=headers)),
-            cli.ImageFile(url=cli.makeUrl('http://george.rdu.rpath.com/CentOS/5.5/isos/x86_64/CentOS-5.5-x86_64-bin-2of8.iso'),
-                destination=cli.makeUrl('http://localhost:1234/uploadImage/2',
-                    headers=headers),
-                progress=cli.makeUrl('http://localhost:1234/foo/2',
-                    headers=headers)),
-        ]
-        uuid, job = cli.download_images(images)
     while 1:
         job = cli.getJob(uuid)
         if job.status.final:

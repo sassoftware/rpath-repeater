@@ -136,20 +136,8 @@ class ImageFile(_BaseSlotCompare, _Serializable):
     __slots__ = [ 'title', 'size', 'sha1', 'fileName', 'url', 'destination', ]
     _tag = "file"
 
-class ImageMetadata(_BaseSlotCompare, _Serializable):
-    __slots__ = [ 'owner', 'billingCode', 'deptCode', 'cost', ]
-    _tag = "metadata"
-
 class Image(_BaseSlotCompare):
     __slots__ = [ 'name', 'architecture', 'files', 'metadata', ]
 
 class ImageFiles(_SerializableList):
     _tag = "files"
-
-if __name__ == '__main__':
-    files = ImageFiles([ ImageFile(title="i1", sha1="s1"),
-        ImageFile(title="i2", sha1="s2") ])
-    metadata = ImageMetadata(owner="me")
-    files.append(metadata)
-    print metadata.toXml()
-    print files.toXml()
