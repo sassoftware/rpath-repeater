@@ -16,22 +16,12 @@ import logging
 
 log = logging.getLogger(__name__)
 
-import os
-import collections
 import StringIO
 import socket
 import sys
 import tempfile
-import time
 
-from conary import versions
-from conary import conaryclient
-from conary.lib import digestlib
 from conary.lib.formattrace import formatTrace
-
-from twisted.internet import defer, protocol, reactor
-from twisted.web import client, iweb
-from zope.interface import implements
 
 from rmake3.core import types
 from rmake3.core import handler
@@ -42,9 +32,9 @@ PREFIX = 'com.rpath.sputnik'
 
 from rpath_repeater.codes import Codes as C
 from rpath_repeater.utils import nodeinfo
-from xml.dom import minidom
 from rpath_repeater import models
 from rpath_repeater.utils.xmlutils import XML
+from rpath_repeater.utils.reporting import ReportingMixIn
 
 GenericData = types.slottype('GenericData', 'p nodes argument response')
 
@@ -92,9 +82,10 @@ class Options(object):
         self.exposed.add(name)
 
 
-class BaseHandler(handler.JobHandler):
+class BaseHandler(handler.JobHandler, ReportingMixIn):
     X_Event_Uuid_Header = 'X-rBuilder-Event-UUID'
     RegistrationTaskNS = None
+    ReportingXmlTag = "system"
 
     class __metaclass__(type):
         def __new__(cls, name, bases, attrs):
@@ -123,40 +114,14 @@ class BaseHandler(handler.JobHandler):
         self.watchTask(task, self.jobUpdateCallback)
         return task
 
-    def postResults(self, elt=None):
-        host = self.resultsLocation.get('host', 'localhost')
-        port = self.resultsLocation.get('port', 80)
-        path = self.resultsLocation.get('path')
-        if not path:
-            return
-        if elt is None:
-            dom = minidom.parseString(self.job.data)
-            elt = dom.firstChild
+    def postprocessXmlNode(self, elt):
         self.addEventInfo(elt)
         self.addJobInfo(elt)
-        data = self.toXml(elt)
-        headers = {
-            'Content-Type' : 'application/xml; charset="utf-8"',
-            'Host' : host, }
+
+    def postprocessHeaders(self, elt, headers):
         eventUuid = self.eventUuid
         if eventUuid:
             headers[self.X_Event_Uuid_Header] = eventUuid.encode('ascii')
-        fact = HTTPClientFactory(path, method='PUT', postdata=data,
-            headers = headers)
-        @fact.deferred.addCallback
-        def processResult(result):
-            log.debug("Received result for %s: %s", host, result)
-            return result
-
-        @fact.deferred.addErrback
-        def processError(error):
-            log.error("Error: %s", error.getErrorMessage())
-
-        reactor.connectTCP(host, port, fact)
-
-    def postFailure(self):
-        el = XML.Element("system")
-        self.postResults(el)
 
     def addEventInfo(self, elt):
         if not self.eventUuid:
@@ -179,10 +144,6 @@ class BaseHandler(handler.JobHandler):
             children.append(T("status_detail", self.job.status.detail))
         job = XML.Element("job", *children)
         elt.appendChild(XML.Element("jobs", job))
-
-    @classmethod
-    def toXml(cls, elt):
-        return XML.toString(elt)
 
     def _getZoneAddresses(self):
         """Return set of IP addresses of all nodes in this zone."""
@@ -274,9 +235,10 @@ class BaseTaskHandler(plug_worker.TaskHandler):
             formatTrace(typ, value, tb, stream = out, withLocals = False)
             out.write("\nFull stack:\n")
             formatTrace(typ, value, tb, stream = out, withLocals = True)
+            formatTrace(typ, value, tb, stream = sys.stderr, withLocals = True)
 
-            self.sendStatus(C.ERR_GENERIC, "Error in %s call: %s" %
-                    (self.InterfaceName, str(value)),
+            log.error(out.getvalue())
+            self.sendStatus(C.ERR_GENERIC, "Error: %s" % str(value),
                 out.getvalue())
 
     @classmethod
@@ -290,39 +252,4 @@ class BaseTaskHandler(plug_worker.TaskHandler):
 
     @classmethod
     def _trove(cls, troveSpec):
-        Text = XML.Text
-        n, v, f = conaryclient.cmdline.parseTroveSpec(troveSpec)
-
-        name = Text("name", n)
-        version = cls._version(v, f)
-        flavor = cls._flavor(f)
-        return XML.Element("trove", name, version, flavor)
-
-    @classmethod
-    def _flavor(cls, flavor):
-        if flavor is None:
-            return XML.Element("flavor")
-        return XML.Text("flavor", str(flavor))
-
-    @classmethod
-    def _version(cls, v, f):
-        thawed_v = versions.ThawVersion(v)
-        Text = XML.Text
-        full = Text("full", str(thawed_v))
-        ordering = Text("ordering", thawed_v.timeStamps()[0])
-        revision = Text("revision", str(thawed_v.trailingRevision()))
-        label = Text("label", str(thawed_v.trailingLabel()))
-        flavor = cls._flavor(f)
-        return XML.Element("version", full, label, revision, ordering, flavor)
-
-
-class HTTPClientFactory(client.HTTPClientFactory):
-    USER_AGENT = "rmake-plugin/1.0"
-
-    def __init__(self, url, *args, **kwargs):
-        if 'agent' not in kwargs:
-            kwargs.update(agent=self.USER_AGENT)
-        client.HTTPClientFactory.__init__(self, url, *args, **kwargs)
-        self.status = None
-        self.deferred.addCallback(
-            lambda data: (data, self.status, self.response_headers))
+        return models.Trove.fromTroveSpec(troveSpec).toXmlDom()

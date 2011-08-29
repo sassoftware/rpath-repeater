@@ -12,9 +12,14 @@
 # full details.
 #
 
+import sys
+
+from conary import conaryclient
+from conary import versions
+
 from rpath_repeater.utils.xmlutils import XML
 
-from rmake3.core.types import SlotCompare
+from rmake3.core.types import SlotCompare, freezify
 from rmake3.lib import chutney
 
 class ModelMeta(type):
@@ -27,6 +32,11 @@ class ModelMeta(type):
             # import this module and find this class, when it's not created
             # just yet.
             chutney.register(new_class, _force=True)
+            frozenType = freezify(new_class)
+            # Frozen models belong to the same module as the class
+            frozenType.__module__ = new_class.__module__
+            module = sys.modules[new_class.__module__]
+            module.__dict__[frozenType.__name__] = frozenType
         return new_class
 
 class _Serializable(object):
@@ -37,7 +47,7 @@ class _Serializable(object):
             return self._tag
         return tag
 
-    def _toXmlDom(self, tag=None):
+    def toXmlDom(self, tag=None):
         tag = self._getTag()
         if tag is None:
             return None
@@ -46,8 +56,8 @@ class _Serializable(object):
             val = getattr(self, slot)
             if val is None:
                 continue
-            if hasattr(val, '_toXmlDom'):
-                val = val._toXmlDom(slot)
+            if hasattr(val, 'toXmlDom'):
+                val = val.toXmlDom(slot)
                 if val is None:
                     continue
                 children.append(val)
@@ -59,19 +69,22 @@ class _Serializable(object):
         return XML.Element(tag, *children)
 
     def toXml(self):
-        dom = self._toXmlDom()
+        dom = self.toXmlDom()
         if dom is None:
             return None
         return XML.toString(dom)
 
-class _SerializableList(list, _Serializable):
-    def _toXmlDom(self, tag=None):
+class _SerializableListMixIn(_Serializable):
+    def toXmlDom(self, tag=None):
         tag = self._getTag()
         if tag is None:
             return None
-        children = (x._toXmlDom() for x in self)
+        children = (x.toXmlDom() for x in self)
         children = (x for x in children if x is not None)
         return XML.Element(tag, *children)
+
+class _SerializableList(list, _SerializableListMixIn):
+    pass
 
 
 class _BaseSlotCompare(SlotCompare):
@@ -102,6 +115,16 @@ class WmiParams(_BaseSlotCompare):
     """
     __slots__ = [ 'host', 'port', 'username', 'password', 'domain',
         'eventUuid', ]
+
+class AssimilatorParams(_BaseSlotCompare):
+    '''
+    Information required to assimilate a Linux system via SSH
+    '''
+    # sshAuth is a list of hashes to try, like so:
+    # [{ 'sshUser' : user, 'sshPassword' : pass, 'sshKey' : key_path_or_bytes }, {...}, ...]
+    # caCert are the contents of the cert
+    # platformLabels is a list of key value pairs [('centos-5',  label), ...]
+    __slots__ = [ 'host', 'port', 'caCert', 'sshAuth', 'platformLabels', 'eventUuid' ]
 
 class ManagementInterfaceParams(_BaseSlotCompare):
     """
@@ -141,3 +164,41 @@ class Image(_BaseSlotCompare):
 
 class ImageFiles(_SerializableList):
     _tag = "files"
+
+class Trove(_BaseSlotCompare, _Serializable):
+    __slots__ = ( 'name', 'version', 'flavor', )
+    _tag = "trove"
+
+    @classmethod
+    def fromTroveSpec(cls, troveSpec):
+        n, v, f = conaryclient.cmdline.parseTroveSpec(troveSpec)
+        thawed_v = versions.ThawVersion(v)
+        return cls.fromNameVersionFlavor(n, thawed_v, f)
+
+    @classmethod
+    def fromNameVersionFlavor(cls, name, version, flavor):
+        obj = cls()
+        obj.name = name
+        obj.version = Version.fromVersionFlavor(version, flavor)
+        obj.flavor = Version.sanitizeFlavor(flavor)
+        return obj
+
+class Version(_BaseSlotCompare, _Serializable):
+    __slots__ = ( 'full', 'label', 'revision', 'ordering', 'flavor', )
+    _tag = "version"
+
+    @classmethod
+    def fromVersionFlavor(cls, version, flavor):
+        nobj = cls()
+        nobj.full = str(version)
+        nobj.ordering = str(version.timeStamps()[0])
+        nobj.revision = str(version.trailingRevision())
+        nobj.label = str(version.trailingLabel())
+        nobj.flavor = cls.sanitizeFlavor(flavor)
+        return nobj
+
+    @classmethod
+    def sanitizeFlavor(cls, flavor):
+        if flavor is None:
+            return ""
+        return str(flavor)
