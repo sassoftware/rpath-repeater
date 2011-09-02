@@ -19,6 +19,7 @@ from twisted.internet import reactor
 from rmake3.core import plug_dispatcher
 from rmake3.lib import netlink
 from rpath_repeater.utils import base_forwarding_plugin as bfp
+from rpath_repeater.utils import http
 
 log = logging.getLogger(__name__)
 
@@ -105,7 +106,7 @@ class NodeReportingPlugin(plug_dispatcher.DispatcherPlugin):
         headers = {
             'Content-Type' : 'application/xml; charset="utf-8"',
             'Host' : host, }
-        fact = bfp.HTTPClientFactory(path, method='PUT', postdata=data,
+        fact = http.HTTPClientFactory(path, method='PUT', postdata=data,
             headers = headers)
         @fact.deferred.addCallback
         def processResult(result):
