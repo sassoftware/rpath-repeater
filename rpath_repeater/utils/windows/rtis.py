@@ -447,7 +447,7 @@ class rTIS(object):
                 #       not be responding for some amount of time.
                 if allowReboot and not rebootStartTime:
                     rebootStartTime = time.time()
-                    self._smb.umount()
+                    self._smb.close()
                     self.callback.info('Waiting for remote system to respond')
 
                 # Handle reboot error case.
