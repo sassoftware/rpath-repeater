@@ -265,15 +265,23 @@ class rTIS(object):
     @_filter
     def _get_manifest(self):
         self.callback.info('Retrieving current system manifest')
-        result = self._query(self._wmi.registryGetKey, self._conary_keypath,
-            'manifest', default=[])
-        return [ TroveTuple(x) for x in result ]
+
+        lines = []
+        if self._smb.pathexists(self.updatesDir, '..', 'manifest'):
+            fh = self._smb.pathopen(self.updatesDir, '..', 'manifest', mode='r')
+            lines = [ x.strip() for x in fh ]
+            fh.close()
+
+        return [ TroveTuple(x) for x in lines ]
 
     def _set_manifest(self, data):
         self.callback.info('Writing system manifest')
         data = [ x.asString(withTimestamp=True) for x in data ]
-        self._query(self._wmi.registrySetKey, self._conary_keypath,
-            'manifest', data)
+
+        fh = self._smb.pathopen(self.updatesDir, '..', 'manifest', mode='w')
+        for line in data:
+            fh.write('%s\r\n' % line)
+        fh.close()
 
     manifest = property(_get_manifest, _set_manifest)
 
