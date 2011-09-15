@@ -9,6 +9,7 @@ Windows system.
 
 import os
 import time
+import codecs
 import shutil
 import tempfile
 import subprocess
@@ -147,9 +148,13 @@ class SMBClient(object):
 
     def pathopen(self, *paths, **kwargs):
         mode = kwargs.get('mode', 'r')
+        codec = kwargs.get('codec', None)
         path = self.pathjoin(*paths)
 
-        return open(path, mode)
+        if codec:
+            return codecs.open(path, mode, codec)
+        else:
+            return open(path, mode)
 
     def getWindowsPath(self, *paths):
         relpath = self.pathjoin(*paths, relpath=True)
