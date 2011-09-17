@@ -268,7 +268,9 @@ class rTIS(object):
 
         lines = []
         if self._smb.pathexists(self.updatesDir, '..', 'manifest'):
-            fh = self._smb.pathopen(self.updatesDir, '..', 'manifest', mode='r')
+            fh = self._smb.pathopen(self.updatesDir, '..', 'manifest', mode='r',
+                codec='utf-8-sig')
+
             lines = [ x.strip() for x in fh ]
             fh.close()
 
@@ -278,7 +280,9 @@ class rTIS(object):
         self.callback.info('Writing system manifest')
         data = [ x.asString(withTimestamp=True) for x in data ]
 
-        fh = self._smb.pathopen(self.updatesDir, '..', 'manifest', mode='w')
+        fh = self._smb.pathopen(self.updatesDir, '..', 'manifest', mode='w',
+            codec='utf-8-sig')
+
         for line in data:
             fh.write('%s\r\n' % line)
         fh.close()
@@ -376,6 +380,7 @@ class rTIS(object):
         line = None
         fh = self._smb.pathopen(logPath, Servicing.LOGFILE)
         for line in fh: pass
+        fh.close()
 
         # Empty file.
         if line is None:
@@ -455,7 +460,6 @@ class rTIS(object):
                 #       not be responding for some amount of time.
                 if allowReboot and not rebootStartTime:
                     rebootStartTime = time.time()
-                    self._smb.close()
                     self.callback.info('Waiting for remote system to respond')
 
                 # Handle reboot error case.
@@ -536,6 +540,11 @@ class rTIS(object):
 
         self.wait(allowReboot=False)
 
+        # Wait for PromgraData\rPath\manifest to exist before setting the
+        # manifest, it should be created by rPathTools Setup.
+        if not self._smb.pathexists(self.updatesDir, '..', 'manifest'):
+            time.sleep(1)
+
         self.manifest = manifest.values()
         self.polling_manifest = criticalJob.polling_manifest
 
@@ -610,7 +619,14 @@ class rTIS(object):
         self.callback.debug(servicing.tostring(prettyPrint=True))
         fh = self._smb.pathopen(jobDir, servicing.FILENAME, mode='w')
         fh.write(servicing.tostring())
+        self.callback.info('appyupdate write %s' % fh.fileno())
+        fh.flush()
         fh.close()
+        # REALLY CLOSE THE FILE DESCRIPTOR, I MEAN IT!
+        try:
+            os.close(fh.fileno())
+        except:
+            pass
 
         # Set rTIS to use the job directory that we just created.
         self.commands = updJob.jobId
@@ -622,8 +638,11 @@ class rTIS(object):
         self.wait(allowReboot=True, reportStatus=jobDir)
 
         # Parse results
-        results = [ x for x in servicing.iterpackageresults(
-            self._smb.pathopen(jobDir, servicing.FILENAME)) ]
+        self.callback.info('Parsing Results')
+        fh = self._smb.pathopen(jobDir, servicing.FILENAME)
+        results = [ x for x in servicing.iterpackageresults(fh) ]
+        self.callback.info('applyupdate read %s' % fh.fileno())
+        fh.close()
 
         # write this at the end, after all updates have completed successfully.
         self.polling_manifest = updJob.polling_manifest
@@ -655,6 +674,7 @@ class rTIS(object):
         self.callback.debug(servicing.tostring(prettyPrint=True))
         fh = self._smb.pathopen(jobDir, servicing.FILENAME, mode='w')
         fh.write(servicing.tostring())
+        self.callback.info('configure write %s' % fh.fileno())
         fh.close()
 
         # Set rTIS to use the job directory that we just created.
@@ -667,7 +687,9 @@ class rTIS(object):
         self.wait(allowReboot=True)
 
         # Get results from the target system
-        results = [ x for x in servicing.iterconfigresults(
-            self._smb.pathopen(jobDir, servicing.FILENAME))]
+        fh = self._smb.pathopen(jobDir, servicing.FILENAME)
+        results = [ x for x in servicing.iterconfigresults(fh)]
+        self.callback.info('configure read %s' % fh.fileno())
+        fh.close()
 
         return results
