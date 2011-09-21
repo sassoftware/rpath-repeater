@@ -117,6 +117,7 @@ class BaseHandler(handler.JobHandler, ReportingMixIn):
     def postprocessXmlNode(self, elt):
         self.addEventInfo(elt)
         self.addJobInfo(elt)
+        return elt
 
     def postprocessHeaders(self, elt, headers):
         eventUuid = self.eventUuid
@@ -131,18 +132,7 @@ class BaseHandler(handler.JobHandler, ReportingMixIn):
 
     def addJobInfo(self, elt):
         # Parse the data, we need to insert the job uuid
-        T = XML.Text
-        jobStateMap = { False : 'Failed', True : 'Completed' }
-        jobStateString = jobStateMap[self.job.status.completed]
-        children = [
-            T("job_uuid", self.job.job_uuid),
-            T("job_state", jobStateString),
-            T("status_code", self.job.status.code),
-            T("status_text", self.job.status.text),
-        ]
-        if self.job.status.detail:
-            children.append(T("status_detail", self.job.status.detail))
-        job = XML.Element("job", *children)
+        job = self.newJobElement()
         elt.appendChild(XML.Element("jobs", job))
 
     def _getZoneAddresses(self):

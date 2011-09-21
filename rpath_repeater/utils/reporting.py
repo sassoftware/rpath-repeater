@@ -36,7 +36,7 @@ class ReportingMixIn(object):
         if elt is None:
             dom = minidom.parseString(self.job.data)
             elt = dom.firstChild
-        self.postprocessXmlNode(elt)
+        elt = self.postprocessXmlNode(elt)
         data = self.toXml(elt)
         headers = {
             'Content-Type' : 'application/xml; charset="utf-8"',
@@ -66,10 +66,30 @@ class ReportingMixIn(object):
         self.postResults(el, method=method)
 
     def postprocessXmlNode(self, elt):
-        pass
+        return elt
 
     def postprocessHeaders(self, elt, headers):
         pass
+
+    def newJobElement(self):
+        T = XML.Text
+        jobStateMap = { False : 'Failed', True : 'Completed' }
+        jobStateString = jobStateMap[self.job.status.completed]
+        children = [
+            T("job_uuid", self.job.job_uuid),
+            T("job_state", jobStateString),
+            T("status_code", self.job.status.code),
+            T("status_text", self.job.status.text),
+        ]
+        if self.job.status.detail:
+            children.append(T("status_detail", self.job.status.detail))
+        job = XML.Element("job", *children)
+        return job
+
+    def addJobResults(self, job, results):
+        resultsNode = XML.Element("results", results)
+        job.appendChild(resultsNode)
+        return job
 
     @classmethod
     def toXml(cls, elt):

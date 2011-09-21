@@ -16,6 +16,7 @@ import sys
 
 from conary import conaryclient
 from conary import versions
+from conary.lib import util
 
 from rpath_repeater.utils.xmlutils import XML
 
@@ -88,6 +89,7 @@ class _SerializableList(list, _SerializableListMixIn):
 
 
 class _BaseSlotCompare(SlotCompare):
+    __slots__ = []
     __metaclass__ = ModelMeta
     def toDict(self):
         ret = {}
@@ -141,14 +143,19 @@ class URL(_BaseSlotCompare):
         'path', 'query', 'fragment', 'unparsedPath', 'headers', ]
 
     def asString(self):
-        port = self.port
-        if self.scheme == "http":
-            port = port or 80
-        elif self.scheme == "https":
-            port = port or 443
-        url = "%s://%s:%s%s" % (self.scheme, self.host, port,
-            self.unparsedPath)
-        return url.encode('ascii')
+        return util.urlUnsplit((self.scheme, self.username, self.password,
+            self.host, self.port, self.path, self.query,
+            self.fragment)).encode('ascii')
+
+    @classmethod
+    def fromString(cls, url):
+        arr = util.urlSplit(url)
+        o = cls()
+        (o.scheme, o.username, o.password, o.host, o.port,
+            o.path, o.query, o.fragment) = arr
+        o.unparsedPath = util.urlUnsplit((None, None, None, None, None,
+            o.path, o.query, o.fragment))
+        return o
 
 class ResultsLocation(URL):
     """
@@ -202,3 +209,20 @@ class Version(_BaseSlotCompare, _Serializable):
         if flavor is None:
             return ""
         return str(flavor)
+
+class Response(_BaseSlotCompare):
+    __slots__ = ['response', ]
+
+class Target(_BaseSlotCompare, _Serializable):
+    __slots__ = []
+    _tag = 'target'
+
+class TargetConfiguration(_BaseSlotCompare):
+    __slots__ = ['targetType', 'targetName', 'alias', 'config',]
+
+class TargetUserCredentials(_BaseSlotCompare):
+    __slots__ = ['rbUser', 'rbUserId', 'isAdmin', 'credentials', ]
+
+class TargetCommandArguments(_BaseSlotCompare):
+    __slots__ = ['jobUrl', 'authToken',
+        'targetConfiguration', 'targetUserCredentials', 'args']

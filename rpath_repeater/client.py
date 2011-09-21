@@ -13,6 +13,7 @@
 
 import sys
 import time
+import weakref
 
 from conary.lib import util
 
@@ -22,7 +23,63 @@ from rmake3.lib import uuid as RmakeUuid
 from rmake3.core.types import RmakeJob
 
 from rpath_repeater.utils.immutabledict import FrozenImmutableDict
-from rpath_repeater import models
+from rpath_repeater import codes, models
+
+class BaseCommand(object):
+    def __init__(self, client):
+        self.client = weakref.ref(client)
+
+    def getClient(self):
+        return self.client()
+
+class TargetCommand(BaseCommand):
+    TargetConfiguration = models.TargetConfiguration
+    TargetUserCredentials = models.TargetUserCredentials
+    def __init__(self, client):
+        BaseCommand.__init__(self, client)
+        self._targetConfig = None
+        self._userCredentials = None
+
+    def configure(self, zone, targetConfiguration, userCredentials=None):
+        self._zone = zone
+        self._targetConfig = targetConfiguration
+        self._userCredentials = userCredentials
+
+    def checkCreate(self):
+        return self._invoke(codes.NS.TARGET_TEST_CREATE)
+
+    def checkCredentials(self):
+        return self._invoke(codes.NS.TARGET_TEST_CREDENTIALS)
+
+    def listImages(self, imageIds=None):
+        return self._invoke(codes.NS.TARGET_IMAGES_LIST, imageIds=imageIds)
+
+    def listInstances(self, instanceIds=None):
+        return self._invoke(codes.NS.TARGET_INSTANCES_LIST, instanceIds=instanceIds)
+
+    def _invoke(self, ns, **kwargs):
+        client = self.getClient()
+
+        params = models.TargetCommandArguments(
+            targetConfiguration=self._targetConfig,
+            targetUserCredentials=self._userCredentials,
+            args=kwargs,
+        )
+        jobUuid = RmakeUuid.uuid4()
+        if client.jobUrlTemplate:
+            jobUrl = client.jobUrlTemplate % dict(job_uuid=jobUuid)
+        else:
+            jobUrl = None
+        # authToken is the "cookie" that will be used for posting data
+        # back to the REST interface
+        # authToken and jobUrl should be surfaced to other parts of the
+        # API too
+        params = dict(zone=self._zone,
+            authToken=RmakeUuid.uuid4(),
+            jobUrl=jobUrl,
+            params=params)
+        data = FrozenImmutableDict(params)
+        return client._createRmakeJob(ns, data, uuid=jobUuid)
 
 class RepeaterClient(object):
     __WMI_PLUGIN_NS = 'com.rpath.sputnik.wmiplugin'
@@ -41,6 +98,8 @@ class RepeaterClient(object):
     Image = models.Image
     ImageFile = models.ImageFile
 
+    TargetCommandClass = TargetCommand
+
     @classmethod
     def makeUrl(cls, url, headers=None):
         scheme, user, passwd, host, port, path, query, fragment = util.urlSplit(
@@ -55,12 +114,20 @@ class RepeaterClient(object):
             host=host, port=port, path=path, query=query, fragment=fragment,
             unparsedPath=unparsedPath, headers=headers)
 
-    def __init__(self, address=None, zone=None):
+    def __init__(self, address=None, zone=None, jobUrlTemplate=None):
+        """
+        jobUrlTemplate is a URL that will be completed by filling in
+        job_uuid
+        """
         if not address:
             address = 'http://localhost:9998/'
 
         self.client = RmakeClient(address)
         self.zone = zone
+        self.targets = self.TargetCommandClass(self)
+        if jobUrlTemplate is None:
+            jobUrlTemplate = "http://localhost/api/v1/jobs/%(job_uuid)s"
+        self.jobUrlTemplate = jobUrlTemplate
 
     def _callParams(self, method, resultsLocation, zone, **kwargs):
         params = dict(method=method, zone=zone or self.zone)
@@ -75,8 +142,10 @@ class RepeaterClient(object):
         data = FrozenImmutableDict(params)
         return self._createRmakeJob(namespace, data)
 
-    def _createRmakeJob(self, namespace, data):
-        job = RmakeJob(RmakeUuid.uuid4(), namespace, owner='nobody',
+    def _createRmakeJob(self, namespace, data, uuid=None):
+        if uuid is None:
+            uuid = RmakeUuid.uuid4()
+        job = RmakeJob(uuid, namespace, owner='nobody',
                        data=data,
                        ).freeze()
 
@@ -219,7 +288,7 @@ def main():
         return 1
     system = sys.argv[1]
     zone = 'Local rBuilder'
-    cli = RepeaterClient()
+    cli = RepeaterClient(jobUrlTemplate="http://localhost:1234/api/v1/jobs/%(job_uuid)s")
     eventUuid = "0xDeadBeef"
     resultsLocation = cli.ResultsLocation(path="/adfadf", port=1234)
     cimParams = cli.CimParams(host=system,
@@ -234,7 +303,21 @@ def main():
         username="Administrator",
         password="password",
         domain=system)
+    targetConfiguration = cli.targets.TargetConfiguration(
+        'vmware', 'vsphere.eng.rpath.com', 'vsphere', config={})
+    userCredentials = cli.targets.TargetUserCredentials(credentials=dict(
+        username="eng", password="password"),
+        rbUser="dontcare", rbUserId=1, isAdmin=False)
     if 0:
+        cli.targets.configure(zone, targetConfiguration)
+        uuid, job = cli.targets.checkCreate()
+    elif 1:
+        cli.targets.configure(zone, targetConfiguration, userCredentials)
+        uuid, job = cli.targets.checkCredentials()
+    elif 1:
+        cli.targets.configure(zone, targetConfiguration, userCredentials)
+        uuid, job = cli.targets.listImages(imageIds=None)
+    elif 0:
         uuid, job = cli.register_cim(cimParams)
     elif 0:
         uuid, job = cli.poll_cim(cimParams, resultsLocation=resultsLocation,
@@ -306,7 +389,7 @@ def main():
         if job.status.final:
             break
         time.sleep(1)
-    print "Failed: %s" % job.status.failed
+    print "Failed: %s; %s" % (job.status.failed, job.status.text)
 
 if __name__ == "__main__":
     main()

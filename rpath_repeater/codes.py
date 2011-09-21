@@ -1,4 +1,4 @@
-# Copyright (c) 2010 rPath, Inc.
+# Copyright (c) 2011 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -33,3 +33,10 @@ class Codes(object):
     ERR_ZONE_MISSING = 420
     ERR_BAD_ARGS = 421
     ERR_GENERIC = 430
+
+class NS(object):
+    TARGET = "com.rpath.sputnik.targetsplugin"
+    TARGET_TEST_CREATE = "%s.test.create" % TARGET
+    TARGET_TEST_CREDENTIALS = "%s.test.credentials" % TARGET
+    TARGET_IMAGES_LIST = "%s.images.list" % TARGET
+    TARGET_INSTANCES_LIST = "%s.instances.list" % TARGET
