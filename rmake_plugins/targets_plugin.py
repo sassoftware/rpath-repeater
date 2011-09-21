@@ -15,7 +15,6 @@
 import sys
 import StringIO
 
-from rmake3.core import types
 from rmake3.core import handler
 
 from conary.lib.formattrace import formatTrace
@@ -27,7 +26,6 @@ from catalogService.rest.models import xmlNode
 from rpath_repeater import models
 from rpath_repeater.codes import Codes as C
 from rpath_repeater.codes import NS
-from rpath_repeater.utils import nodeinfo
 from rpath_repeater.utils import base_forwarding_plugin as bfp
 
 class TargetsPlugin(bfp.BaseForwardingPlugin):
