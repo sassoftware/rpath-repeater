@@ -1,0 +1,41 @@
+#!/usr/bin/python
+
+import os
+import sys
+import logging
+
+from conary.lib import util
+sys.excepthook = util.genExcepthook()
+
+from conary import versions
+from conary import conarycfg
+from conary import conaryclient
+
+from rpath_repeater.utils import windows
+
+def setupLogging():
+    rootLog = logging.getLogger('')
+    streamHandler = logging.StreamHandler(sys.stdout)
+    streamFormatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+    streamHandler.setFormatter(streamFormatter)
+    rootLog.addHandler(streamHandler)
+    rootLog.setLevel(logging.DEBUG)
+    return rootLog
+
+log = setupLogging()
+
+if len(sys.argv) != 3:
+    print >>sys.stderr, 'usage: %s <host> <admin password>' % sys.argv[0]
+    sys.exit(1)
+
+user = 'Administrator'
+domain = host = sys.argv[1]
+password = sys.argv[2]
+
+def status(l, p):
+    print p
+
+authInfo = windows.WindowsAuthInfo(host, domain, user, password)
+system = windows.WindowsSystem(authInfo, status)
+
+import epdb; epdb.st()
