@@ -7,6 +7,9 @@ import copy
 import itertools
 from collections import namedtuple
 
+import logging
+log = logging.getLogger('windows.update')
+
 from conary import files
 from conary import trove
 from conary import conarycfg
@@ -252,6 +255,8 @@ class UpdateJob(object):
             return self._contents
 
         self.callback.info('Retrieving file contents')
+
+        log.debug(self._updates)
 
         cs = self._client.repos.createChangeSet(self._updates, withFiles=True,
             withFileContents=True)
