@@ -559,7 +559,7 @@ class rTIS(object):
 
         # Wait for PromgraData\rPath\manifest to exist before setting the
         # manifest, it should be created by rPathTools Setup.
-        if not self._smb.pathexists(self.updatesDir, '..', 'manifest'):
+        while not self._smb.pathexists(self.updatesDir, '..', 'manifest'):
             time.sleep(1)
 
         self.manifest = manifest.values()
