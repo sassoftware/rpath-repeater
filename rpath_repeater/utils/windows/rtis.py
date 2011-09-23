@@ -14,6 +14,7 @@ from conary.deps import deps
 from conary.trovetup import TroveTuple
 
 from wmiclient import WMIBaseError
+from wmiclient import WMIInternalError
 from wmiclient import WMIFileNotFoundError
 
 from rpath_repeater.utils.windows.callbacks import BaseCallback
@@ -188,7 +189,7 @@ class rTIS(object):
     _conary_keypath = r'SOFTWARE\rPath\rTIS.NET\conary'
 
     _reboot_timeout = 600 # in seconds
-    _query_sleep = 1
+    _query_sleep = 3
 
     def __init__(self, wmiclient, smbclient, callback=None):
         self._wmi = wmiclient
@@ -400,13 +401,27 @@ class rTIS(object):
         Start the rTIS service.
         """
 
-        status = self._wmi.serviceStart(self._service_name)
+        e = None
+        status = None
 
-        if len(status.output) != 1:
-            raise (ServiceFailedToStartError, 'The rPath Tools Installer '
-                'service failed to start, please try again.')
+        while status is None or not status.output:
+            self.callback.info('attempting to start %s' % self._service_name)
+            try:
+                status = self._wmi.serviceStart(self._service_name)
+            # Service started, but we got an error anyway
+            except WMIInternalError, e:
+                break
 
-        assert status.output[0] == 'Success'
+            # Wait a second before trying to start the service again.
+            if not status.output:
+                self._wmi.close()
+                time.sleep(1)
+
+#        if len(status.output) != 1:
+#            raise (ServiceFailedToStartError, 'The rPath Tools Installer '
+#                'service failed to start, please try again.')
+
+#        assert status.output[0] == 'Success'
 
         # Now wait for the service to actually start.
         state = None
@@ -417,7 +432,8 @@ class rTIS(object):
                 result = self._query(self._wmi.registryGetKey,
                                      self._params_keypath,
                                      statusKey, raiseErrors=True)
-                state = result[0]
+                if result:
+                    state = result[0]
 
             # FIXME: There should be a better way
             # If we are updating rTIS as the first job, the key that we are
@@ -428,8 +444,9 @@ class rTIS(object):
                 pass
 
             if time.time() - start > 30:
+                error = e and e or ''
                 raise (ServiceFailedToStartError, 'The rPath Tools Installer '
-                    'service failed to start.')
+                    'service failed to start. %s' % str(error))
 
     def wait(self, allowReboot=True, reportStatus=None):
         """
