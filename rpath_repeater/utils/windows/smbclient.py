@@ -112,6 +112,7 @@ class SMBClient(object):
             self._runCmd(self._umount_cmd + [ self._rootdir, ])
         finally:
             self._rootdir = None
+            self._mounted = False
 
     def pathjoin(self, *paths, **kwargs):
         if not self._mounted:
