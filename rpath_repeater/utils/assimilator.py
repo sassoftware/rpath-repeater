@@ -234,18 +234,19 @@ cmd = cmd + " /etc/conary/rpath-tools/certs/%s.0" % sslpath
 runCmd(cmd)
 
 logger.info("(re)starting CIM")
+runCmd("service conary-cim start")
 runCmd("service sfcb-conary restart")
 
 logger.info("waiting for CIM to come online")
 s = socket.socket()
 socket_ok = False
 time.sleep(5)
-for x in range(0,20):
+for x in range(0,10):
     try:
         s.connect(('127.0.0.1', 5989))
         socket_ok=True
     except Exception, e:
-        time.sleep(5)
+        time.sleep(3)
 if not socket_ok:
     logger.error('CIM wait timeout exceeded, registration failure expected')
 logger.info("CIM online")
