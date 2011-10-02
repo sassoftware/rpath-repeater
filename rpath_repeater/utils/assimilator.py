@@ -206,8 +206,8 @@ runCmd("sh /var/spool/tmp/assimilate_tags.sh", must_succeed=True)
 logger.info("configuring conaryProxy")
 proxyFile = open('/etc/conary/config.d/rpath-tools-conaryProxy','w')
 # using the worker node address
-logger.info("destination: server=%s, port=%s" % (server, port))
 server, port = sys.argv[2].split(":")
+logger.info("destination: server=%s, port=%s" % (server, port))
 proxyFile.write("conaryProxy https://%s\\n" % server)
 proxyFile.close()
 
