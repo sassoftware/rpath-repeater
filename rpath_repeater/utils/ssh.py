@@ -59,7 +59,6 @@ class SshConnector(object):
 
        client.set_log_channel(None)
 
-       client.load_system_host_keys()
        # might want an 'ignore' policy that doesn't chirp to stderr later
        client.set_missing_host_key_policy(paramiko.WarningPolicy())
        if self.key and self.key != '':
