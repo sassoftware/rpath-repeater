@@ -131,7 +131,10 @@ class BootstrapTask(AssimilatorTaskHandler):
         platformLabels = dict(data.p.platformLabels)
         retVal, outParams = self._bootstrap(host=data.p.host, port=data.p.port, \
             nodes=data.nodes, sshAuth=data.p.sshAuth, uuid=data.p.eventUuid, \
-            caCert=data.p.caCert, platformLabels=platformLabels)
+            caCert=data.p.caCert, 
+            projectLabel=data.p.projectLabel, 
+            installTrove=data.p.installTrove,
+            platformLabels=platformLabels)
 
         # xml doesn't contain much, this returns what the CIM task returns...
         data.response = "<system/>"
@@ -148,7 +151,8 @@ class BootstrapTask(AssimilatorTaskHandler):
                     (data.p.host, errorSummary), errorDetails)
 
     def _bootstrap(self, host=None, port=None, nodes=None, 
-        sshAuth=None, caCert=None, uuid=None, platformLabels=None):
+        sshAuth=None, caCert=None, uuid=None, projectLabel=None,
+        installTrove=None, platformLabels=None):
         '''
         Guts of actual bootstrap code...
         '''
@@ -181,7 +185,9 @@ class BootstrapTask(AssimilatorTaskHandler):
             eventUuid=uuid,
             caCert=caCert,
             platformLabels=platformLabels,
-            status=self.sendStatus
+            status=self.sendStatus,
+            projectLabel=projectLabel,
+            installTrove=installTrove
         )
         rc, output = asim.assimilate()
         sshConn.close()
