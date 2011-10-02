@@ -126,7 +126,7 @@ class AssimilatorParams(_BaseSlotCompare):
     # [{ 'sshUser' : user, 'sshPassword' : pass, 'sshKey' : key_path_or_bytes }, {...}, ...]
     # caCert are the contents of the cert
     # platformLabels is a list of key value pairs [('centos-5',  label), ...]
-    __slots__ = [ 'host', 'port', 'caCert', 'sshAuth', 'platformLabels', 'eventUuid' ]
+    __slots__ = [ 'host', 'port', 'caCert', 'sshAuth', 'platformLabels', 'projectLabel', 'installTrove', 'eventUuid' ]
 
 class ManagementInterfaceParams(_BaseSlotCompare):
     """

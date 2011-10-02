@@ -28,7 +28,8 @@ class LinuxAssimilator(object):
     """
 
     def __init__(self, sshConnector=None, zoneAddresses=None, 
-        caCert=None, status=None, platformLabels=None, eventUuid=-1):
+        caCert=None, status=None, platformLabels=None, 
+        installTrove=None, projectLabel=None, eventUuid=-1):
 
         self._status               = status
         self.ssh                   = sshConnector
@@ -37,6 +38,9 @@ class LinuxAssimilator(object):
         self.zoneAddresses         = zoneAddresses
         self.caCert                = caCert
         self.eventUuid             = eventUuid
+        self.installTrove          = installTrove
+        self.projectLabel          = projectLabel
+
         self.builder = LinuxAssimilatorBuilder(
             osFamily       = self.osFamily,
             caCert         = caCert,
@@ -103,7 +107,7 @@ class LinuxAssimilator(object):
         addrs = " ".join(self.zoneAddresses)
         commands.append("cd /; tar -xf /tmp/rpath_assimilator.tar")
         script = "/usr/conary/bin/python /usr/share/bin/rpath_bootstrap.py"
-        commands.append("%s %s %s" % (script, self.eventUuid, addrs))
+        commands.append("%s %s %s %s %s" % (script, self.eventUuid, self.projectLabel, self.installTrove, addrs))
         return commands
 
     def runCmd(self, cmd):
@@ -221,7 +225,9 @@ except OSError:
     pass
 fd = open("/etc/conary/rpath-tools/config.d/directMethod", "w+")
 fd.write("directMethod []\\n")
-for zoneAddr in sys.argv[2:]:
+projectLabel = sys.argv[2]
+installTrove = sys.argv[3]
+for zoneAddr in sys.argv[4:]:
     fd.write("directMethod %s\\n" % zoneAddr)
 fd.close()
 
@@ -253,6 +259,7 @@ time.sleep(5)
 
 logger.info("registering")
 runCmd("rpath-register --event-uuid=%s" % sys.argv[1], must_succeed=True)
+runCmd("conary update %s=%s" % (installTrove, projectLabel), must_succeed=True)
 
 sys.exit(0)
 '''
