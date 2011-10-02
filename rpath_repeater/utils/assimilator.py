@@ -206,8 +206,8 @@ runCmd("sh /var/spool/tmp/assimilate_tags.sh", must_succeed=True)
 logger.info("configuring conaryProxy")
 proxyFile = open('/etc/conary/config.d/rpath-tools-conaryProxy','w')
 # using the worker node address
-server, port = sys.argv[2].split(":")
 logger.info("destination: server=%s, port=%s" % (server, port))
+server, port = sys.argv[2].split(":")
 proxyFile.write("conaryProxy https://%s\\n" % server)
 proxyFile.close()
 
@@ -225,9 +225,9 @@ except OSError:
     pass
 fd = open("/etc/conary/rpath-tools/config.d/directMethod", "w+")
 fd.write("directMethod []\\n")
-projectLabel = sys.argv[2]
-installTrove = sys.argv[3]
-for zoneAddr in sys.argv[4:]:
+projectLabel = sys.argv[3]
+installTrove = sys.argv[4]
+for zoneAddr in sys.argv[5:]:
     fd.write("directMethod %s\\n" % zoneAddr)
 fd.close()
 
