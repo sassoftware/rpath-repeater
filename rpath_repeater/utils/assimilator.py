@@ -261,7 +261,7 @@ time.sleep(5)
 
 logger.info("registering")
 runCmd("rpath-register --event-uuid=%s" % sys.argv[1], must_succeed=True)
-runCmd("conary update %s=%s" % (installTrove, projectLabel), must_succeed=True)
+runCmd("conary migrate %s=%s --replace-unmanaged-files" % (installTrove, projectLabel), must_succeed=True)
 
 sys.exit(0)
 '''
