@@ -63,6 +63,8 @@ class SshConnector(object):
        client.set_missing_host_key_policy(paramiko.WarningPolicy())
        if self.key and self.key != '':
            self.key = paramiko.PKey(data=self.key)
+           if not self.password:
+               self.password = None
            # try the ssh key, password protected keys are ok
            try:
                self.status(C.MSG_GENERIC, 'attempting SSH with key')
