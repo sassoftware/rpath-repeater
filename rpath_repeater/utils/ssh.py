@@ -69,7 +69,9 @@ class SshConnector(object):
            try:
                self.status(C.MSG_GENERIC, 'attempting SSH with key')
                client.connect(self.host, port=self.port,
-                   password=self.password, pkey=self.key,
+                   password=self.password,
+                   look_for_keys=False,
+                   pkey=self.key,
                    allow_agent=True) # look_for_keys=True)
            except paramiko.PasswordRequiredException:
                # this won't retry the unlock password as your username/password
