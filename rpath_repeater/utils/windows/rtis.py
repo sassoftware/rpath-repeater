@@ -245,7 +245,6 @@ class rTIS(object):
             self._wmi.registryCreateKey(r'SOFTWARE\rPath', 'rTIS.NET')
             self._wmi.registryCreateKey(r'SOFTWARE\rPath\rTIS.NET', 'conary')
             self.system_model = ''
-            self.manifest = ''
             self.polling_manifest = ''
 
     @_filter
