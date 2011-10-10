@@ -233,6 +233,13 @@ for zoneAddr in sys.argv[4:]:
     fd.write("directMethod %s\\n" % zoneAddr)
 fd.close()
 
+logger.info("adding project to search path")
+data = file("/etc/conary/config.d/assimilator").read()
+data = data.replace("installLabelPath", "installLabelPath %s " % projectLabel)
+conary_cfg = file("/etc/conary/config.d/assimilator", "w")
+conary_cfg.write(data)
+conary_cfg.close()
+
 logger.info("computing cert location")
 cmd = 'openssl x509 -in /etc/conary/rpath-tools/certs/rbuilder-hg.pem  -noout -hash'
 sslpath = os.popen(cmd).read().strip()
