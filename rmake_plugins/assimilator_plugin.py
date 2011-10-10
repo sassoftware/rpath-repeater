@@ -23,7 +23,7 @@ AssimilatorData = types.slottype('AssimilatorData',
     'p nodes response') # where p is a AssimilatorParam
 
 class AssimilatorConfig(cny_cfg.ConfigFile):
-    platformLabel = (ct.CfgDict(ct.CfgList(ct.CfgString)), None)
+    platformLabel = (ct.CfgDict(ct.CfgLineList(ct.CfgString)), None)
 
 ###########################################################################    
 

@@ -130,8 +130,9 @@ class LinuxAssimilator(object):
 
         allOutput = ""
         # place the deploy tarball onto the system
-        self.status(C.MSG_GENERIC, 'deploying payload')
+        self.status(C.MSG_GENERIC, 'transferring archive')
         self.ssh.putFile(self.payload, "/tmp/rpath_assimilator.tar")
+        self.status(C.MSG_GENERIC, 'assimilating system')
         
         commands  = self._commands()
 
@@ -215,7 +216,7 @@ proxyFile.close()
 logger.info("updating packages")
 cmd = "conary update conary sblim-sfcb-conary sblim-sfcb-schema-conary"
 cmd = cmd + " sblim-cmpi-network-conary sblim-cmpi-base-conary"
-cmd = cmd + " conary-cim cmpi-bindings-conary iconfig"
+cmd = cmd + " conary-cim cmpi-bindings-conary iconfig rpm:python"
 cmd = cmd + " m2crypto-conary openslp-conary info-sfcb --no-deps"
 runCmd(cmd)
 
@@ -286,7 +287,8 @@ sys.exit(0)
             "group-rpath-tools",
             "rpath-tools",
             "m2crypto-conary", # not in group-rpath-tools, this is a bug
-            "pywbem-conary" # looks like we need this too?
+            "pywbem-conary",
+            "rpm:python", # for encapsulated packages
         ]
         self.caCert = caCert
         self.rLabels = self._install_labels(osFamily)
@@ -339,9 +341,11 @@ sys.exit(0)
         to the remote client, rebuilding if needed.  Supports building
         for multiple flavors (saving as different filenames)
         '''
+        self.status(C.MSG_GENERIC, 'determining archive applicability')
         (digestVersion, shouldRebuild, trovesNeeded) = self._makeRebuildDecision()
         if shouldRebuild:
             self._buildTarball(digestVersion, trovesNeeded)
+        self.status(C.MSG_GENERIC, 'archive ready')
         return self.buildResult
 
     def _downloadConaryPackages(self, trovesNeeded):
@@ -420,8 +424,8 @@ sys.exit(0)
             LinuxAssimilatorBuilder.BOOTSTRAP_SCRIPT,
         )
         assimConfig = ""
-        for label in self.rLabels:
-            assimConfig = assimConfig + "installLabelPath %s\n" % label
+        labels = " ".join(self.rLabels)
+        assimConfig = "installLabelPath %s\n" % labels
         assimConfig = assimConfig + "ignoreDependencies abi soname file" + \
              " trove userinfo groupinfo CIL java python perl ruby php rpm" + \
              " rpmlib\n"
@@ -452,6 +456,7 @@ sys.exit(0)
         except OSError:
             pass
 
+        self.status(C.MSG_GENERIC, 'preparing archive contents')
         self._downloadConaryPackages(trovesNeeded)
 
         self._writeConfigFiles(digestVersion)
