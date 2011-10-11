@@ -5,6 +5,20 @@ import paramiko
 import logging
 from rpath_repeater.codes import Codes as C
 
+class PrivateKey(object):
+    """
+    A file-like object for use w/ paramiko
+    """
+
+    def __init__(self, key_bytes):
+        self.key_bytes = key_bytes
+
+    def read(self):
+        return self.key_bytes
+
+    def readlines(self):
+        return self.key_bytes.split("\n")
+
 class SshConnector(object):
 
     """
@@ -59,27 +73,47 @@ class SshConnector(object):
 
        client.set_log_channel(None)
 
+       if self.password == '':
+           self.password = None
+
        # might want an 'ignore' policy that doesn't chirp to stderr later
        client.set_missing_host_key_policy(paramiko.WarningPolicy())
        if self.key and self.key != '':
-           self.key = paramiko.PKey(data=self.key)
+
+           key_obj = PrivateKey(self.key)
+           self.key = None
+           try:
+               self.key = paramiko.DSSKey.from_private_key(file_obj=key_obj, password=self.password)
+           except paramiko.SSHException: 
+               self.key = paramiko.RSAKey.from_private_key(file_obj=key_obj, password=self.password)
+
            # try the ssh key, password protected keys are ok
            try:
-               self.status(C.MSG_GENERIC, 'attempting SSH with key')
-               client.connect(self.host, port=self.port,
+               self.status(C.MSG_GENERIC, 'attempting SSH login with key')
+               client.connect(
+                   self.host, 
+                   port=self.port,
+                   username=self.user,
                    password=self.password,
-                   # look_for_keys=False,
+                   look_for_keys=False,
                    pkey=self.key,
-                   allow_agent=True) # look_for_keys=True)
+                   allow_agent=False
+               ) 
            except paramiko.PasswordRequiredException:
                # this won't retry the unlock password as your username/password
                raise Exception("invalid key password")
        else:
            # no key provided, try username/password
-           self.status(C.MSG_GENERIC, 'attempting SSH with password')
-           client.connect(self.host, port=self.port, username=self.user,
-               password=self.password, allow_agent=True)
-               # look_for_keys=True)
+           self.status(C.MSG_GENERIC, 'attempting SSH login with password')
+           client.connect(
+               self.host, 
+               port=self.port, 
+               username=self.user,
+               password=self.password, 
+               allow_agent=False, 
+               look_for_keys=False
+           )
+       self.status(C.MSG_GENERIC, 'connection established')
        return client
 
     def close(self):
