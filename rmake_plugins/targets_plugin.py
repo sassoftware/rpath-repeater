@@ -250,6 +250,8 @@ class TargetsInstanceCaptureTask(BaseTaskHandler):
         # used
         job = self.Job(self.sendStatus)
         self.driver.captureSystem(job, instanceId, params)
+        # XXX
+        instance = "XXX FIXME"
         self.finishCall(instance, "Instance captured")
 
 
