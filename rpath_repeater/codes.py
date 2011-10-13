@@ -21,6 +21,7 @@ class Codes(object):
     MSG_PROBE = 106
     MSG_GENERIC = 110
     MSG_BOOTSTRAP_REQ = 111
+    MSG_PROGRESS = 112
 
     # 200
     OK = 200
@@ -40,3 +41,4 @@ class NS(object):
     TARGET_TEST_CREDENTIALS = "%s.test.credentials" % TARGET
     TARGET_IMAGES_LIST = "%s.images.list" % TARGET
     TARGET_INSTANCES_LIST = "%s.instances.list" % TARGET
+    TARGET_SYSTEM_CAPTURE = "%s.instances.capture" % TARGET

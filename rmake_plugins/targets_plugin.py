@@ -38,6 +38,7 @@ class TargetsPlugin(bfp.BaseForwardingPlugin):
         handler.registerHandler(TargetsTestCredentialsHandler)
         handler.registerHandler(TargetsImageListHandler)
         handler.registerHandler(TargetsInstanceListHandler)
+        handler.registerHandler(TargetsInstanceCaptureHandler)
 
     def worker_get_task_types(self):
         return {
@@ -45,6 +46,7 @@ class TargetsPlugin(bfp.BaseForwardingPlugin):
             NS.TARGET_TEST_CREDENTIALS: TargetsTestCredentials,
             NS.TARGET_IMAGES_LIST: TargetsImageListTask,
             NS.TARGET_INSTANCES_LIST: TargetsInstanceListTask,
+            NS.TARGET_SYSTEM_CAPTURE: TargetsInstanceCaptureTask,
         }
 
 
@@ -104,6 +106,9 @@ class TargetsImageListHandler(BaseHandler):
 
 class TargetsInstanceListHandler(BaseHandler):
     jobType = NS.TARGET_INSTANCES_LIST
+
+class TargetsInstanceCaptureHandler(BaseHandler):
+    jobType = NS.TARGET_SYSTEM_CAPTURE
 
 class RestDatabase(object):
     __slots__ = [ 'cfg', 'auth', ]
@@ -226,4 +231,27 @@ class TargetsInstanceListTask(BaseTaskHandler):
         """
         instances = self.driver.getInstancesFromTarget(None)
         self.finishCall(instances, "Retrieved list of instances")
+
+class TargetsInstanceCaptureTask(BaseTaskHandler):
+    class Job(object):
+        def __init__(self, msgMethod):
+            self.msgMethod = msgMethod
+
+        def addHistoryEntry(self, *args):
+            self.msgMethod(C.MSG_PROGRESS, ' '.join(args))
+
+    def _run(self):
+        """
+        List target instances
+        """
+        instanceId = self.cmdArgs['instanceId']
+        params = self.cmdArgs['params']
+        # Look at captureSystem to figure out which params are really
+        # used
+        job = self.Job(self.sendStatus)
+        self.driver.captureSystem(job, instanceId, params)
+        # XXX
+        instance = "XXX FIXME"
+        self.finishCall(instance, "Instance captured")
+
 

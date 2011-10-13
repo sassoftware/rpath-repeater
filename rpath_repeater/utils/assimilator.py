@@ -297,7 +297,6 @@ sys.exit(0)
             "rpath-tools",
             "m2crypto-conary", # not in group-rpath-tools, this is a bug
             "pywbem-conary",
-            "rpm:python", # for encapsulated packages
         ]
         self.caCert = caCert
         self.rLabels = self._install_labels(osFamily)
