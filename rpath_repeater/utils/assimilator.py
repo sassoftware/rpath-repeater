@@ -268,7 +268,9 @@ logger.info("CIM online")
 time.sleep(5)
 
 logger.info("registering")
-runCmd("conary migrate %s=%s --replace-unmanaged-files" % (installTrove, projectLabel), must_succeed=True)
+
+if projectLabel != "None":
+    runCmd("conary migrate %s=%s --replace-unmanaged-files" % (installTrove, projectLabel), must_succeed=True)
 runCmd("rpath-register --event-uuid=%s" % sys.argv[1], must_succeed=True)
 
 sys.exit(0)
