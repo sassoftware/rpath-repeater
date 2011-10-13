@@ -250,8 +250,7 @@ class TargetsInstanceCaptureTask(BaseTaskHandler):
         # used
         job = self.Job(self.sendStatus)
         self.driver.captureSystem(job, instanceId, params)
-        # XXX
-        instance = "XXX FIXME"
-        self.finishCall(instance, "Instance captured")
+        imageRef = models.ImageRef(params['image_id'])
+        self.finishCall(imageRef, "Instance captured")
 
 

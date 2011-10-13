@@ -330,6 +330,7 @@ def main():
             imageFilesCommitUrl="http://dhcp155.eng.rpath.com/api/products/celery/images/5/files",
             imageTitle='Image Title',
             imageName="cobbler-clone.ova",
+            image_id="http://dhcp155.eng.rpath.com/api/v1/images/5",
         )
         params.update({'metadata.owner': 'Owner', 'metadata.admin' : 'Admin'})
         instanceId = '42345ce9-8a1e-7239-ceb9-3cfbcc8c6667'

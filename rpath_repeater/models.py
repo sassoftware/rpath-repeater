@@ -172,6 +172,10 @@ class Image(_BaseSlotCompare):
 class ImageFiles(_SerializableList):
     _tag = "files"
 
+class ImageRef(_BaseSlotCompare, _Serializable):
+    __slots__ = ['id']
+    _tag = "image"
+
 class Trove(_BaseSlotCompare, _Serializable):
     __slots__ = ( 'name', 'version', 'flavor', )
     _tag = "trove"
