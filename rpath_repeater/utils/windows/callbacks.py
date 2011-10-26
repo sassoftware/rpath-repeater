@@ -4,6 +4,8 @@
 
 import logging
 
+from conary.conaryclient import callbacks
+
 from wmiclient import WMICallback
 from rpath_repeater.codes import Codes
 
@@ -48,6 +50,21 @@ class FileCopyCallback(object):
         self.cbfn(self.msg + msg)
 
 
+class ChangeSetCallback(callbacks.ChangesetCallback):
+    def __init__(self, *args, **kwargs):
+        self._logFunc = kwargs.pop('logFunc', None)
+
+        callbacks.ChangesetCallback.__init__(self, *args, **kwargs)
+        self._last = None
+
+    def _message(self, msg):
+        if msg != self._last:
+            self._logFunc(msg)
+
+    def __del__(self):
+        pass
+
+
 class RepeaterWMICallback(WMICallback, BaseCallback):
     def __init__(self, authInfo, statusMethod):
         WMICallback.__init__(self, authInfo)
@@ -77,6 +94,9 @@ class RepeaterWMICallback(WMICallback, BaseCallback):
 
     def copyfile(self, msg, size):
         return FileCopyCallback(msg, size, self.info)
+
+    def getChangeSetCallback(self):
+        return ChangeSetCallback(logFunc=self.info)
 
     def start(self, msg=None):
         self._log(Codes.MSG_START, msg)

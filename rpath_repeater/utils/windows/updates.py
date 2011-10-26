@@ -254,7 +254,8 @@ class UpdateJob(object):
         self.callback.info('Retrieving file contents')
 
         cs = self._client.repos.createChangeSet(self._updates, withFiles=True,
-            withFileContents=True)
+            withFileContents=True,
+            callback=self.callback.getChangeSetCallback())
 
         names = [ x[0] for x in self._updates ]
 
