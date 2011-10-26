@@ -2,6 +2,7 @@
 # Copyright (c) 2011 rPath, Inc.
 #
 
+import time
 import logging
 
 from conary.conaryclient import callbacks
@@ -35,11 +36,26 @@ class BaseCallback(object):
         pass
 
 
+class ThrottleCallback(object):
+    def __init__(self, logFunc):
+        self._logFunc = logFunc
+
+        self._last = None
+        self._last_t = 0
+
+    def __call__(self, msg):
+        if (self._logFunc is not None and msg != self._last and
+            (time.time() - self._last_t > 1)):
+            self._last = msg
+            self._last_t = time.time()
+            self._logFunc(msg)
+
+
 class FileCopyCallback(object):
     def __init__(self, msg, total, cbfn):
         self.msg = msg
         self.total = total
-        self.cbfn = cbfn
+        self.cbfn = ThrottleCallback(cbfn)
 
     def __call__(self, amount, rate):
         # units are bytes and bytes/second, convert to KB
@@ -52,14 +68,8 @@ class FileCopyCallback(object):
 
 class ChangeSetCallback(callbacks.ChangesetCallback):
     def __init__(self, *args, **kwargs):
-        self._logFunc = kwargs.pop('logFunc', None)
-
+        self._message = ThrottleCallback(kwargs.pop('logFunc', None))
         callbacks.ChangesetCallback.__init__(self, *args, **kwargs)
-        self._last = None
-
-    def _message(self, msg):
-        if msg != self._last:
-            self._logFunc(msg)
 
     def __del__(self):
         pass
