@@ -206,7 +206,7 @@ class rTIS(object):
         time.sleep(self._query_sleep)
 
     def _query(self, func, *args, **kwargs):
-        retries = kwargs.pop('retries', 3)
+        retries = kwargs.pop('retries', 10)
         default = kwargs.pop('default', None)
         raiseErrors = kwargs.pop('raiseErrors', False)
         queries = 0
@@ -399,13 +399,13 @@ class rTIS(object):
         Start the rTIS service.
         """
 
-        status = self._wmi.serviceStart(self._service_name)
+        status = self._query(self._wmi.serviceStart, self._service_name)
 
-        if len(status.output) != 1:
+        if len(status) != 1:
             raise (ServiceFailedToStartError, 'The rPath Tools Installer '
                 'service failed to start, please try again.')
 
-        assert status.output[0] == 'Success'
+        assert status[0] == 'Success'
 
         # Now wait for the service to actually start.
         state = None
