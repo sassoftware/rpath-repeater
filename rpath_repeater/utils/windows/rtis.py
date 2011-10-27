@@ -401,11 +401,14 @@ class rTIS(object):
 
         status = self._query(self._wmi.serviceStart, self._service_name)
 
-        if len(status) != 1:
-            raise (ServiceFailedToStartError, 'The rPath Tools Installer '
-                'service failed to start, please try again.')
-
-        assert status[0] == 'Success'
+        # FIXME: The status check that comes back from wmi seems to be
+        #        unreliable at best. For now just assume that the call went
+        #        through and fail if the key doesn't get set.
+        #if len(status) != 1:
+        #    raise (ServiceFailedToStartError, 'The rPath Tools Installer '
+        #        'service failed to start, please try again.')
+        #
+        #assert status[0] == 'Success'
 
         # Now wait for the service to actually start.
         state = None
@@ -499,8 +502,9 @@ class rTIS(object):
         # overwrite the existing system model since it shouldn't exist yet.
         self.system_model = criticalJob.system_model
 
-        logPath = self._smb.getWindowsPath('Windows/Temp/rpath_install.log')
-        msiexec = r'msiexec.exe /i %%s /quiet /l*vx %s' % logPath
+        logPath = self._smb.pathjoin('Windows', 'Temp', 'rpath_install.log')
+        winLogPath = self._smb.getWindowsPath('Windows/Temp/rpath_install.log')
+        msiexec = r'msiexec.exe /i %%s /quiet /l*vx %s' % winLogPath
 
         manifest = dict((x.name, x) for x in criticalJob.manifest)
 
@@ -543,6 +547,21 @@ class rTIS(object):
         # manifest, it should be created by rPathTools Setup.
         if not self._smb.pathexists(self.updatesDir, '..', 'manifest'):
             time.sleep(1)
+
+        while not self._smb.pathexists(logPath):
+            time.sleep(1)
+
+        # Wait for MSI to complete the update
+        self.callback.info('waiting for installation to complete')
+        done = False
+        while not done:
+            fh = self._smb.pathopen(logPath, codec='utf_16_le')
+            for line in fh:
+                if 'MainEngineThread is returning 0' in line:
+                    done = True
+            fh.close()
+            time.sleep(1)
+        self.callback.info('critical update installation complete')
 
         self.manifest = manifest.values()
         self.polling_manifest = criticalJob.polling_manifest
