@@ -399,8 +399,7 @@ class rTIS(object):
         Start the rTIS service.
         """
 
-        status = self._query(self._wmi.serviceStart, self._service_name)  # pyflakes=igore
-
+        status = self._query(self._wmi.serviceStart, self._service_name)  # pyflakes=ignore
 
         # FIXME: The status check that comes back from wmi seems to be
         #        unreliable at best. For now just assume that the call went
