@@ -138,7 +138,7 @@ class BaseTaskHandler(bfp.BaseTaskHandler):
             formatTrace(typ, value, tb, stream = out, withLocals = True)
 
             self.sendStatus(C.ERR_GENERIC,
-                "Error in Interface Detection call: %s"
+                "Error in target call: %s"
                     % str(value), out.getvalue())
 
     def _initConfig(self):
