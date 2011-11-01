@@ -107,7 +107,8 @@ class LinuxAssimilator(object):
         addrs = " ".join(self.zoneAddresses)
         commands.append("cd /; tar -xf /tmp/rpath_assimilator.tar")
         script = "/usr/conary/bin/python /usr/share/bin/rpath_bootstrap.py"
-        commands.append("%s %s %s %s %s" % (script, self.eventUuid, self.projectLabel, self.installTrove, addrs))
+        commands.append("%s %s %s '%s' %s" % (script, self.eventUuid,
+            self.projectLabel, self.installTrove, addrs))
         return commands
 
     def runCmd(self, cmd):
