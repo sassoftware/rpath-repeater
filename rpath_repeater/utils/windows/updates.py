@@ -144,8 +144,8 @@ class UpdateJob(object):
         cJob._newSystemModel = [ 'install %s=%s' % (x[0], x[2][0])
             for x in cJob._updates ]
 
-        cJob._newPollingManifest = [ '%s=%s[%s]' % (x[0], x[2][0], x[2][1])
-            for x in cJob._updates ]
+        cJob._newPollingManifest = [ TroveTuple(x[0], x[2][0], x[2][1]
+            ).asString(withTimestamp=True) for x in cJob._updates ]
 
         return cJob
 
