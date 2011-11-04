@@ -126,7 +126,7 @@ class TargetsImageDeployHandler(BaseHandler):
         imageXml = response.response
         targetImageXml = targetImageXmlTemplate % dict(image=imageXml)
         imageFileUpdateUrl = params['imageFileUpdateUrl']
-        location = models.URL.fromString(imageFileUpdateUrl)
+        location = models.URL.fromString(imageFileUpdateUrl, port=80)
         self.postResults(targetImageXml, location=location)
 
 class TargetsImageDeployDescriptorHandler(BaseHandler):
