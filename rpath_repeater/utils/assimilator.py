@@ -107,7 +107,8 @@ class LinuxAssimilator(object):
         addrs = " ".join(self.zoneAddresses)
         commands.append("cd /; tar -xf /tmp/rpath_assimilator.tar")
         script = "/usr/conary/bin/python /usr/share/bin/rpath_bootstrap.py"
-        commands.append("%s %s %s %s %s" % (script, self.eventUuid, self.projectLabel, self.installTrove, addrs))
+        commands.append("%s %s %s '%s' %s" % (script, self.eventUuid,
+            self.projectLabel, self.installTrove, addrs))
         return commands
 
     def runCmd(self, cmd):
@@ -271,7 +272,8 @@ time.sleep(5)
 logger.info("registering")
 
 if projectLabel != "None":
-    runCmd("conary migrate %s=%s --replace-unmanaged-files" % (installTrove, projectLabel), must_succeed=True)
+    runCmd("conary migrate --replace-unmanaged-files '%s'" % (installTrove,),
+            must_succeed=True)
 runCmd("rpath-register --event-uuid=%s" % sys.argv[1], must_succeed=True)
 
 sys.exit(0)
