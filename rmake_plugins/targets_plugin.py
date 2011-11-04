@@ -12,8 +12,10 @@
 # full details.
 #
 
+from lxml import etree
 import sys
 import StringIO
+import weakref
 
 from rmake3.core import handler
 
@@ -39,6 +41,8 @@ class TargetsPlugin(bfp.BaseForwardingPlugin):
         handler.registerHandler(TargetsImageListHandler)
         handler.registerHandler(TargetsInstanceListHandler)
         handler.registerHandler(TargetsInstanceCaptureHandler)
+        handler.registerHandler(TargetsImageDeployHandler)
+        handler.registerHandler(TargetsImageDeployDescriptorHandler)
 
     def worker_get_task_types(self):
         return {
@@ -47,6 +51,8 @@ class TargetsPlugin(bfp.BaseForwardingPlugin):
             NS.TARGET_IMAGES_LIST: TargetsImageListTask,
             NS.TARGET_INSTANCES_LIST: TargetsInstanceListTask,
             NS.TARGET_SYSTEM_CAPTURE: TargetsInstanceCaptureTask,
+            NS.TARGET_IMAGE_DEPLOY: TargetsImageDeployTask,
+            NS.TARGET_IMAGE_DEPLOY_DESCRIPTOR: TargetsImageDeployDescriptorTask,
         }
 
 
@@ -69,7 +75,7 @@ class BaseHandler(bfp.BaseHandler):
         self.authToken = self.data.pop('authToken')
         jobUrl = self.data.pop('jobUrl')
         if jobUrl:
-            self.jobUrl = models.URL.fromString(jobUrl)
+            self.jobUrl = models.URL.fromString(jobUrl, host='localhost', port=80)
         else:
             self.jobUrl = None
 
@@ -78,13 +84,8 @@ class BaseHandler(bfp.BaseHandler):
         task = self.newTask(self.jobType, self.jobType, self.data, zone=self.zone)
         return self._handleTask(task)
 
-    def getResultsLocation(self):
-        if self.jobUrl is None:
-            return None, None, None
-        host = self.jobUrl.host or 'localhost'
-        port = self.jobUrl.port or 80
-        path = self.jobUrl.unparsedPath
-        return host, port, path
+    def getResultsUrl(self):
+        return self.jobUrl
 
     def postprocessHeaders(self, elt, headers):
         if self.authToken:
@@ -110,14 +111,45 @@ class TargetsInstanceListHandler(BaseHandler):
 class TargetsInstanceCaptureHandler(BaseHandler):
     jobType = NS.TARGET_SYSTEM_CAPTURE
 
+class TargetsImageDeployHandler(BaseHandler):
+    jobType = NS.TARGET_IMAGE_DEPLOY
+
+    def setup(self):
+        BaseHandler.setup(self)
+        self.addTaskStatusCodeWatcher(C.PART_RESULT_1,
+            self.linkImage)
+
+    def linkImage(self, task):
+        params = self.data['params'].args['params']
+        targetImageXmlTemplate = params['targetImageXmlTemplate']
+        response = task.task_data.thaw().getObject()
+        imageXml = response.response
+        targetImageXml = targetImageXmlTemplate % dict(image=imageXml)
+        imageFileUpdateUrl = params['imageFileUpdateUrl']
+        location = models.URL.fromString(imageFileUpdateUrl)
+        self.postResults(targetImageXml, location=location)
+
+class TargetsImageDeployDescriptorHandler(BaseHandler):
+    jobType = NS.TARGET_IMAGE_DEPLOY_DESCRIPTOR
+
 class RestDatabase(object):
-    __slots__ = [ 'cfg', 'auth', ]
+    __slots__ = [ 'cfg', 'auth', 'taskHandler', 'targetMgr', ]
     class Auth(object):
         __slots__ = [ 'auth', ]
-    def __init__(self):
+
+    class TargetManager(object):
+        def __init__(self, taskHandler):
+            self.taskHandler = taskHandler
+
+        def linkTargetImageToImage(self, targetTypeName, targetName,
+                rbuilderImageId, targetImageId):
+            self.taskHandler.linkTargetImageToImage(rbuilderImageId, targetImageId)
+
+    def __init__(self, taskHandler):
+        self.taskHandler = weakref.proxy(taskHandler)
         self.cfg = None
         self.auth = self.Auth()
-
+        self.targetMgr = self.TargetManager(self.taskHandler)
 
 class BaseTaskHandler(bfp.BaseTaskHandler):
     """
@@ -183,7 +215,7 @@ class BaseTaskHandler(bfp.BaseTaskHandler):
         return hndlr.toXml(node)
 
     def _createRestDatabase(self):
-        db = self.RestDatabaseClass()
+        db = self.RestDatabaseClass(self)
         if self.userCredentials is not None:
             db.auth.auth = users.Authorization(authorized=True,
                 userId=self.userCredentials.rbUserId,
@@ -232,7 +264,7 @@ class TargetsInstanceListTask(BaseTaskHandler):
         instances = self.driver.getInstancesFromTarget(None)
         self.finishCall(instances, "Retrieved list of instances")
 
-class TargetsInstanceCaptureTask(BaseTaskHandler):
+class JobProgressTaskHandler(BaseTaskHandler):
     class Job(object):
         def __init__(self, msgMethod):
             self.msgMethod = msgMethod
@@ -240,6 +272,7 @@ class TargetsInstanceCaptureTask(BaseTaskHandler):
         def addHistoryEntry(self, *args):
             self.msgMethod(C.MSG_PROGRESS, ' '.join(args))
 
+class TargetsInstanceCaptureTask(JobProgressTaskHandler):
     def _run(self):
         """
         List target instances
@@ -253,4 +286,37 @@ class TargetsInstanceCaptureTask(BaseTaskHandler):
         imageRef = models.ImageRef(params['image_id'])
         self.finishCall(imageRef, "Instance captured")
 
+class TargetsImageDeployTask(JobProgressTaskHandler):
+    def _run(self):
+        params = self.cmdArgs['params']
+        # Look at captureSystem to figure out which params are really
+        # used
+        job = self.Job(self.sendStatus)
+        imageFileInfo = params['imageFileInfo']
+        descriptorData = params['descriptorData']
+        imageDownloadUrl = params['imageDownloadUrl']
+        imgObj = self.driver.imageFromFileInfo(imageFileInfo, imageDownloadUrl)
+        self.image = imgObj
+        img = self.driver.deployImageFromUrl(job, imgObj, descriptorData)
+        self.finishCall(None, "Image deployed")
 
+    def linkTargetImageToImage(self, rbuilderImageId, targetImageId):
+        imageXml = etree.tostring(self.image.getElementTree(),
+            xml_declaration=False)
+
+        io = XmlStringIO(imageXml)
+        self.finishCall(io, "Linking image", C.PART_RESULT_1)
+
+class XmlStringIO(StringIO.StringIO):
+    def toXml(self):
+        return self.getvalue()
+
+class TargetsImageDeployDescriptorTask(BaseTaskHandler):
+    def _run(self):
+        """
+        Fetch image deployment descriptor
+        """
+        descr = self.driver.getImageDeploymentDescriptor()
+        io = XmlStringIO()
+        descr.serialize(io)
+        self.finishCall(io, "Descriptor generated")

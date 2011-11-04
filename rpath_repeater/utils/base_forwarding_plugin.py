@@ -97,7 +97,10 @@ class BaseHandler(handler.JobHandler, ReportingMixIn):
             return ret
 
     def setup(self):
-        pass
+        self._taskStatusCodeWatchers = {}
+
+    def addTaskStatusCodeWatcher(self, code, watcher):
+        self._taskStatusCodeWatchers[code] = watcher
 
     def initCall(self):
         self.data = self.getData().thaw().getDict()
@@ -160,6 +163,9 @@ class BaseHandler(handler.JobHandler, ReportingMixIn):
             # for us
             return
         self.setStatus(status)
+        watcher = self._taskStatusCodeWatchers.get(status.code)
+        if watcher is not None:
+            watcher(task)
 
     def _handleTask(self, task):
         """
@@ -182,6 +188,7 @@ class BaseHandler(handler.JobHandler, ReportingMixIn):
         self.job.data = response
         self.setStatus(C.OK, "Done")
         self.postResults()
+        self._taskStatusCodeWatchers.clear()
 
     def _handleTaskError(self, reason):
         """
@@ -190,6 +197,7 @@ class BaseHandler(handler.JobHandler, ReportingMixIn):
         """
         d = self.failJob(reason)
         self.postFailure()
+        self._taskStatusCodeWatchers.clear()
         return d
 
 

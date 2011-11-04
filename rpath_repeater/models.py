@@ -148,13 +148,17 @@ class URL(_BaseSlotCompare):
             self.fragment)).encode('ascii')
 
     @classmethod
-    def fromString(cls, url):
+    def fromString(cls, url, host=None, port=None):
         arr = util.urlSplit(url)
         o = cls()
         (o.scheme, o.username, o.password, o.host, o.port,
             o.path, o.query, o.fragment) = arr
         o.unparsedPath = util.urlUnsplit((None, None, None, None, None,
             o.path, o.query, o.fragment))
+        if o.host is None:
+            o.host = host
+        if o.port is None:
+            o.port = port
         return o
 
 class ResultsLocation(URL):

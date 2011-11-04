@@ -61,6 +61,12 @@ class TargetCommand(BaseCommand):
         return self._invoke(codes.NS.TARGET_SYSTEM_CAPTURE,
             instanceId=instanceId, params=params)
 
+    def imageDeploymentDescriptor(self):
+        return self._invoke(codes.NS.TARGET_IMAGE_DEPLOY_DESCRIPTOR)
+
+    def deployImage(self, params):
+        return self._invoke(codes.NS.TARGET_IMAGE_DEPLOY, params=params)
+
     def _invoke(self, ns, **kwargs):
         client = self.getClient()
 
@@ -318,6 +324,35 @@ def main():
     elif 0:
         cli.targets.configure(zone, targetConfiguration, userCredentials)
         uuid, job = cli.targets.checkCredentials()
+    elif 1:
+        cli.targets.configure(zone, targetConfiguration, userCredentials)
+        uuid, job = cli.targets.deployImage({
+            'imageFileInfo' : {
+                'name': 'cobbler-clone.ova',
+                'sha1': 'f7d35c02a3d87e8a7b932d1f98bd6b03ee94be25',
+                'size' : '1215610880',
+                'fileId' : 5,
+                'baseFileName' : 'cobbler-clone',
+            },
+            'descriptorData': """\
+<descriptor_data>
+  <imageId>5</imageId>
+  <imageName>My Deployed Image</imageName>
+  <imageDescription>My Deployed Image - description</imageDescription>
+  <dataCenter>datacenter-6098</dataCenter>
+  <vmfolder-datacenter-6098>group-v6099</vmfolder-datacenter-6098>
+  <cr-datacenter-6098>domain-c19781</cr-datacenter-6098>
+  <network-datacenter-6098>dvportgroup-19802</network-datacenter-6098>
+  <dataStore-domain-c19781>datastore-19907</dataStore-domain-c19781>
+  <resourcePool-domain-c19781>resgroup-19782</resourcePool-domain-c19781>
+</descriptor_data>""",
+            'imageDownloadUrl': 'http://localhost/cgi-bin/cobbler-clone.ova',
+            'imageFileUpdateUrl': 'http://localhost:12346/api/v1/images/5/build_files/5',
+            'targetImageXmlTemplate': '<file>\n  <target_images>\n    <target_image>\n      <target id="/api/v1/targets/1"/>\n      %(image)s\n    </target_image>\n  </target_images>\n</file>'
+        })
+    elif 0:
+        cli.targets.configure(zone, targetConfiguration, userCredentials)
+        uuid, job = cli.targets.imageDeploymentDescriptor()
     elif 0:
         cli.targets.configure(zone, targetConfiguration, userCredentials)
         uuid, job = cli.targets.listImages(imageIds=None)

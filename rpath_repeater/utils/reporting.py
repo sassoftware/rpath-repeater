@@ -27,17 +27,23 @@ class ReportingMixIn(object):
         resultsLocation
         ReportingXmlTag (class variable)
     """
-    def postResults(self, elt=None, method=None):
+    def postResults(self, elt=None, method=None, location=None):
         if method is None:
             method = 'PUT'
-        host, port, path = self.getResultsLocation()
+        if location is None:
+            location = self.getResultsUrl()
+        host, port, path = self._getResultsLocation(location)
         if not path:
             return
         if elt is None:
             dom = minidom.parseString(self.job.data)
             elt = dom.firstChild
-        elt = self.postprocessXmlNode(elt)
-        data = self.toXml(elt)
+        if isinstance(elt, basestring):
+            # We were given an XML string, no need to postprocess it
+            data = elt
+        else:
+            elt = self.postprocessXmlNode(elt)
+            data = self.toXml(elt)
         headers = {
             'Content-Type' : 'application/xml; charset="utf-8"',
             'Host' : host, }
@@ -55,10 +61,17 @@ class ReportingMixIn(object):
 
         reactor.connectTCP(host, port, fact)
 
-    def getResultsLocation(self):
-        host = self.resultsLocation.get('host', 'localhost')
-        port = self.resultsLocation.get('port', 80)
-        path = self.resultsLocation.get('path')
+    def getResultsUrl(self):
+        return self.resultsLocation
+
+    def _getResultsLocation(self, location):
+        if location is None:
+            return None, None, None
+        if hasattr(location, 'host'):
+            return location.host, location.port, location.path
+        host = location.get('host', 'localhost')
+        port = location.get('port', 80)
+        path = location.get('path')
         return host, port, path
 
     def postFailure(self, method=None):

@@ -35,6 +35,12 @@ class Codes(object):
     ERR_BAD_ARGS = 421
     ERR_GENERIC = 430
 
+    # 800 - partial results
+    PART_RESULT_1 = 801
+    PART_RESULT_2 = 802
+    PART_RESULT_3 = 803
+    PART_RESULT_4 = 804
+
 class NS(object):
     TARGET = "com.rpath.sputnik.targetsplugin"
     TARGET_TEST_CREATE = "%s.test.create" % TARGET
@@ -42,3 +48,5 @@ class NS(object):
     TARGET_IMAGES_LIST = "%s.images.list" % TARGET
     TARGET_INSTANCES_LIST = "%s.instances.list" % TARGET
     TARGET_SYSTEM_CAPTURE = "%s.instances.capture" % TARGET
+    TARGET_IMAGE_DEPLOY = "%s.images.deploy" % TARGET
+    TARGET_IMAGE_DEPLOY_DESCRIPTOR = "%s.images.deploy.descriptor" % TARGET
