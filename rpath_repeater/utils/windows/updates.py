@@ -53,6 +53,7 @@ class UpdateJob(object):
         self._cfg.initializeFlavors()
         self._cfg.dbPath = ':memory:'
         self._cfg.flavor = [self._systemFlavor, ]
+        self._cfg.configLine('updateThreshold 1')
         self._cfg.readUrl('http://localhost.localdomain/conaryrc')
 
         self._client = conaryclient.ConaryClient(self._cfg)
@@ -144,7 +145,8 @@ class UpdateJob(object):
         cJob._newSystemModel = [ 'install %s=%s' % (x[0], x[2][0])
             for x in cJob._updates ]
 
-        cJob._newPollingManifest = [ '%s=%s[%s]' % (x[0], x[2][0], x[2][1])
+        cJob._newPollingManifest = [
+            '%s=%s[%s]' % (x[0], x[2][0].freeze(), x[2][1])
             for x in cJob._updates ]
 
         return cJob
