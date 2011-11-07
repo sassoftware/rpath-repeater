@@ -298,7 +298,7 @@ class TargetsImageDeployTask(JobProgressTaskHandler):
         imgObj = self.driver.imageFromFileInfo(imageFileInfo, imageDownloadUrl)
         self.image = imgObj
         img = self.driver.deployImageFromUrl(job, imgObj, descriptorData)
-        self.finishCall(None, "Image deployed")
+        self.finishCall(img, "Image deployed")
 
     def linkTargetImageToImage(self, rbuilderImageId, targetImageId):
         imageXml = etree.tostring(self.image.getElementTree(),
