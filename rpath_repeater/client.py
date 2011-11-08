@@ -326,6 +326,9 @@ def main():
         uuid, job = cli.targets.checkCredentials()
     elif 1:
         cli.targets.configure(zone, targetConfiguration, userCredentials)
+        uuid, job = cli.targets.listInstances()
+    elif 1:
+        cli.targets.configure(zone, targetConfiguration, userCredentials)
         uuid, job = cli.targets.deployImage({
             'imageFileInfo' : {
                 'name': 'cobbler-clone.ova',

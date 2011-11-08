@@ -261,7 +261,7 @@ class TargetsInstanceListTask(BaseTaskHandler):
         """
         List target instances
         """
-        instances = self.driver.getInstancesFromTarget(None)
+        instances = self.driver.getAllInstances()
         self.finishCall(instances, "Retrieved list of instances")
 
 class JobProgressTaskHandler(BaseTaskHandler):
