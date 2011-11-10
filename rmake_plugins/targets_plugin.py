@@ -12,6 +12,7 @@
 # full details.
 #
 
+from xobj import xobj2
 from lxml import etree
 import sys
 import StringIO
@@ -23,6 +24,8 @@ from conary.lib.formattrace import formatTrace
 
 from mint import users
 from catalogService import errors
+from catalogService import storage
+
 from catalogService.rest.models import xmlNode
 
 from rpath_repeater import models
@@ -42,7 +45,9 @@ class TargetsPlugin(bfp.BaseForwardingPlugin):
         handler.registerHandler(TargetsInstanceListHandler)
         handler.registerHandler(TargetsInstanceCaptureHandler)
         handler.registerHandler(TargetsImageDeployHandler)
+        handler.registerHandler(TargetsSystemLaunchHandler)
         handler.registerHandler(TargetsImageDeployDescriptorHandler)
+        handler.registerHandler(TargetsSystemLaunchDescriptorHandler)
 
     def worker_get_task_types(self):
         return {
@@ -52,7 +57,9 @@ class TargetsPlugin(bfp.BaseForwardingPlugin):
             NS.TARGET_INSTANCES_LIST: TargetsInstanceListTask,
             NS.TARGET_SYSTEM_CAPTURE: TargetsInstanceCaptureTask,
             NS.TARGET_IMAGE_DEPLOY: TargetsImageDeployTask,
+            NS.TARGET_SYSTEM_LAUNCH: TargetsSystemLaunchTask,
             NS.TARGET_IMAGE_DEPLOY_DESCRIPTOR: TargetsImageDeployDescriptorTask,
+            NS.TARGET_SYSTEM_LAUNCH_DESCRIPTOR: TargetsSystemLaunchDescriptorTask,
         }
 
 
@@ -129,8 +136,27 @@ class TargetsImageDeployHandler(BaseHandler):
         location = models.URL.fromString(imageFileUpdateUrl, port=80)
         self.postResults(targetImageXml, location=location)
 
+class TargetsSystemLaunchHandler(TargetsImageDeployHandler):
+    jobType = NS.TARGET_SYSTEM_LAUNCH
+
+    def setup(self):
+        TargetsImageDeployHandler.setup(self)
+        self.addTaskStatusCodeWatcher(C.PART_RESULT_2,
+            self.uploadSystems)
+
+    def uploadSystems(self, task):
+        params = self.data['params'].args['params']
+        systemsCreateUrl = params['systemsCreateUrl']
+        response = task.task_data.thaw().getObject()
+        systemsXml = response.response
+        location = models.URL.fromString(systemsCreateUrl, port=80)
+        self.postResults(systemsXml, method='POST', location=location)
+
 class TargetsImageDeployDescriptorHandler(BaseHandler):
     jobType = NS.TARGET_IMAGE_DEPLOY_DESCRIPTOR
+
+class TargetsSystemLaunchDescriptorHandler(BaseHandler):
+    jobType = NS.TARGET_SYSTEM_LAUNCH_DESCRIPTOR
 
 class RestDatabase(object):
     __slots__ = [ 'cfg', 'auth', 'taskHandler', 'targetMgr', ]
@@ -196,7 +222,8 @@ class BaseTaskHandler(bfp.BaseTaskHandler):
                 return True
 
         restDb = self._createRestDatabase()
-        self.driver = Driver(None, targetType, cloudName=self.targetConfig.targetName,
+        scfg = storage.StorageConfig(storagePath="/srv/rbuilder/catalog")
+        self.driver = Driver(scfg, targetType, cloudName=self.targetConfig.targetName,
             db=restDb)
         self.driver._nodeFactory.baseUrl = '/'
 
@@ -288,9 +315,11 @@ class TargetsInstanceCaptureTask(JobProgressTaskHandler):
 
 class TargetsImageDeployTask(JobProgressTaskHandler):
     def _run(self):
+        img = self._deployImage()
+        self.finishCall(img, "Image deployed")
+
+    def _deployImage(self):
         params = self.cmdArgs['params']
-        # Look at captureSystem to figure out which params are really
-        # used
         job = self.Job(self.sendStatus)
         imageFileInfo = params['imageFileInfo']
         descriptorData = params['descriptorData']
@@ -298,7 +327,7 @@ class TargetsImageDeployTask(JobProgressTaskHandler):
         imgObj = self.driver.imageFromFileInfo(imageFileInfo, imageDownloadUrl)
         self.image = imgObj
         img = self.driver.deployImageFromUrl(job, imgObj, descriptorData)
-        self.finishCall(img, "Image deployed")
+        return img
 
     def linkTargetImageToImage(self, rbuilderImageId, targetImageId):
         imageXml = etree.tostring(self.image.getElementTree(),
@@ -306,6 +335,77 @@ class TargetsImageDeployTask(JobProgressTaskHandler):
 
         io = XmlStringIO(imageXml)
         self.finishCall(io, "Linking image", C.PART_RESULT_1)
+
+class System(object):
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
+
+class Systems(object):
+    _xobjMeta = xobj2.XObjMetadata(
+        tag = 'systems',
+        elements = [ xobj2.Field("system", [ System ]) ])
+
+class InventoryHandler(object):
+    System = System
+    Systems = Systems
+
+    def __init__(self, parent):
+        self.parent = parent
+        self.cloudType = parent().driver.cloudType
+        self.cloudName = parent().driver.cloudName
+        self.systems = self.Systems()
+        self.systems.system = []
+
+    @property
+    def log_info(self):
+        return self.parent().log_info
+
+    def addSystem(self, systemFields, dnsName=None, withNetwork=True):
+        system = self.System(**systemFields)
+        system.dnsName = dnsName
+        system.targetName = self.cloudName
+        system.targetType = self.cloudType
+        self.systems.system.append(system)
+
+    def reset(self):
+        del self.systems.system[:]
+
+    def commit(self):
+        taskHandler = self.parent()
+        if taskHandler is None:
+            return
+        doc = xobj2.Document(root=self.systems)
+        io = XmlStringIO(doc.toxml())
+        taskHandler.finishCall(io, "Systems created", C.PART_RESULT_2)
+
+class TargetsSystemLaunchTask(TargetsImageDeployTask):
+    def _run(self):
+        params = self.cmdArgs['params']
+        job = self.Job(self.sendStatus)
+        imageFileInfo = params['imageFileInfo']
+        descriptorData = params['descriptorData']
+        imageDownloadUrl = params['imageDownloadUrl']
+        self.driver.inventoryHandler = InventoryHandler(parent=weakref.ref(self))
+        img = self._isImageDeployed()
+        if img is None:
+            params = self.cmdArgs['params']
+            img = self.driver.imageFromFileInfo(imageFileInfo, imageDownloadUrl)
+        self.image = img
+        instanceIdList = self.driver.launchSystemSynchronously(job, img, descriptorData)
+        xml = "<systems>%s</systems>" % ''.join(
+            "<system><target_system_id>%s</target_system_id></system>" % sid
+                for sid in instanceIdList)
+        io = XmlStringIO(xobj2.Document.serialize(self.driver.inventoryHandler.systems))
+        self.finishCall(io, "Systems launched")
+
+    def _isImageDeployed(self):
+        targetImageIdList = self.cmdArgs['params']['targetImageIdList']
+        if targetImageIdList is None:
+            return None
+        images = self.driver.getImagesFromTarget(targetImageIdList)
+        if images:
+            return images[0]
+        return None
 
 class XmlStringIO(StringIO.StringIO):
     def toXml(self):
@@ -317,6 +417,16 @@ class TargetsImageDeployDescriptorTask(BaseTaskHandler):
         Fetch image deployment descriptor
         """
         descr = self.driver.getImageDeploymentDescriptor()
+        io = XmlStringIO()
+        descr.serialize(io)
+        self.finishCall(io, "Descriptor generated")
+
+class TargetsSystemLaunchDescriptorTask(BaseTaskHandler):
+    def _run(self):
+        """
+        Fetch system launch descriptor
+        """
+        descr = self.driver.getLaunchDescriptor()
         io = XmlStringIO()
         descr.serialize(io)
         self.finishCall(io, "Descriptor generated")

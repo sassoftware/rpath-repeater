@@ -50,3 +50,5 @@ class NS(object):
     TARGET_SYSTEM_CAPTURE = "%s.instances.capture" % TARGET
     TARGET_IMAGE_DEPLOY = "%s.images.deploy" % TARGET
     TARGET_IMAGE_DEPLOY_DESCRIPTOR = "%s.images.deploy.descriptor" % TARGET
+    TARGET_SYSTEM_LAUNCH = "%s.instances.launch" % TARGET
+    TARGET_SYSTEM_LAUNCH_DESCRIPTOR = "%s.instances.launch.descriptor" % TARGET

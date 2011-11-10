@@ -64,8 +64,14 @@ class TargetCommand(BaseCommand):
     def imageDeploymentDescriptor(self):
         return self._invoke(codes.NS.TARGET_IMAGE_DEPLOY_DESCRIPTOR)
 
+    def systemLaunchDescriptor(self):
+        return self._invoke(codes.NS.TARGET_SYSTEM_LAUNCH_DESCRIPTOR)
+
     def deployImage(self, params):
         return self._invoke(codes.NS.TARGET_IMAGE_DEPLOY, params=params)
+
+    def launchSystem(self, params):
+        return self._invoke(codes.NS.TARGET_SYSTEM_LAUNCH, params=params)
 
     def _invoke(self, ns, **kwargs):
         client = self.getClient()
@@ -326,16 +332,47 @@ def main():
         uuid, job = cli.targets.checkCredentials()
     elif 1:
         cli.targets.configure(zone, targetConfiguration, userCredentials)
+        uuid, job = cli.targets.launchSystem({
+            'imageFileInfo' : {
+                'name': 'celery-1-x86_64.ova',
+                'sha1': '851cbe6c3f1e5fe47c41df6f3a3d2947a3d8c384',
+                'size' : '155248640',
+                'fileId' : 5,
+                'baseFileName' : 'celery-1-x86_64',
+            },
+            'descriptorData': """\
+<descriptor_data>
+  <imageId>5</imageId>
+  <instanceName>My Deployed System</instanceName>
+  <instanceDescription>My Deployed System - description</instanceDescription>
+  <dataCenter>datacenter-6098</dataCenter>
+  <vmfolder-datacenter-6098>group-v6099</vmfolder-datacenter-6098>
+  <cr-datacenter-6098>domain-c19781</cr-datacenter-6098>
+  <network-datacenter-6098>dvportgroup-19802</network-datacenter-6098>
+  <dataStore-domain-c19781>datastore-19907</dataStore-domain-c19781>
+  <resourcePool-domain-c19781>resgroup-19782</resourcePool-domain-c19781>
+</descriptor_data>""",
+            'systemsCreateUrl' : 'http://localhost:12347/a/b/c',
+            'imageDownloadUrl': 'http://localhost/cgi-bin/cobbler-clone.ova',
+            'imageFileUpdateUrl': 'http://localhost:12346/api/v1/images/5/build_files/5',
+            'targetImageXmlTemplate': '<file>\n  <target_images>\n    <target_image>\n      <target id="/api/v1/targets/1"/>\n      %(image)s\n    </target_image>\n  </target_images>\n</file>',
+            'targetImageIdList' : ['aaa', 'bbb', 'ccc', '4234ba5a-6d51-e826-5940-ad5a122b0109', ],
+        })
+    elif 0:
+        cli.targets.configure(zone, targetConfiguration, userCredentials)
+        uuid, job = cli.targets.systemLaunchDescriptor()
+    elif 0:
+        cli.targets.configure(zone, targetConfiguration, userCredentials)
         uuid, job = cli.targets.listInstances()
-    elif 1:
+    elif 0:
         cli.targets.configure(zone, targetConfiguration, userCredentials)
         uuid, job = cli.targets.deployImage({
             'imageFileInfo' : {
-                'name': 'cobbler-clone.ova',
-                'sha1': 'f7d35c02a3d87e8a7b932d1f98bd6b03ee94be25',
-                'size' : '1215610880',
+                'name': 'celery-1-x86_64.ova',
+                'sha1': '851cbe6c3f1e5fe47c41df6f3a3d2947a3d8c384',
+                'size' : '155248640',
                 'fileId' : 5,
-                'baseFileName' : 'cobbler-clone',
+                'baseFileName' : 'celery-1-x86_64',
             },
             'descriptorData': """\
 <descriptor_data>
