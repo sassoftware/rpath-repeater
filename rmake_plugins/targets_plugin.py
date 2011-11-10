@@ -392,9 +392,6 @@ class TargetsSystemLaunchTask(TargetsImageDeployTask):
             img = self.driver.imageFromFileInfo(imageFileInfo, imageDownloadUrl)
         self.image = img
         instanceIdList = self.driver.launchSystemSynchronously(job, img, descriptorData)
-        xml = "<systems>%s</systems>" % ''.join(
-            "<system><target_system_id>%s</target_system_id></system>" % sid
-                for sid in instanceIdList)
         io = XmlStringIO(xobj2.Document.serialize(self.driver.inventoryHandler.systems))
         self.finishCall(io, "Systems launched")
 
