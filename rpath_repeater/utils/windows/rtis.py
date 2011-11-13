@@ -431,9 +431,8 @@ class rTIS(object):
                 pass
 
             if time.time() - start > 30:
-                error = e and e or ''
                 raise (ServiceFailedToStartError, 'The rPath Tools Installer '
-                    'service failed to start. %s' % str(error))
+                    'service failed to start. %s')
 
     def wait(self, allowReboot=True, reportStatus=None):
         """
