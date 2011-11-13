@@ -14,6 +14,8 @@ import shutil
 import tempfile
 import subprocess
 
+from conary.lib import util
+
 from rpath_repeater.utils.windows import errors
 from rpath_repeater.utils.windows.callbacks import BaseCallback
 
@@ -151,6 +153,9 @@ class SMBClient(object):
         mode = kwargs.get('mode', 'r')
         codec = kwargs.get('codec', None)
         path = self.pathjoin(*paths)
+
+        if not os.path.exists(os.path.dirname(path)):
+            util.mkdirChain(os.path.dirname(path))
 
         if codec:
             return codecs.open(path, mode, codec)

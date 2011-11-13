@@ -13,6 +13,7 @@
 
 import sys
 import time
+import weakref
 
 from conary.lib import util
 
@@ -22,21 +23,98 @@ from rmake3.lib import uuid as RmakeUuid
 from rmake3.core.types import RmakeJob
 
 from rpath_repeater.utils.immutabledict import FrozenImmutableDict
-from rpath_repeater import models
+from rpath_repeater import codes, models
+
+class BaseCommand(object):
+    def __init__(self, client):
+        self.client = weakref.ref(client)
+
+    def getClient(self):
+        return self.client()
+
+class TargetCommand(BaseCommand):
+    TargetConfiguration = models.TargetConfiguration
+    TargetUserCredentials = models.TargetUserCredentials
+    def __init__(self, client):
+        BaseCommand.__init__(self, client)
+        self._targetConfig = None
+        self._userCredentials = None
+
+    def configure(self, zone, targetConfiguration, userCredentials=None):
+        self._zone = zone
+        self._targetConfig = targetConfiguration
+        self._userCredentials = userCredentials
+
+    def checkCreate(self):
+        return self._invoke(codes.NS.TARGET_TEST_CREATE)
+
+    def checkCredentials(self):
+        return self._invoke(codes.NS.TARGET_TEST_CREDENTIALS)
+
+    def listImages(self, imageIds=None):
+        return self._invoke(codes.NS.TARGET_IMAGES_LIST, imageIds=imageIds)
+
+    def listInstances(self, instanceIds=None):
+        return self._invoke(codes.NS.TARGET_INSTANCES_LIST, instanceIds=instanceIds)
+
+    def captureSystem(self, instanceId, params):
+        return self._invoke(codes.NS.TARGET_SYSTEM_CAPTURE,
+            instanceId=instanceId, params=params)
+
+    def imageDeploymentDescriptor(self):
+        return self._invoke(codes.NS.TARGET_IMAGE_DEPLOY_DESCRIPTOR)
+
+    def systemLaunchDescriptor(self):
+        return self._invoke(codes.NS.TARGET_SYSTEM_LAUNCH_DESCRIPTOR)
+
+    def deployImage(self, params):
+        return self._invoke(codes.NS.TARGET_IMAGE_DEPLOY, params=params)
+
+    def launchSystem(self, params):
+        return self._invoke(codes.NS.TARGET_SYSTEM_LAUNCH, params=params)
+
+    def _invoke(self, ns, **kwargs):
+        client = self.getClient()
+
+        params = models.TargetCommandArguments(
+            targetConfiguration=self._targetConfig,
+            targetUserCredentials=self._userCredentials,
+            args=kwargs,
+        )
+        jobUuid = RmakeUuid.uuid4()
+        if client.jobUrlTemplate:
+            jobUrl = client.jobUrlTemplate % dict(job_uuid=jobUuid)
+        else:
+            jobUrl = None
+        # authToken is the "cookie" that will be used for posting data
+        # back to the REST interface
+        # authToken and jobUrl should be surfaced to other parts of the
+        # API too
+        params = dict(zone=self._zone,
+            authToken=RmakeUuid.uuid4(),
+            jobUrl=jobUrl,
+            params=params)
+        data = FrozenImmutableDict(params)
+        return client._createRmakeJob(ns, data, uuid=jobUuid)
 
 class RepeaterClient(object):
     __WMI_PLUGIN_NS = 'com.rpath.sputnik.wmiplugin'
     __CIM_PLUGIN_NS = 'com.rpath.sputnik.cimplugin'
+    # FIXME: the following is probably unused
+    __ASSIMILATOR_PLUGIN_NS = 'com.rpath.sputnik.assimilatorplugin'
     __LAUNCH_PLUGIN_NS = 'com.rpath.sputnik.launchplugin'
     __MGMT_IFACE_PLUGIN_NS = 'com.rpath.sputnik.interfacedetectionplugin'
 
     CimParams = models.CimParams
     WmiParams = models.WmiParams
+    AssimilatorParams = models.AssimilatorParams
     ManagementInterfaceParams = models.ManagementInterfaceParams
     URL = models.URL
     ResultsLocation = models.ResultsLocation
     Image = models.Image
     ImageFile = models.ImageFile
+
+    TargetCommandClass = TargetCommand
 
     @classmethod
     def makeUrl(cls, url, headers=None):
@@ -52,12 +130,20 @@ class RepeaterClient(object):
             host=host, port=port, path=path, query=query, fragment=fragment,
             unparsedPath=unparsedPath, headers=headers)
 
-    def __init__(self, address=None, zone=None):
+    def __init__(self, address=None, zone=None, jobUrlTemplate=None):
+        """
+        jobUrlTemplate is a URL that will be completed by filling in
+        job_uuid
+        """
         if not address:
             address = 'http://localhost:9998/'
 
         self.client = RmakeClient(address)
         self.zone = zone
+        self.targets = self.TargetCommandClass(self)
+        if jobUrlTemplate is None:
+            jobUrlTemplate = "http://localhost/api/v1/jobs/%(job_uuid)s"
+        self.jobUrlTemplate = jobUrlTemplate
 
     def _callParams(self, method, resultsLocation, zone, **kwargs):
         params = dict(method=method, zone=zone or self.zone)
@@ -70,7 +156,12 @@ class RepeaterClient(object):
 
     def _launchRmakeJob(self, namespace, params):
         data = FrozenImmutableDict(params)
-        job = RmakeJob(RmakeUuid.uuid4(), namespace, owner='nobody',
+        return self._createRmakeJob(namespace, data)
+
+    def _createRmakeJob(self, namespace, data, uuid=None):
+        if uuid is None:
+            uuid = RmakeUuid.uuid4()
+        job = RmakeJob(uuid, namespace, owner='nobody',
                        data=data,
                        ).freeze()
 
@@ -104,6 +195,15 @@ class RepeaterClient(object):
     def register_wmi(self, wmiParams, resultsLocation=None, zone=None):
         method = 'register'
         return self._wmiCallDispatcher(method, wmiParams, resultsLocation, zone)
+
+    def bootstrap(self, assimilatorParams, resultsLocation=None, zone=None):
+        '''this will only be valid for Linux, and adopts an unmanaged system'''
+        params = self._callParams('bootstrap', resultsLocation, zone)
+        assert isinstance(assimilatorParams, self.AssimilatorParams)
+        if assimilatorParams.port is None:
+            assimilatorParams.port = 22
+        params['assimilatorParams'] = assimilatorParams.toDict()
+        return self._launchRmakeJob(self.__ASSIMILATOR_PLUGIN_NS, params)
 
     def shutdown_cim(self, cimParams, resultsLocation=None, zone=None):
         method = 'shutdown'
@@ -204,7 +304,7 @@ def main():
         return 1
     system = sys.argv[1]
     zone = 'Local rBuilder'
-    cli = RepeaterClient()
+    cli = RepeaterClient(jobUrlTemplate="http://localhost:1234/api/v1/jobs/%(job_uuid)s")
     eventUuid = "0xDeadBeef"
     resultsLocation = cli.ResultsLocation(path="/adfadf", port=1234)
     cimParams = cli.CimParams(host=system,
@@ -219,7 +319,98 @@ def main():
         username="Administrator",
         password="password",
         domain=system)
+    targetConfiguration = cli.targets.TargetConfiguration(
+        'vmware', 'vsphere.eng.rpath.com', 'vsphere', config={})
+    userCredentials = cli.targets.TargetUserCredentials(credentials=dict(
+        username="eng", password="password"),
+        rbUser="dontcare", rbUserId=1, isAdmin=False)
     if 0:
+        cli.targets.configure(zone, targetConfiguration)
+        uuid, job = cli.targets.checkCreate()
+    elif 0:
+        cli.targets.configure(zone, targetConfiguration, userCredentials)
+        uuid, job = cli.targets.checkCredentials()
+    elif 1:
+        cli.targets.configure(zone, targetConfiguration, userCredentials)
+        uuid, job = cli.targets.launchSystem({
+            'imageFileInfo' : {
+                'name': 'celery-1-x86_64.ova',
+                'sha1': '851cbe6c3f1e5fe47c41df6f3a3d2947a3d8c384',
+                'size' : '155248640',
+                'fileId' : 5,
+                'baseFileName' : 'celery-1-x86_64',
+            },
+            'descriptorData': """\
+<descriptor_data>
+  <imageId>5</imageId>
+  <instanceName>My Deployed System</instanceName>
+  <instanceDescription>My Deployed System - description</instanceDescription>
+  <dataCenter>datacenter-6098</dataCenter>
+  <vmfolder-datacenter-6098>group-v6099</vmfolder-datacenter-6098>
+  <cr-datacenter-6098>domain-c19781</cr-datacenter-6098>
+  <network-datacenter-6098>dvportgroup-19802</network-datacenter-6098>
+  <dataStore-domain-c19781>datastore-19907</dataStore-domain-c19781>
+  <resourcePool-domain-c19781>resgroup-19782</resourcePool-domain-c19781>
+</descriptor_data>""",
+            'systemsCreateUrl' : 'http://localhost:12347/a/b/c',
+            'imageDownloadUrl': 'http://localhost/cgi-bin/cobbler-clone.ova',
+            'imageFileUpdateUrl': 'http://localhost:12346/api/v1/images/5/build_files/5',
+            'targetImageXmlTemplate': '<file>\n  <target_images>\n    <target_image>\n      <target id="/api/v1/targets/1"/>\n      %(image)s\n    </target_image>\n  </target_images>\n</file>',
+            'targetImageIdList' : ['aaa', 'bbb', 'ccc', '4234ba5a-6d51-e826-5940-ad5a122b0109', ],
+        })
+    elif 0:
+        cli.targets.configure(zone, targetConfiguration, userCredentials)
+        uuid, job = cli.targets.systemLaunchDescriptor()
+    elif 0:
+        cli.targets.configure(zone, targetConfiguration, userCredentials)
+        uuid, job = cli.targets.listInstances()
+    elif 0:
+        cli.targets.configure(zone, targetConfiguration, userCredentials)
+        uuid, job = cli.targets.deployImage({
+            'imageFileInfo' : {
+                'name': 'celery-1-x86_64.ova',
+                'sha1': '851cbe6c3f1e5fe47c41df6f3a3d2947a3d8c384',
+                'size' : '155248640',
+                'fileId' : 5,
+                'baseFileName' : 'celery-1-x86_64',
+            },
+            'descriptorData': """\
+<descriptor_data>
+  <imageId>5</imageId>
+  <imageName>My Deployed Image</imageName>
+  <imageDescription>My Deployed Image - description</imageDescription>
+  <dataCenter>datacenter-6098</dataCenter>
+  <vmfolder-datacenter-6098>group-v6099</vmfolder-datacenter-6098>
+  <cr-datacenter-6098>domain-c19781</cr-datacenter-6098>
+  <network-datacenter-6098>dvportgroup-19802</network-datacenter-6098>
+  <dataStore-domain-c19781>datastore-19907</dataStore-domain-c19781>
+  <resourcePool-domain-c19781>resgroup-19782</resourcePool-domain-c19781>
+</descriptor_data>""",
+            'imageDownloadUrl': 'http://localhost/cgi-bin/cobbler-clone.ova',
+            'imageFileUpdateUrl': 'http://localhost:12346/api/v1/images/5/build_files/5',
+            'targetImageXmlTemplate': '<file>\n  <target_images>\n    <target_image>\n      <target id="/api/v1/targets/1"/>\n      %(image)s\n    </target_image>\n  </target_images>\n</file>'
+        })
+    elif 0:
+        cli.targets.configure(zone, targetConfiguration, userCredentials)
+        uuid, job = cli.targets.imageDeploymentDescriptor()
+    elif 0:
+        cli.targets.configure(zone, targetConfiguration, userCredentials)
+        uuid, job = cli.targets.listImages(imageIds=None)
+    elif 1:
+        cli.targets.configure(zone, targetConfiguration, userCredentials)
+        instanceId = ""
+        params = dict(
+            outputToken='afe25c82-94e9-44c3-ae47-b352f06ee3aa',
+            imageUploadUrl="http://dhcp155.eng.rpath.com/uploadBuild/5",
+            imageFilesCommitUrl="http://dhcp155.eng.rpath.com/api/products/celery/images/5/files",
+            imageTitle='Image Title',
+            imageName="cobbler-clone.ova",
+            image_id="http://dhcp155.eng.rpath.com/api/v1/images/5",
+        )
+        params.update({'metadata.owner': 'Owner', 'metadata.admin' : 'Admin'})
+        instanceId = '42345ce9-8a1e-7239-ceb9-3cfbcc8c6667'
+        uuid, job = cli.targets.captureSystem(instanceId, params)
+    elif 0:
         uuid, job = cli.register_cim(cimParams)
     elif 0:
         uuid, job = cli.poll_cim(cimParams, resultsLocation=resultsLocation,
@@ -252,13 +443,46 @@ def main():
                 'group-windemo-appliance=/windemo.eng.rpath.com@rpath:windemo-1-devel/1-2-1[]',
             ],
             )
+    else:
+       
+        keyData = file("/root/.ssh/id_rsa.pub").read() 
+        assimilatorParams = cli.AssimilatorParams(host=system, port=22,
+            eventUuid='eventUuid',
+            # normally filled in by rBuilder
+            caCert=file("/srv/rbuilder/pki/hg_ca.crt").read(),
+            # normally filled in by plugin
+            platformLabels={
+                'centos-5' : [ 'jules.eng.rpath.com@rpath:centos-5-stable',
+                               'centos.rpath.com@rpath:centos-5-common' ],
+                'sles-11'  : [ 'jules.eng.rpath.com@rpath:sles-11-stable', 
+                               'sles.rpath.com@rpath:sles-11-common' ]
+            },
+            sshAuth = [
+                           { 
+                               'sshUser'     : 'root', 
+                               'sshKey'      : keyData,
+                               'sshPassword' : 'letmein',
+                           },
+                           { 
+                               'sshUser'     : 'root', 
+                               'sshPassword' : 'wrong1' 
+                           },
+                           { 
+                               'sshUser'     : 'root', 
+                               'sshPassword' : 'password' 
+                           },
+            ]
+        )
+
+        uuid, job = cli.bootstrap(assimilatorParams,
+            resultsLocation = resultsLocation,
+            zone = zone)
     while 1:
         job = cli.getJob(uuid)
         if job.status.final:
             break
         time.sleep(1)
-    print "Failed: %s" % job.status.failed
-    #import epdb; epdb.st()
+    print "Failed: %s; %s" % (job.status.failed, job.status.text)
 
 if __name__ == "__main__":
     main()

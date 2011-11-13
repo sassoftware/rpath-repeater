@@ -15,6 +15,7 @@ class rPathRepeater(PackageRecipe):
         'pywbem:python',
         'rmake3:python',
         'wmiclient:python',
+        'paramiko:python',
     ]
 
     def setup(r):

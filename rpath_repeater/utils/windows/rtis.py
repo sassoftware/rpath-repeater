@@ -14,7 +14,6 @@ from conary.deps import deps
 from conary.trovetup import TroveTuple
 
 from wmiclient import WMIBaseError
-from wmiclient import WMIInternalError
 from wmiclient import WMIFileNotFoundError
 
 from rpath_repeater.utils.windows.callbacks import BaseCallback
@@ -189,7 +188,7 @@ class rTIS(object):
     _conary_keypath = r'SOFTWARE\rPath\rTIS.NET\conary'
 
     _reboot_timeout = 600 # in seconds
-    _query_sleep = 3
+    _query_sleep = 1
 
     def __init__(self, wmiclient, smbclient, callback=None):
         self._wmi = wmiclient
@@ -207,7 +206,7 @@ class rTIS(object):
         time.sleep(self._query_sleep)
 
     def _query(self, func, *args, **kwargs):
-        retries = kwargs.pop('retries', 3)
+        retries = kwargs.pop('retries', 10)
         default = kwargs.pop('default', None)
         raiseErrors = kwargs.pop('raiseErrors', False)
         queries = 0
@@ -246,7 +245,6 @@ class rTIS(object):
             self._wmi.registryCreateKey(r'SOFTWARE\rPath', 'rTIS.NET')
             self._wmi.registryCreateKey(r'SOFTWARE\rPath\rTIS.NET', 'conary')
             self.system_model = ''
-            self.manifest = ''
             self.polling_manifest = ''
 
     @_filter
@@ -401,27 +399,16 @@ class rTIS(object):
         Start the rTIS service.
         """
 
-        e = None
-        status = None
+        status = self._query(self._wmi.serviceStart, self._service_name)  # pyflakes=ignore
 
-        while status is None or not status.output:
-            self.callback.info('attempting to start %s' % self._service_name)
-            try:
-                status = self._wmi.serviceStart(self._service_name)
-            # Service started, but we got an error anyway
-            except WMIInternalError, e:
-                break
-
-            # Wait a second before trying to start the service again.
-            if not status.output:
-                self._wmi.close()
-                time.sleep(1)
-
-#        if len(status.output) != 1:
-#            raise (ServiceFailedToStartError, 'The rPath Tools Installer '
-#                'service failed to start, please try again.')
-
-#        assert status.output[0] == 'Success'
+        # FIXME: The status check that comes back from wmi seems to be
+        #        unreliable at best. For now just assume that the call went
+        #        through and fail if the key doesn't get set.
+        #if len(status) != 1:
+        #    raise (ServiceFailedToStartError, 'The rPath Tools Installer '
+        #        'service failed to start, please try again.')
+        #
+        #assert status[0] == 'Success'
 
         # Now wait for the service to actually start.
         state = None
@@ -517,8 +504,9 @@ class rTIS(object):
         # overwrite the existing system model since it shouldn't exist yet.
         self.system_model = criticalJob.system_model
 
-        logPath = self._smb.getWindowsPath('Windows/Temp/rpath_install.log')
-        msiexec = r'msiexec.exe /i %%s /quiet /l*vx %s' % logPath
+        logPath = self._smb.pathjoin('Windows', 'Temp', 'rpath_install.log')
+        winLogPath = self._smb.getWindowsPath('Windows/Temp/rpath_install.log')
+        msiexec = r'msiexec.exe /i %%s /quiet /l*vx %s' % winLogPath
 
         manifest = dict((x.name, x) for x in criticalJob.manifest)
 
@@ -559,8 +547,23 @@ class rTIS(object):
 
         # Wait for PromgraData\rPath\manifest to exist before setting the
         # manifest, it should be created by rPathTools Setup.
-        while not self._smb.pathexists(self.updatesDir, '..', 'manifest'):
+        if not self._smb.pathexists(self.updatesDir, '..', 'manifest'):
             time.sleep(1)
+
+        while not self._smb.pathexists(logPath):
+            time.sleep(1)
+
+        # Wait for MSI to complete the update
+        self.callback.info('waiting for installation to complete')
+        done = False
+        while not done:
+            fh = self._smb.pathopen(logPath, codec='utf_16_le')
+            for line in fh:
+                if 'MainEngineThread is returning 0' in line:
+                    done = True
+            fh.close()
+            time.sleep(1)
+        self.callback.info('critical update installation complete')
 
         self.manifest = manifest.values()
         self.polling_manifest = criticalJob.polling_manifest

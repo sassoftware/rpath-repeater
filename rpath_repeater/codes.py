@@ -1,4 +1,4 @@
-# Copyright (c) 2010 rPath, Inc.
+# Copyright (c) 2011 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -21,6 +21,7 @@ class Codes(object):
     MSG_PROBE = 106
     MSG_GENERIC = 110
     MSG_BOOTSTRAP_REQ = 111
+    MSG_PROGRESS = 112
 
     # 200
     OK = 200
@@ -33,3 +34,21 @@ class Codes(object):
     ERR_ZONE_MISSING = 420
     ERR_BAD_ARGS = 421
     ERR_GENERIC = 430
+
+    # 800 - partial results
+    PART_RESULT_1 = 801
+    PART_RESULT_2 = 802
+    PART_RESULT_3 = 803
+    PART_RESULT_4 = 804
+
+class NS(object):
+    TARGET = "com.rpath.sputnik.targetsplugin"
+    TARGET_TEST_CREATE = "%s.test.create" % TARGET
+    TARGET_TEST_CREDENTIALS = "%s.test.credentials" % TARGET
+    TARGET_IMAGES_LIST = "%s.images.list" % TARGET
+    TARGET_INSTANCES_LIST = "%s.instances.list" % TARGET
+    TARGET_SYSTEM_CAPTURE = "%s.instances.capture" % TARGET
+    TARGET_IMAGE_DEPLOY = "%s.images.deploy" % TARGET
+    TARGET_IMAGE_DEPLOY_DESCRIPTOR = "%s.images.deploy.descriptor" % TARGET
+    TARGET_SYSTEM_LAUNCH = "%s.instances.launch" % TARGET
+    TARGET_SYSTEM_LAUNCH_DESCRIPTOR = "%s.instances.launch.descriptor" % TARGET
