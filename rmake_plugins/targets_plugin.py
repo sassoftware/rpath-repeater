@@ -22,7 +22,6 @@ from rmake3.core import handler
 
 from conary.lib.formattrace import formatTrace
 
-from mint import users
 from catalogService import errors
 from catalogService import storage
 
@@ -32,6 +31,10 @@ from rpath_repeater import models
 from rpath_repeater.codes import Codes as C
 from rpath_repeater.codes import NS
 from rpath_repeater.utils import base_forwarding_plugin as bfp
+
+class Authorization(object):
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
 
 class TargetsPlugin(bfp.BaseForwardingPlugin):
     """
@@ -244,7 +247,7 @@ class BaseTaskHandler(bfp.BaseTaskHandler):
     def _createRestDatabase(self):
         db = self.RestDatabaseClass(self)
         if self.userCredentials is not None:
-            db.auth.auth = users.Authorization(authorized=True,
+            db.auth.auth = Authorization(authorized=True,
                 userId=self.userCredentials.rbUserId,
                 admin=bool(self.userCredentials.isAdmin))
         return db
