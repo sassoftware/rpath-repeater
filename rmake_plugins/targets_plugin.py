@@ -210,8 +210,12 @@ class BaseTaskHandler(bfp.BaseTaskHandler):
         self.cmdArgs = params.args
 
     def _initTarget(self):
-        targetType = self.targetConfig.targetType
-        moduleName = "catalogService.rest.drivers.%s" % targetType
+        driverName = self.targetConfig.targetType
+        # xen enterprise is a one-off
+        if driverName == 'xen-enterprise':
+            driverName = 'xenent'
+
+        moduleName = "catalogService.rest.drivers.%s" % driverName
         BaseDriverClass = __import__(moduleName, {}, {}, '.driver').driver
 
         class Driver(BaseDriverClass):
@@ -226,7 +230,7 @@ class BaseTaskHandler(bfp.BaseTaskHandler):
 
         restDb = self._createRestDatabase()
         scfg = storage.StorageConfig(storagePath="/srv/rbuilder/catalog")
-        self.driver = Driver(scfg, targetType, cloudName=self.targetConfig.targetName,
+        self.driver = Driver(scfg, driverName, cloudName=self.targetConfig.targetName,
             db=restDb)
         self.driver._nodeFactory.baseUrl = '/'
 
