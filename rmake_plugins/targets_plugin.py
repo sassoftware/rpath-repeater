@@ -166,6 +166,12 @@ class RestDatabase(object):
     class Auth(object):
         __slots__ = [ 'auth', ]
 
+    class Cfg(object):
+        __slots__ = [ 'proxy', ]
+        def __init__(self, **kwargs):
+            for s in self.__slots__:
+                setattr(self, s, kwargs.get(s, None))
+
     class TargetManager(object):
         def __init__(self, taskHandler):
             self.taskHandler = taskHandler
@@ -176,7 +182,10 @@ class RestDatabase(object):
 
     def __init__(self, taskHandler):
         self.taskHandler = weakref.proxy(taskHandler)
-        self.cfg = None
+        # XXX Proxy information will have to be read from conary's
+        # config object (which is set by the rAPA plugin, both on the
+        # rUS and on the rbuilder).
+        self.cfg = self.Cfg(proxy={})
         self.auth = self.Auth()
         self.targetMgr = self.TargetManager(self.taskHandler)
 
@@ -219,6 +228,7 @@ class BaseTaskHandler(bfp.BaseTaskHandler):
         BaseDriverClass = __import__(moduleName, {}, {}, '.driver').driver
 
         class Driver(BaseDriverClass):
+            InventoryHandler = InventoryHandler
             def _getCloudCredentialsForUser(slf):
                 return self.userCredentials.credentials
             def _getStoredTargetConfiguration(slf):
@@ -358,8 +368,6 @@ class InventoryHandler(object):
 
     def __init__(self, parent):
         self.parent = parent
-        self.cloudType = parent().driver.cloudType
-        self.cloudName = parent().driver.cloudName
         self.systems = self.Systems()
         self.systems.system = []
 
@@ -368,10 +376,11 @@ class InventoryHandler(object):
         return self.parent().log_info
 
     def addSystem(self, systemFields, dnsName=None, withNetwork=True):
+        parent = self.parent()
         system = self.System(**systemFields)
         system.dnsName = dnsName
-        system.targetName = self.cloudName
-        system.targetType = self.cloudType
+        system.targetName = parent.driver.cloudName
+        system.targetType = parent.driver.cloudType
         self.systems.system.append(system)
 
     def reset(self):
@@ -392,7 +401,6 @@ class TargetsSystemLaunchTask(TargetsImageDeployTask):
         imageFileInfo = params['imageFileInfo']
         descriptorData = params['descriptorData']
         imageDownloadUrl = params['imageDownloadUrl']
-        self.driver.inventoryHandler = InventoryHandler(parent=weakref.ref(self))
         img = self._isImageDeployed()
         if img is None:
             params = self.cmdArgs['params']
