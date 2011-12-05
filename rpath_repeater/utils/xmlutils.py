@@ -36,6 +36,6 @@ class XML(object):
 
     @classmethod
     def toString(cls, elt):
-        return elt.toxml(encoding="UTF-8").encode("utf-8")
+        return elt.toxml(encoding="UTF-8")
 
 
