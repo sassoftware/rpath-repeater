@@ -228,7 +228,6 @@ class BaseTaskHandler(bfp.BaseTaskHandler):
         BaseDriverClass = __import__(moduleName, {}, {}, '.driver').driver
 
         class Driver(BaseDriverClass):
-            InventoryHandler = InventoryHandler
             def _getCloudCredentialsForUser(slf):
                 return self.userCredentials.credentials
             def _getStoredTargetConfiguration(slf):
@@ -241,7 +240,7 @@ class BaseTaskHandler(bfp.BaseTaskHandler):
         restDb = self._createRestDatabase()
         scfg = storage.StorageConfig(storagePath="/srv/rbuilder/catalog")
         self.driver = Driver(scfg, driverName, cloudName=self.targetConfig.targetName,
-            db=restDb)
+            db=restDb, inventoryHandler=InventoryHandler(weakref.ref(self)))
         self.driver._nodeFactory.baseUrl = '/'
 
     def finishCall(self, node, msg, code=C.OK):
@@ -370,6 +369,8 @@ class InventoryHandler(object):
         self.parent = parent
         self.systems = self.Systems()
         self.systems.system = []
+        # The driver is not yet initialized, so don't try to access it
+        # in the constructor
 
     @property
     def log_info(self):
