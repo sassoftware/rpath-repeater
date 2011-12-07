@@ -236,6 +236,9 @@ class BaseTaskHandler(bfp.BaseTaskHandler):
                 return config
             def _checkAuth(slf):
                 return True
+            def _getMintImagesByType(self, imageType):
+                "Overridden, no access to mint"
+                return []
 
         restDb = self._createRestDatabase()
         scfg = storage.StorageConfig(storagePath="/srv/rbuilder/catalog")
