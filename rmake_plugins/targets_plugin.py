@@ -430,8 +430,7 @@ class TargetsImageDeployDescriptorTask(BaseTaskHandler):
         Fetch image deployment descriptor
         """
         descr = self.driver.getImageDeploymentDescriptor()
-        io = XmlStringIO()
-        descr.serialize(io)
+        io = XmlStringIO(etree.tounicode(descr.getElementTree()))
         self.finishCall(io, "Descriptor generated")
 
 class TargetsSystemLaunchDescriptorTask(BaseTaskHandler):
