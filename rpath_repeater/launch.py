@@ -143,7 +143,7 @@ class WaitForNetworkTask(plug_worker.TaskHandler):
         db = database.Database(cfg)
         authToken = (cfg.authUser, cfg.authPass)
         cu = db.cursor()
-        cu.execute("SELECT MIN(userId) from userGroupMembers "
+        cu.execute("SELECT MIN(userId) from Users "
                    "WHERE is_admin = true")
         ret = cu.fetchall()
         userId = ret[0][0]
