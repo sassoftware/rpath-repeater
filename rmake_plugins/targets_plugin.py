@@ -404,6 +404,8 @@ class TargetsSystemLaunchTask(TargetsImageDeployTask):
         if img is None:
             params = self.cmdArgs['params']
             img = self.driver.imageFromFileInfo(imageFileInfo, imageDownloadUrl)
+        else:
+            self.driver.updateImageFromFileInfo(img, imageFileInfo)
         self.image = img
         instanceIdList = self.driver.launchSystemSynchronously(job, img, descriptorData)
         io = XmlStringIO(xobj2.Document.serialize(self.driver.inventoryHandler.systems))
