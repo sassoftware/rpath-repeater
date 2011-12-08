@@ -20,6 +20,7 @@ import weakref
 
 from rmake3.core import handler
 
+from conary import conarycfg
 from conary.lib.formattrace import formatTrace
 
 from catalogService import errors
@@ -162,15 +163,9 @@ class TargetsSystemLaunchDescriptorHandler(BaseHandler):
     jobType = NS.TARGET_SYSTEM_LAUNCH_DESCRIPTOR
 
 class RestDatabase(object):
-    __slots__ = [ 'cfg', 'auth', 'taskHandler', 'targetMgr', ]
+    __slots__ = [ 'auth', 'taskHandler', 'targetMgr', ]
     class Auth(object):
         __slots__ = [ 'auth', ]
-
-    class Cfg(object):
-        __slots__ = [ 'proxy', ]
-        def __init__(self, **kwargs):
-            for s in self.__slots__:
-                setattr(self, s, kwargs.get(s, None))
 
     class TargetManager(object):
         def __init__(self, taskHandler):
@@ -180,12 +175,12 @@ class RestDatabase(object):
                 rbuilderImageId, targetImageId):
             self.taskHandler.linkTargetImageToImage(rbuilderImageId, targetImageId)
 
+    # Class attribute. We only want to read the conary config once, when
+    # the module is loaded.
+    cfg = conarycfg.ConaryConfiguration(readConfigFiles=True)
+
     def __init__(self, taskHandler):
         self.taskHandler = weakref.proxy(taskHandler)
-        # XXX Proxy information will have to be read from conary's
-        # config object (which is set by the rAPA plugin, both on the
-        # rUS and on the rbuilder).
-        self.cfg = self.Cfg(proxy={})
         self.auth = self.Auth()
         self.targetMgr = self.TargetManager(self.taskHandler)
 
