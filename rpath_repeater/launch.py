@@ -31,6 +31,7 @@ from mint import config
 from mint.db import database
 from mint.rest.db import authmgr
 from mint.django_rest.rbuilder.inventory import models
+from mint.django_rest.rbuilder.jobs import models as jobmodels
 
 from catalogService.rest.api import clouds
 
@@ -68,8 +69,8 @@ class LaunchHandler(handler.JobHandler):
             response = task.task_data.getObject().response
             self.job.data = response
             self.setStatus(C.OK, "Done. %s" % response)
-            jobState = models.JobState.objects.get(name=models.JobState.COMPLETED)
-            job = models.Job.objects.get(job_uuid=self.job.job_uuid)
+            jobState = jobmodels.JobState.objects.get(name=jobmodels.JobState.COMPLETED)
+            job = jobmodels.Job.objects.get(job_uuid=self.job.job_uuid)
             job.job_state = jobState
             job.status_code = self.job.status.code
             job.status_text = self.job.status.text
