@@ -229,8 +229,8 @@ class TargetConfiguration(_BaseSlotCompare):
     __slots__ = ['targetType', 'targetName', 'alias', 'config',]
 
 class TargetUserCredentials(_BaseSlotCompare):
-    __slots__ = ['rbUser', 'rbUserId', 'isAdmin', 'credentials', ]
+    __slots__ = ['rbUser', 'rbUserId', 'isAdmin', 'credentials', 'opaqueCredentialsId', ]
 
 class TargetCommandArguments(_BaseSlotCompare):
     __slots__ = ['jobUrl', 'authToken',
-        'targetConfiguration', 'targetUserCredentials', 'args']
+        'targetConfiguration', 'targetUserCredentials', 'args', 'targetAllUserCredentials', ]

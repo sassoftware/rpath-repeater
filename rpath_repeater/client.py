@@ -40,10 +40,12 @@ class TargetCommand(BaseCommand):
         self._targetConfig = None
         self._userCredentials = None
 
-    def configure(self, zone, targetConfiguration, userCredentials=None):
+    def configure(self, zone, targetConfiguration, userCredentials=None,
+            allUserCredentials=None):
         self._zone = zone
         self._targetConfig = targetConfiguration
         self._userCredentials = userCredentials
+        self._allUserCredentials = allUserCredentials
 
     def checkCreate(self):
         return self._invoke(codes.NS.TARGET_TEST_CREATE)
@@ -80,6 +82,7 @@ class TargetCommand(BaseCommand):
             targetConfiguration=self._targetConfig,
             targetUserCredentials=self._userCredentials,
             args=kwargs,
+            targetAllUserCredentials=self._allUserCredentials,
         )
         jobUuid = RmakeUuid.uuid4()
         if client.jobUrlTemplate:
@@ -323,14 +326,14 @@ def main():
         'vmware', 'vsphere.eng.rpath.com', 'vsphere', config={})
     userCredentials = cli.targets.TargetUserCredentials(credentials=dict(
         username="eng", password="password"),
-        rbUser="dontcare", rbUserId=1, isAdmin=False)
+        rbUser="dontcare", rbUserId=1, isAdmin=False, opaqueCredentialsId=1)
     if 0:
         cli.targets.configure(zone, targetConfiguration)
         uuid, job = cli.targets.checkCreate()
     elif 0:
         cli.targets.configure(zone, targetConfiguration, userCredentials)
         uuid, job = cli.targets.checkCredentials()
-    elif 1:
+    elif 0:
         cli.targets.configure(zone, targetConfiguration, userCredentials)
         uuid, job = cli.targets.launchSystem({
             'imageFileInfo' : {
@@ -361,8 +364,8 @@ def main():
     elif 0:
         cli.targets.configure(zone, targetConfiguration, userCredentials)
         uuid, job = cli.targets.systemLaunchDescriptor()
-    elif 0:
-        cli.targets.configure(zone, targetConfiguration, userCredentials)
+    elif 1:
+        cli.targets.configure(zone, targetConfiguration, None, [ userCredentials ])
         uuid, job = cli.targets.listInstances()
     elif 0:
         cli.targets.configure(zone, targetConfiguration, userCredentials)

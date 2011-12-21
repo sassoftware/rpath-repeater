@@ -211,6 +211,7 @@ class BaseTaskHandler(bfp.BaseTaskHandler):
         params = self.data.pop('params')
         self.targetConfig = params.targetConfiguration
         self.userCredentials = params.targetUserCredentials
+        self.allUserCredentials = params.targetAllUserCredentials
         self.cmdArgs = params.args
 
     def _initTarget(self):
@@ -223,21 +224,27 @@ class BaseTaskHandler(bfp.BaseTaskHandler):
         BaseDriverClass = __import__(moduleName, {}, {}, '.driver').driver
 
         class Driver(BaseDriverClass):
+            def __init__(slf, userCredentials, *args, **kwargs):
+                super(Driver, slf).__init__(*args, **kwargs)
+                slf.setUserCredentials(userCredentials)
+            def setUserCredentials(slf, userCredentials):
+                slf._userCredentials = userCredentials
+                slf.reset()
             def _getCloudCredentialsForUser(slf):
-                return self.userCredentials.credentials
+                return slf._userCredentials.credentials
             def _getStoredTargetConfiguration(slf):
                 config = self.targetConfig.config.copy()
                 config.update(alias=self.targetConfig.alias)
                 return config
             def _checkAuth(slf):
                 return True
-            def _getMintImagesByType(self, imageType):
+            def _getMintImagesByType(slf, imageType):
                 "Overridden, no access to mint"
                 return []
 
         restDb = self._createRestDatabase()
         scfg = storage.StorageConfig(storagePath="/srv/rbuilder/catalog")
-        self.driver = Driver(scfg, driverName, cloudName=self.targetConfig.targetName,
+        self.driver = Driver(self.userCredentials, scfg, driverName, cloudName=self.targetConfig.targetName,
             db=restDb, inventoryHandler=InventoryHandler(weakref.ref(self)))
         self.driver._nodeFactory.baseUrl = '/'
 
@@ -302,7 +309,19 @@ class TargetsInstanceListTask(BaseTaskHandler):
         """
         List target instances
         """
-        instances = self.driver.getAllInstances()
+        instancesMap = {}
+        for creds in self.allUserCredentials:
+            self.driver.setUserCredentials(creds)
+            credId = creds.opaqueCredentialsId
+            instances = self.driver.getAllInstances()
+            for inst in instances:
+                instId = inst.getInstanceId()
+                # Append current credentials to this instance
+                instancesMap.setdefault(instId, (inst, []))[1].append(credId)
+        instances = self.driver.Instances()
+        for _, (inst, credIds) in sorted(instancesMap.items()):
+            inst.setCredentials(credIds)
+            instances.append(inst)
         self.finishCall(instances, "Retrieved list of instances")
 
 class JobProgressTaskHandler(BaseTaskHandler):
