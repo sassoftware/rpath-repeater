@@ -5,6 +5,7 @@
 import os
 import time
 import statvfs
+from collections import namedtuple
 
 from lxml import etree
 from lxml.builder import ElementMaker
@@ -137,7 +138,8 @@ class Servicing(object):
     def c2d(node):
         return dict((x.tag, x) for x in node.iterchildren())
 
-    def _handle_unicode_header(self, fobj):
+    @staticmethod
+    def _handle_unicode_header(fobj):
         header = fobj.read(3)
         if header != '\xef\xbb\xbf':
             fobj.seek(0)
@@ -177,6 +179,49 @@ class Servicing(object):
                 yield int(hdlr.exitCode), hdlr.name, hdlr.exitCodeDescription
 
 
+class Package(namedtuple('Package', 'name version product_code')):
+    __slots__ = ()
+
+
+class Packages(object):
+    """
+    Parse a packages.xml from a remote Windows system into a nice structure.
+    """
+
+    FILENAME = 'products.xml'
+
+    def __init__(self):
+        self.packages = []
+
+    @classmethod
+    def parse(cls, fobj):
+        """
+        Parse the file object.
+        """
+
+        _handle_unicode_header = Servicing._handle_unicode_header
+        c2d = Servicing.c2d
+
+        obj = cls()
+
+        # Strip any utf-8 header garbage
+        fobj = _handle_unicode_header(fobj)
+
+        # Parse the xml
+        root = etree.parse(fobj).getroot()
+
+        for package in root.iterchildren():
+            node = c2d(package)
+            pkg = Package(node['name'].text, node['version'].text,
+                node['productCode'].text)
+            obj.packages.append(pkg)
+
+        return obj
+
+    def __contains__(self, pcode):
+        return pcode in [ x.product_code for x in self.packages ]
+
+
 class rTIS(object):
     """
     Representation of all interactions with the remote Windows system with
@@ -201,6 +246,7 @@ class rTIS(object):
 
         self._updatesDir = None
         self._flavor = None
+        self._runcount = None
 
     def _sleep(self):
         time.sleep(self._query_sleep)
@@ -310,11 +356,25 @@ class rTIS(object):
         return result
 
     def _set_commands(self, data):
-        self.callback.info('Setting commands')
+        self.callback.info('Setting commands %s' % data)
         self._query(self._wmi.registrySetKey, self._params_keypath,
             'Commands', data)
 
     commands = property(_get_commands, _set_commands)
+
+    def _get_runcount(self):
+        self.callback.info('Retrieving runcount')
+        result = self._query(self._wmi.registryGetKey, self._params_keypath,
+            'Runcount', default='')
+        assert len(result) == 1
+        return result[0]
+
+    def _set_runcount(self, data):
+        self.callback.info('Setting runcount %s' % data)
+        self._query(self._wmi.registrySetKey, self._params_keypath,
+            'Runcount', data)
+
+    runcount = property(_get_runcount, _set_runcount)
 
     @property
     def flavor(self):
@@ -368,6 +428,26 @@ class rTIS(object):
             self._params_keypath, 'Running', retries=0)
         return bool(res)
 
+    @property
+    def hasRun(self):
+        """
+        Report if rTIS has been run.
+        """
+
+        runcount = self.runcount
+        if self._runcount is not None and runcount != self._runcount:
+            return True
+        else:
+            self._runcount = runcount
+            return False
+
+    def resetRunStatus(self):
+        """
+        Reset the has run flag.
+        """
+
+        self._runcount = None
+
     def _reportStatus(self, logPath):
         """
         Report the last like of the logfile in the given path.
@@ -414,7 +494,7 @@ class rTIS(object):
         state = None
         statusKey = 'Running'
         start = time.time()
-        while state != 'running':
+        while state != 'running' and not self.hasRun:
             try:
                 result = self._query(self._wmi.registryGetKey,
                                      self._params_keypath,
@@ -442,6 +522,10 @@ class rTIS(object):
         # Don't wait for the service if it
         # is not installed.
         if not self.isInstalled:
+            return
+
+        # If the service has already run, don't wait for it.
+        if self.hasRun:
             return
 
         self.callback.info('Waiting for the %s to exit' % self._service_name)
@@ -638,7 +722,6 @@ class rTIS(object):
         self.callback.debug(servicing.tostring(prettyPrint=True))
         fh = self._smb.pathopen(jobDir, servicing.FILENAME, mode='w')
         fh.write(servicing.tostring())
-        self.callback.info('appyupdate write %s' % fh.fileno())
         fh.flush()
         fh.close()
         # REALLY CLOSE THE FILE DESCRIPTOR, I MEAN IT!
@@ -712,3 +795,43 @@ class rTIS(object):
         fh.close()
 
         return results
+
+    def _queryPackages(self, jobId):
+        """
+        Query the list of packages from a remote Windows machine.
+        """
+
+        self.callback.info('Querying Windows system for package information.')
+
+        if not jobId.startswith('job-'):
+            jobId = 'job-%s' % jobId
+
+        # Create directory for the results.
+        jobDir = self._smb.pathjoin(self.updatesDir, jobId)
+        self._smb.mkdir(jobDir)
+
+        # Set the command.
+        self.commands = 'query=%s' % jobId
+
+        # Querying for packages is sometimes too fast for us to notice that the
+        # service actually ran. Ignore the error and look for the output file.
+        # If it isn't there, raise an error.
+
+        try:
+            # Start the service.
+            self.start()
+        except ServiceFailedToStartError:
+            pass
+
+        # Wait for the service to exit.
+        self.wait()
+
+        # Gather the results.
+        if self._smb.pathexists(jobDir, Packages.FILENAME):
+            fh = self._smb.pathopen(jobDir, Packages.FILENAME)
+            packages = Packages.parse(fh)
+            fh.close()
+        else:
+            raise ServiceFailedToStartError
+
+        return packages
