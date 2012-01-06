@@ -12,4 +12,4 @@ class NotEnoughSpaceError(BaseException):
     pass
 
 class ServiceFailedToStartError(BaseException):
-    pass
+    error = 'The rPath Tools Installer Service failed to start.'
