@@ -225,10 +225,11 @@ class BaseTaskHandler(plug_worker.TaskHandler):
             if e.error:
                 errmsg = e.error
             else:
-                errmsg = "Error"
+                errmsg = "Error: %s" % e.__class__.__name__
             self.sendStatus(C.ERR_GENERIC, errmsg)
         except:
             typ, value, tb = sys.exc_info()
+            #import epdb; epdb.post_mortem(tb, typ, value)
             out = StringIO.StringIO()
             formatTrace(typ, value, tb, stream = out, withLocals = False)
             out.write("\nFull stack:\n")
