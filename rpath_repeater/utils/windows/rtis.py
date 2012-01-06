@@ -479,16 +479,8 @@ class rTIS(object):
         Start the rTIS service.
         """
 
-        status = self._query(self._wmi.serviceStart, self._service_name)  # pyflakes=ignore
-
-        # FIXME: The status check that comes back from wmi seems to be
-        #        unreliable at best. For now just assume that the call went
-        #        through and fail if the key doesn't get set.
-        #if len(status) != 1:
-        #    raise (ServiceFailedToStartError, 'The rPath Tools Installer '
-        #        'service failed to start, please try again.')
-        #
-        #assert status[0] == 'Success'
+        # Starting a new run, reset the internal status flag.
+        self.resetRunStatus()
 
         # Now wait for the service to actually start.
         state = None
