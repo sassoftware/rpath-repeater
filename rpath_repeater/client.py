@@ -173,9 +173,8 @@ class RepeaterClient(object):
 
         return (uuid, job.thaw())
 
-    def _cimCallDispatcher(self, method, cimParams, resultsLocation, zone,
-            **kwargs):
-        uuid = kwargs.pop('uuid', None)
+    def _cimCallDispatcher(self, method, cimParams, resultsLocation=None,
+            zone=None, uuid=None, **kwargs):
         params = self._callParams(method, resultsLocation, zone, **kwargs)
         assert isinstance(cimParams, self.CimParams)
         if cimParams.port is None:
@@ -183,9 +182,8 @@ class RepeaterClient(object):
         params['cimParams'] = cimParams.toDict()
         return self._launchRmakeJob(self.__CIM_PLUGIN_NS, params, uuid=uuid)
 
-    def _wmiCallDispatcher(self, method, wmiParams, resultsLocation, zone,
-            **kwargs):
-        uuid = kwargs.pop('uuid', None)
+    def _wmiCallDispatcher(self, method, wmiParams, resultsLocation=None,
+            zone=None, uuid=None, **kwargs):
         params = self._callParams(method, resultsLocation, zone, **kwargs)
         assert isinstance(wmiParams, self.WmiParams)
         if wmiParams.port is None:
@@ -193,17 +191,17 @@ class RepeaterClient(object):
         params['wmiParams'] = wmiParams.toDict()
         return self._launchRmakeJob(self.__WMI_PLUGIN_NS, params, uuid=uuid)
 
-    def register_cim(self, cimParams, resultsLocation=None, zone=None):
+    def register_cim(self, cimParams, **kwargs):
         method = 'register'
-        return self._cimCallDispatcher(method, cimParams, resultsLocation, zone)
+        return self._cimCallDispatcher(method, cimParams, **kwargs)
 
-    def register_wmi(self, wmiParams, resultsLocation=None, zone=None):
+    def register_wmi(self, wmiParams, **kwargs):
         method = 'register'
-        return self._wmiCallDispatcher(method, wmiParams, resultsLocation, zone)
+        return self._wmiCallDispatcher(method, wmiParams, **kwargs)
 
-    def bootstrap(self, assimilatorParams, resultsLocation=None, zone=None):
+    def bootstrap(self, assimilatorParams, resultsLocation=None, zone=None,
+            uuid=None, **kwargs):
         '''this will only be valid for Linux, and adopts an unmanaged system'''
-        uuid = kwargs.pop('uuid', None)
         params = self._callParams('bootstrap', resultsLocation, zone)
         assert isinstance(assimilatorParams, self.AssimilatorParams)
         if assimilatorParams.port is None:
@@ -211,33 +209,31 @@ class RepeaterClient(object):
         params['assimilatorParams'] = assimilatorParams.toDict()
         return self._launchRmakeJob(self.__ASSIMILATOR_PLUGIN_NS, params, uuid=uuid)
 
-    def shutdown_cim(self, cimParams, resultsLocation=None, zone=None):
+    def shutdown_cim(self, cimParams, **kwargs):
         method = 'shutdown'
-        return self._cimCallDispatcher(method, cimParams, resultsLocation, zone)
+        return self._cimCallDispatcher(method, cimParams, **kwargs)
 
-    def shutdown_wmi(self, cimParams, resultsLocation=None, zone=None):
+    def shutdown_wmi(self, cimParams, **kwargs):
         method = 'shutdown'
         raise NotImplementedError(method)
 
-    def update_cim(self, cimParams, resultsLocation=None, zone=None, sources=None):
+    def update_cim(self, cimParams, sources=None, **kwargs):
         method = 'update'
-        return self._cimCallDispatcher(method, cimParams, resultsLocation, zone,
-            sources=sources)
+        return self._cimCallDispatcher(method, cimParams, sources=sources, **kwargs)
 
-    def update_wmi(self, wmiParams, resultsLocation=None, zone=None, sources=None):
+    def update_wmi(self, wmiParams, sources=None, **kwargs):
         method = 'update'
-        return self._wmiCallDispatcher(method, wmiParams, resultsLocation, zone,
-            sources=sources)
+        return self._wmiCallDispatcher(method, wmiParams, sources=sources, **kwargs)
 
-    def configuration_cim(self, cimParams, resultsLocation=None, zone=None, configuration=None):
+    def configuration_cim(self, cimParams, configuration=None, **kwargs):
         method = 'configuration'
-        return self._cimCallDispatcher(method, cimParams, resultsLocation, zone,
-            configuration=configuration)
+        return self._cimCallDispatcher(method, cimParams,
+            configuration=configuration, **kwargs)
 
-    def configuration_wmi(self, wmiParams, resultsLocation=None, zone=None, configuration=None):
+    def configuration_wmi(self, wmiParams, configuration=None, **kwargs):
         method = 'configuration'
-        return self._wmiCallDispatcher(method, wmiParams, resultsLocation, zone,
-            configuration=configuration)
+        return self._wmiCallDispatcher(method, wmiParams,
+            configuration=configuration, **kwargs)
 
     def retireNode(self, node, zone, port = None):
         """ This is a temporary large hammer for handling the retirement
@@ -248,16 +244,16 @@ class RepeaterClient(object):
     def getNodes(self):
         return self.client.getWorkerList()
 
-    def poll_cim(self, cimParams, resultsLocation=None, zone=None):
+    def poll_cim(self, cimParams, **kwargs):
         method = 'poll'
-        return self._cimCallDispatcher(method, cimParams, resultsLocation, zone)
+        return self._cimCallDispatcher(method, cimParams, **kwargs)
 
-    def poll_wmi(self, wmiParams, resultsLocation=None, zone=None):
+    def poll_wmi(self, wmiParams, **kwargs):
         method = 'poll'
-        return self._wmiCallDispatcher(method, wmiParams, resultsLocation, zone)
+        return self._wmiCallDispatcher(method, wmiParams, **kwargs)
 
     def launchWaitForNetwork(self, cimParams, resultsLocation=None, zone=None,
-                             **kwargs):
+                             uuid=None, **kwargs):
         params = dict(zone=zone or self.zone)
         if kwargs:
             params['methodArguments'] = kwargs
@@ -267,19 +263,13 @@ class RepeaterClient(object):
             assert isinstance(resultsLocation, self.ResultsLocation)
             params['resultsLocation'] = resultsLocation.toDict()
 
-        data = FrozenImmutableDict(params)
-        job = RmakeJob(RmakeUuid.uuid4(), self.__LAUNCH_PLUGIN_NS, 
-                       owner='nobody',
-                       data=data,
-                       ).freeze()
+        uuid, job = self._launchRmakeJob(self.__LAUNCH_PLUGIN_NS,
+           params, uuid=uuid)
 
-        uuid = job.job_uuid
-        job = self.client.createJob(job)
-
-        return (uuid, job.thaw())
+        return (uuid, job)
 
     def detectMgmtInterface(self, mgmtParams, resultsLocation=None,
-            zone=None):
+            zone=None, uuid=None, **kwargs):
         """
         ifaceParamList is a list of ManagementInterfaceParams to be probed
         """
@@ -289,16 +279,10 @@ class RepeaterClient(object):
             assert isinstance(resultsLocation, self.ResultsLocation)
             params['resultsLocation'] = resultsLocation.toDict()
 
-        data = FrozenImmutableDict(params)
-        job = RmakeJob(RmakeUuid.uuid4(), self.__MGMT_IFACE_PLUGIN_NS,
-                       owner='nobody',
-                       data=data,
-                       ).freeze()
+        uuid, job = self._launchRmakeJob(self.__MGMT_IFACE_PLUGIN_NS,
+            params, uuid=uuid)
 
-        uuid = job.job_uuid
-        job = self.client.createJob(job)
-
-        return (uuid, job.thaw())
+        return (uuid, job)
 
     def getJob(self, uuid):
         return self.client.getJob(uuid).thaw()
