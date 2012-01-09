@@ -157,9 +157,9 @@ class RepeaterClient(object):
             params['resultsLocation'] = resultsLocation.toDict()
         return params
 
-    def _launchRmakeJob(self, namespace, params):
+    def _launchRmakeJob(self, namespace, params, uuid=None):
         data = FrozenImmutableDict(params)
-        return self._createRmakeJob(namespace, data)
+        return self._createRmakeJob(namespace, data, uuid=uuid)
 
     def _createRmakeJob(self, namespace, data, uuid=None):
         if uuid is None:
@@ -175,21 +175,23 @@ class RepeaterClient(object):
 
     def _cimCallDispatcher(self, method, cimParams, resultsLocation, zone,
             **kwargs):
+        uuid = kwargs.pop('uuid', None)
         params = self._callParams(method, resultsLocation, zone, **kwargs)
         assert isinstance(cimParams, self.CimParams)
         if cimParams.port is None:
             cimParams.port = 5989
         params['cimParams'] = cimParams.toDict()
-        return self._launchRmakeJob(self.__CIM_PLUGIN_NS, params)
+        return self._launchRmakeJob(self.__CIM_PLUGIN_NS, params, uuid=uuid)
 
     def _wmiCallDispatcher(self, method, wmiParams, resultsLocation, zone,
             **kwargs):
+        uuid = kwargs.pop('uuid', None)
         params = self._callParams(method, resultsLocation, zone, **kwargs)
         assert isinstance(wmiParams, self.WmiParams)
         if wmiParams.port is None:
             wmiParams.port = 135
         params['wmiParams'] = wmiParams.toDict()
-        return self._launchRmakeJob(self.__WMI_PLUGIN_NS, params)
+        return self._launchRmakeJob(self.__WMI_PLUGIN_NS, params, uuid=uuid)
 
     def register_cim(self, cimParams, resultsLocation=None, zone=None):
         method = 'register'
@@ -201,12 +203,13 @@ class RepeaterClient(object):
 
     def bootstrap(self, assimilatorParams, resultsLocation=None, zone=None):
         '''this will only be valid for Linux, and adopts an unmanaged system'''
+        uuid = kwargs.pop('uuid', None)
         params = self._callParams('bootstrap', resultsLocation, zone)
         assert isinstance(assimilatorParams, self.AssimilatorParams)
         if assimilatorParams.port is None:
             assimilatorParams.port = 22
         params['assimilatorParams'] = assimilatorParams.toDict()
-        return self._launchRmakeJob(self.__ASSIMILATOR_PLUGIN_NS, params)
+        return self._launchRmakeJob(self.__ASSIMILATOR_PLUGIN_NS, params, uuid=uuid)
 
     def shutdown_cim(self, cimParams, resultsLocation=None, zone=None):
         method = 'shutdown'
