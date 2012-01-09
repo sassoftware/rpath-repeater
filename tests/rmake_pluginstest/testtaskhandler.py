@@ -52,10 +52,12 @@ class Client(client.RepeaterClient):
     class Wchild(object):
         cfg = None
 
-    def _launchRmakeJob(self, namespace, params):
+    def _launchRmakeJob(self, namespace, params, uuid=None):
         methodName = params.pop('method')
         key = "%s.%s" % (self.baseNamespace, methodName)
-        jobUuid = self._uuidgen()
+        jobUuid = uuid
+        if jobUuid is None:
+            jobUuid = self._uuidgen()
         taskUuid = jobUuid
 
         taskParams = self.handlerClass.initParams(params)
