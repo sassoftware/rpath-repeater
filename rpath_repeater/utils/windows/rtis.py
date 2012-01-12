@@ -482,6 +482,12 @@ class rTIS(object):
         # Starting a new run, reset the internal status flag.
         self.resetRunStatus()
 
+        # Cache the run status
+        self.hasRun
+
+        # Start the service.
+        self._query(self._wmi.serviceStart, self._service_name)  # pyflakes=ignore
+
         # Now wait for the service to actually start.
         state = None
         statusKey = 'Running'
