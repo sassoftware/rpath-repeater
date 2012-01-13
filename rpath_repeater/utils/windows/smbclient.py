@@ -94,13 +94,20 @@ class SMBClient(object):
 
         self.callback.info('mounting windows share')
 
+        retries = 10
         self._rootdir = tempfile.mkdtemp()
-        try:
-            self._runCmd(self._mount_cmd + [ self._rootdir, ],
-                self._mount_env, self._mount_rc)
-        except Exception:
-            self._rootdir = None
-            raise
+        while retries:
+            try:
+                self._runCmd(self._mount_cmd + [ self._rootdir, ],
+                    self._mount_env, self._mount_rc)
+                break
+            except SMBMountError:
+                time.sleep(10)
+                retries -= 1
+            except Exception:
+                retries = None
+                self._rootdir = None
+                raise
 
         self._mounted = True
 
