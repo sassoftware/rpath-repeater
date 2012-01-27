@@ -16,7 +16,7 @@ from rmake3.core import types
 from rmake3.core import handler
 
 from rpath_repeater.models import CimParams
-from rpath_repeater.codes import Codes as C
+from rpath_repeater.codes import Codes as C, NS
 from rpath_repeater.utils import wbemlib
 from rpath_repeater.utils import nodeinfo
 from rpath_repeater.utils import cimupdater
@@ -24,13 +24,6 @@ from rpath_repeater.utils import cimupdater
 from rpath_repeater.utils import base_forwarding_plugin as bfp
 
 XML = bfp.XML
-
-CIM_JOB = bfp.PREFIX + '.cimplugin'
-CIM_TASK_REGISTER = CIM_JOB + '.register'
-CIM_TASK_SHUTDOWN = CIM_JOB + '.shutdown'
-CIM_TASK_POLLING = CIM_JOB + '.poll'
-CIM_TASK_UPDATE = CIM_JOB + '.update'
-CIM_TASK_CONFIGURATION = CIM_JOB + '.configuration'
 
 # These are just the starting point attributes
 CimData = types.slottype('CimData', 'p nodes response')
@@ -42,21 +35,20 @@ class CimForwardingPlugin(bfp.BaseForwardingPlugin):
     @classmethod
     def worker_get_task_types(cls):
         return {
-            CIM_TASK_REGISTER: RegisterTask,
-            CIM_TASK_SHUTDOWN: ShutdownTask,
-            CIM_TASK_POLLING: PollingTask,
-            CIM_TASK_UPDATE: UpdateTask,
-            CIM_TASK_SHUTDOWN: ShutdownTask,
-            CIM_TASK_CONFIGURATION: ConfigurationTask,
+            NS.CIM_TASK_REGISTER: RegisterTask,
+            NS.CIM_TASK_SHUTDOWN: ShutdownTask,
+            NS.CIM_TASK_POLLING: PollingTask,
+            NS.CIM_TASK_UPDATE: UpdateTask,
+            NS.CIM_TASK_CONFIGURATION: ConfigurationTask,
         }
 
 
 class CimHandler(bfp.BaseHandler):
 
-    jobType = CIM_JOB
+    jobType = NS.CIM_JOB
     firstState = 'cimCall'
 
-    RegistrationTaskNS = CIM_TASK_REGISTER
+    RegistrationTaskNS = NS.CIM_TASK_REGISTER
 
     def setup (self):
         bfp.BaseHandler.setup(self)
@@ -89,12 +81,12 @@ class CimHandler(bfp.BaseHandler):
 
     @classmethod
     def _getArgs(cls, taskType, params, methodArguments, zoneAddresses):
-        if taskType in [ CIM_TASK_REGISTER, CIM_TASK_SHUTDOWN, CIM_TASK_POLLING ]:
+        if taskType in [ NS.CIM_TASK_REGISTER, NS.CIM_TASK_SHUTDOWN, NS.CIM_TASK_POLLING ]:
             return CimData(params, zoneAddresses)
-        if taskType in [ CIM_TASK_UPDATE ]:
+        if taskType in [ NS.CIM_TASK_UPDATE ]:
             sources = methodArguments['sources']
             return bfp.GenericData(params, zoneAddresses, sources)
-        if taskType in [ CIM_TASK_CONFIGURATION ]:
+        if taskType in [ NS.CIM_TASK_CONFIGURATION ]:
             configuration = methodArguments['configuration']
             return bfp.GenericData(params, zoneAddresses, configuration)
         raise Exception("Unhandled task type %s" % taskType)
@@ -108,23 +100,23 @@ class CimHandler(bfp.BaseHandler):
 
     @bfp.exposed
     def register(self):
-        return self._method(CIM_TASK_REGISTER)
+        return self._method(NS.CIM_TASK_REGISTER)
 
     @bfp.exposed
     def shutdown(self):
-        return self._method(CIM_TASK_SHUTDOWN)
+        return self._method(NS.CIM_TASK_SHUTDOWN)
 
     @bfp.exposed
     def poll(self):
-        return self._method(CIM_TASK_POLLING)
+        return self._method(NS.CIM_TASK_POLLING)
 
     @bfp.exposed
     def update(self):
-        return self._method(CIM_TASK_UPDATE)
+        return self._method(NS.CIM_TASK_UPDATE)
 
     @bfp.exposed
     def configuration(self):
-        return self._method(CIM_TASK_CONFIGURATION)
+        return self._method(NS.CIM_TASK_CONFIGURATION)
 
 
 class CIMTaskHandler(bfp.BaseTaskHandler):

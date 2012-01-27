@@ -233,4 +233,5 @@ class TargetUserCredentials(_BaseSlotCompare):
 
 class TargetCommandArguments(_BaseSlotCompare):
     __slots__ = ['jobUrl', 'authToken',
-        'targetConfiguration', 'targetUserCredentials', 'args', 'targetAllUserCredentials', ]
+        'targetConfiguration', 'targetUserCredentials', 'args',
+        'targetAllUserCredentials', 'zoneAddresses', ]

@@ -69,6 +69,9 @@ class TargetsPlugin(bfp.BaseForwardingPlugin):
 
 class BaseHandler(bfp.BaseHandler):
     firstState = 'callRun'
+    # using the system launch task should be good enough, it's deployed
+    # where the reg one is deployed
+    RegistrationTaskNS = NS.TARGET_SYSTEM_LAUNCH
 
     def setup(self):
         bfp.BaseHandler.setup(self)
@@ -89,6 +92,8 @@ class BaseHandler(bfp.BaseHandler):
             self.jobUrl = models.URL.fromString(jobUrl, host='localhost', port=80)
         else:
             self.jobUrl = None
+        # Add IP addresses for all nodes in this zone
+        self.data['params'].zoneAddresses = self.zoneAddresses
 
     def _run(self):
         self.setStatus(C.MSG_NEW_TASK, 'Creating task')
@@ -213,6 +218,7 @@ class BaseTaskHandler(bfp.BaseTaskHandler):
         self.userCredentials = params.targetUserCredentials
         self.allUserCredentials = params.targetAllUserCredentials
         self.cmdArgs = params.args
+        self.zoneAddresses = params.zoneAddresses
 
     def _initTarget(self):
         driverName = self.targetConfig.targetType
@@ -245,7 +251,8 @@ class BaseTaskHandler(bfp.BaseTaskHandler):
         restDb = self._createRestDatabase()
         scfg = storage.StorageConfig(storagePath="/srv/rbuilder/catalog")
         self.driver = Driver(self.userCredentials, scfg, driverName, cloudName=self.targetConfig.targetName,
-            db=restDb, inventoryHandler=InventoryHandler(weakref.ref(self)))
+            db=restDb, inventoryHandler=InventoryHandler(weakref.ref(self)),
+            zoneAddresses=self.zoneAddresses)
         self.driver._nodeFactory.baseUrl = '/'
 
     def finishCall(self, node, msg, code=C.OK):

@@ -28,13 +28,13 @@ from rmake3.core import handler
 from rmake3.core import plug_dispatcher
 from rmake3.worker import plug_worker
 
-PREFIX = 'com.rpath.sputnik'
-
-from rpath_repeater.codes import Codes as C
+from rpath_repeater.codes import Codes as C, NS
 from rpath_repeater.utils import nodeinfo
 from rpath_repeater import models
 from rpath_repeater.utils.xmlutils import XML
 from rpath_repeater.utils.reporting import ReportingMixIn
+
+PREFIX = NS.PREFIX
 
 GenericData = types.slottype('GenericData', 'p nodes argument response')
 

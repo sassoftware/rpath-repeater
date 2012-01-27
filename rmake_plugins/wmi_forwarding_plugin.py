@@ -20,15 +20,8 @@ from rmake3.core import handler
 
 from rpath_repeater.utils import windows
 from rpath_repeater.models import WmiParams
-from rpath_repeater.codes import Codes as C
+from rpath_repeater.codes import Codes as C, NS
 from rpath_repeater.utils import base_forwarding_plugin as bfp
-
-WMI_JOB = bfp.PREFIX + '.wmiplugin'
-WMI_TASK_REGISTER = WMI_JOB + '.register'
-WMI_TASK_SHUTDOWN = WMI_JOB + '.shutdown'
-WMI_TASK_POLLING = WMI_JOB + '.poll'
-WMI_TASK_UPDATE = WMI_JOB + '.update'
-WMI_TASK_CONFIGURATION = WMI_JOB + '.configuration'
 
 # These are just the starting point attributes
 WmiData = types.slottype('WmiData', 'p response')
@@ -41,22 +34,21 @@ class WmiForwardingPlugin(bfp.BaseForwardingPlugin):
     @classmethod
     def worker_get_task_types(cls):
         return {
-            WMI_TASK_REGISTER: RegisterTask,
-            WMI_TASK_SHUTDOWN: ShutdownTask,
-            WMI_TASK_POLLING: PollingTask,
-            WMI_TASK_UPDATE: UpdateTask,
-            WMI_TASK_SHUTDOWN: ShutdownTask,
-            WMI_TASK_CONFIGURATION: ConfigurationTask,
+            NS.WMI_TASK_REGISTER: RegisterTask,
+            NS.WMI_TASK_SHUTDOWN: ShutdownTask,
+            NS.WMI_TASK_POLLING: PollingTask,
+            NS.WMI_TASK_UPDATE: UpdateTask,
+            NS.WMI_TASK_CONFIGURATION: ConfigurationTask,
         }
 
 
 class WmiHandler(bfp.BaseHandler):
     timeout = 7200
 
-    jobType = WMI_JOB
+    jobType = NS.WMI_JOB
     firstState = 'wmiCall'
 
-    RegistrationTaskNS = WMI_TASK_REGISTER
+    RegistrationTaskNS = NS.WMI_TASK_REGISTER
 
     def setup (self):
         bfp.BaseHandler.setup(self)
@@ -89,13 +81,13 @@ class WmiHandler(bfp.BaseHandler):
 
     @classmethod
     def _getArgs(cls, taskType, params, methodArguments, zoneAddresses):
-        if taskType in [ WMI_TASK_REGISTER, WMI_TASK_SHUTDOWN,
-                WMI_TASK_POLLING ]:
+        if taskType in [ NS.WMI_TASK_REGISTER, NS.WMI_TASK_SHUTDOWN,
+                NS.WMI_TASK_POLLING ]:
             return WmiData(params)
-        if taskType in [ WMI_TASK_UPDATE ]:
+        if taskType in [ NS.WMI_TASK_UPDATE ]:
             sources = methodArguments['sources']
             return bfp.GenericData(params, zoneAddresses, sources)
-        if taskType in [ WMI_TASK_CONFIGURATION ]:
+        if taskType in [ NS.WMI_TASK_CONFIGURATION ]:
             configuration = methodArguments['configuration']
             return bfp.GenericData(params, zoneAddresses, configuration)
         raise Exception("Unhandled task type %s" % taskType)
@@ -109,23 +101,23 @@ class WmiHandler(bfp.BaseHandler):
 
     @bfp.exposed
     def register(self):
-        return self._method(WMI_TASK_REGISTER)
+        return self._method(NS.WMI_TASK_REGISTER)
 
     @bfp.exposed
     def shutdown(self):
-        return self._method(WMI_TASK_SHUTDOWN)
+        return self._method(NS.WMI_TASK_SHUTDOWN)
 
     @bfp.exposed
     def poll(self):
-        return self._method(WMI_TASK_POLLING)
+        return self._method(NS.WMI_TASK_POLLING)
 
     @bfp.exposed
     def update(self):
-        return self._method(WMI_TASK_UPDATE)
+        return self._method(NS.WMI_TASK_UPDATE)
 
     @bfp.exposed
     def configuration(self):
-        return self._method(WMI_TASK_CONFIGURATION)
+        return self._method(NS.WMI_TASK_CONFIGURATION)
 
 
 class WMITaskHandler(bfp.BaseTaskHandler):
