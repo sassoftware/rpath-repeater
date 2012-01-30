@@ -284,7 +284,8 @@ class rTIS(object):
         """
 
         try:
-            self._wmi.registryGetKey(self._conary_keypath, 'system_model')
+            self._query(self._wmi.registryGetKey, self._conary_keypath,
+                'system_model', raiseErrors=True)
         except WMIFileNotFoundError:
             self.callback.info('Creating Required Registry Keys')
             self._wmi.registryCreateKey('SOFTWARE', 'rPath')
