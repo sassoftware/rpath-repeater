@@ -19,6 +19,7 @@ from wmiclient import WMIFileNotFoundError
 
 from rpath_repeater.utils.windows.callbacks import BaseCallback
 from rpath_repeater.utils.windows.errors import NotEnoughSpaceError
+from rpath_repeater.utils.windows.errors import MSIInstallationError
 from rpath_repeater.utils.windows.errors import ServiceFailedToStartError
 
 def _filter(func):
@@ -234,6 +235,9 @@ class rTIS(object):
 
     _reboot_timeout = 600 # in seconds
     _query_sleep = 1
+
+    # success, restart initiated, restart required
+    _success = (0, 1641, 3010)
 
     def __init__(self, wmiclient, smbclient, callback=None):
         self._wmi = wmiclient
@@ -625,27 +629,40 @@ class rTIS(object):
             self.callback.info('installing %s=%s[%s]' % (name, version, flavor))
             result = self._wmi.processCreate(msiexec % remotePath)
 
-        self.wait(allowReboot=False)
-
-        # Wait for PromgraData\rPath\manifest to exist before setting the
-        # manifest, it should be created by rPathTools Setup.
-        if not self._smb.pathexists(self.updatesDir, '..', 'manifest'):
-            time.sleep(1)
-
+        self.callback.info('waiting for installation to start')
         while not self._smb.pathexists(logPath):
             time.sleep(1)
 
         # Wait for MSI to complete the update
         self.callback.info('waiting for installation to complete')
+        rc = None
         done = False
+        magic = 'MainEngineThread is returning'
         while not done:
             fh = self._smb.pathopen(logPath, codec='utf_16_le')
             for line in fh:
-                if 'MainEngineThread is returning 0' in line:
+                if magic in line:
                     done = True
+                    parts = line[line.find(magic)+len(magic):].split()
+                    if len(parts) > 0 and parts[0].isdigit():
+                        rc = int(parts[0])
+                    else:
+                        rc = -1
+                    break
             fh.close()
             time.sleep(1)
+
+        if rc not in self._success:
+            self.callback.error('msiexec failed to install rPathTools with the '
+                'following error code: %s' % rc)
+            raise MSIInstallationError
+
         self.callback.info('critical update installation complete')
+
+        # Wait for PromgraData\rPath\manifest to exist before setting the
+        # manifest, it should be created by rPathTools Setup.
+        while not self._smb.pathexists(self.updatesDir, '..', 'manifest'):
+            time.sleep(1)
 
         self.manifest = manifest.values()
         self.polling_manifest = criticalJob.polling_manifest
