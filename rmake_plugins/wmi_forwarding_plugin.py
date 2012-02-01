@@ -220,7 +220,11 @@ class UpdateTask(WMITaskHandler):
             code = C.MSG_GENERIC
             if not status:
                 code = C.ERR_GENERIC
-                msg = 'failed with unknown error'
+                msg = ('Failed to find update status code. This normally means '
+                    'that the rPathTools Installer Service failed to run for '
+                    'some reason. Please check the remote machine for details. '
+                    'Logs can be found in C:\ProgramFiles (x86)\rPath\rTIS.NET '
+                    'and the event viewer.')
             else:
                 msg = status.get('status')
                 if status.get('exitCode') not in (None, '0'):
