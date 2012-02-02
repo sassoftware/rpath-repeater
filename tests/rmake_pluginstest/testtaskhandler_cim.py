@@ -9,6 +9,8 @@ import cim_forwarding_plugin
 
 from testtaskhandler import TestBase
 
+from rpath_repeater.codes import NS
+
 CIMProperty = pywbem.CIMProperty
 CIMInstanceName = pywbem.CIMInstanceName
 CIMInstance = pywbem.CIMInstance
@@ -17,7 +19,7 @@ Uint16 = pywbem.Uint16
 class CimTest(TestBase):
     # These cannot be defined in setUp, they are needed in the base class
     taskDispatcher = cim_forwarding_plugin.CimForwardingPlugin.worker_get_task_types()
-    baseNamespace = cim_forwarding_plugin.CIM_JOB
+    baseNamespace = NS.CIM_JOB
     handlerClass = cim_forwarding_plugin.CimHandler
 
     class OP(object):

@@ -9,13 +9,15 @@ import wmiclient
 
 import wmi_forwarding_plugin
 
+from rpath_repeater.codes import NS
+
 from testtaskhandler import TestBase
 
 
 class WmiTest(TestBase):
     # These cannot be defined in setUp, they are needed in the base class
     taskDispatcher = wmi_forwarding_plugin.WmiForwardingPlugin.worker_get_task_types()
-    baseNamespace = wmi_forwarding_plugin.WMI_JOB
+    baseNamespace = NS.WMI_JOB
     handlerClass = wmi_forwarding_plugin.WmiHandler
 
     class K:
