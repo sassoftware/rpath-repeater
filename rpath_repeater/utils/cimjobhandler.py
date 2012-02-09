@@ -1,6 +1,6 @@
-#!/usr/bin/python2.4
+#!/usr/bin/python
 #
-# Copyright (c) 2009 rPath, Inc.
+# Copyright (c) 2009-2012 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -20,11 +20,10 @@ import wbemlib
 
 WBEMException = wbemlib.WBEMException
 
-class CIMUpdater(object):
+class CIMJobHandler(object):
     '''
-    Class for checking and applying updates to a remote appliance via CIM.
-    Exposes both asynchronous and synchronous methods to check for and apply
-    updates.
+    Class for checking jobs of all kinds.
+    Exposes both asynchronous and synchronous methods.
     '''
 
     DEFAULT_TIMEOUT = 3600
@@ -33,8 +32,6 @@ class CIMUpdater(object):
     def __init__(self, server, logger=None):
         self.server = server
         self._jobStates = None
-        self._updateCheckReturnValues = None
-        self._elementSoftwareStatusValues = None
         self.logger = logger
 
     def _normalizeValueMap(self, values, valueMap, cimType):
@@ -74,17 +71,6 @@ class CIMUpdater(object):
 
         return self._jobStates
     jobStates = property(_getJobStates)
-
-    def _getSoftwareElementStatusValues(self, force = False):
-        if not self._elementSoftwareStatusValues or force:
-            cimClass = self.server.VAMI_ElementSoftwareIdentity.GetClass()
-            prop = cimClass.properties['ElementSoftwareStatus']
-            states = prop.qualifiers
-            self._elementSoftwareStatusValues = self._normalizeValueMap(
-                states['Values'].value, states['ValueMap'].value,
-                prop.type)
-        return self._elementSoftwareStatusValues
-    elementSoftwareStatusValues = property(_getSoftwareElementStatusValues)
 
     def _unexpectedReturnCode(self, CIMClassName, methodName, returnCode,
         expectedReturnCode):
@@ -135,89 +121,21 @@ class CIMUpdater(object):
             time.sleep(1)
         return None
 
-    def getInstalledItemList(self):
-        # Select the ones that have Installed and Available as
-        # ElementSoftwareStatus. See the mof for the value mappings
-        return self._filterItemList([2, 6])
-
-    def getAvailableItemList(self):
-        return self._filterItemList([8])
-
-    def getInstalledGroups(self):
-        # XXX this is fairly low-level, we should probably try to wrap some of
-        # these in wbemlib
-        installedGroups = self.getInstalledItemList()
-        ids = [ g['Antecedent']['InstanceID'] for g in installedGroups ]
-        instanceNames = [ wbemlib.pywbem.cim_obj.CIMInstanceName(
-            'VAMI_SoftwareIdentity', keybindings = dict(InstanceId = i))
-            for i in ids ]
-        instances = [ self.server.VAMI_SoftwareIdentity.GetInstance(i)
-            for i in instanceNames ]
-        ret = [ "%s=%s" % (x['name'], x['VersionString'])
-            for x in instances ]
-        return ret
-
-    def _filterItemList(self, states):
-        insts = self.server.VAMI_ElementSoftwareIdentity.EnumerateInstances()
-        targetState = set(states)
-        insts = [ x for x in insts
-            if targetState.issubset(x.properties['ElementSoftwareStatus'].value)]
-        return insts
-
-    def updateCheckAsync(self):
-        result = self.server.VAMI_SoftwareInstallationService.CheckAvailableUpdates()
-
-        if result[0] != 4096L:
-            self._unexpectedReturnCode('VAMI_SoftwareInstallationService', 
-                'CheckAvailableUpdates', result[0], 4096L)
-
-        job = result[1]['job']
-        return job
-
-    def updateCheck(self, timeout = DEFAULT_TIMEOUT):
-        job = self.updateCheckAsync()
-        return self.pollJobForCompletion(job, timeout = timeout)
-
-    def applyUpdateAsync(self, sources, nodes):
+    def callMethodAsync(self, cimClassName, methodName, methodKwargs):
         conn = self.server.conn
-        result = conn.callMethod('VAMI_SoftwareInstallationService',
-            'InstallFromNetworkLocations',
-            ManagementNodeAddresses=nodes,
-            Sources=sources,
-            InstallOptions=[pywbem.Uint16(2),])
+        result = conn.callMethod(cimClassName, methodName,
+            **methodKwargs)
         return result[1]['job']
 
-    def applyUpdate(self, sources, timeout = DEFAULT_TIMEOUT, nodes=None):
-        job = self.applyUpdateAsync(sources, nodes)
+    def handleJob(self, job, timeout=DEFAULT_TIMEOUT):
         job = self.pollJobForCompletion(job, timeout = timeout)
         if not self.isJobSuccessful(job):
             error = self.server.getError(job)
             self.log_error(error)
-            raise RuntimeError('Error while applying updates. The error from '
+            raise RuntimeError('Error while executing job. The error from '
                 'the managed system was: %s' % error)
-
-    def checkAndApplyUpdate(self, timeout = DEFAULT_TIMEOUT):
-        job = self.updateCheck(timeout = timeout)
-        if job is None:
-            return
-        if not self.isJobSuccessful(job):
-            error = self.server.getError(job)
-            self.log_error(error)
-            raise RuntimeError("Error checking for available software")
-        job = self.applyUpdate(timeout = timeout)
-        if not self.isJobSuccessful(job):
-            error = self.server.getError(job)
-            self.log_error(error)
-            raise RuntimeError('Error while applying updates. The error from '
-                'the managed system was: %s' % error)
+        return job
 
     def log_error(self, error):
         if self.logger:
             self.logger.error(error)
-
-if __name__ == '__main__':
-    host = 'https://ec2-174-129-153-120.compute-1.amazonaws.com'
-    x509 = dict(cert_file = "/tmp/cert.crt", key_file = "/tmp/cert.key")
-    updater = CIMUpdater(host, x509 = x509)
-    updater.checkAndApplyUpdate()
-
