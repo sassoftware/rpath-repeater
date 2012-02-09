@@ -20,6 +20,7 @@ from rpath_repeater.codes import Codes as C, NS
 from rpath_repeater.utils import wbemlib
 from rpath_repeater.utils import nodeinfo
 from rpath_repeater.utils import cimupdater
+from rpath_repeater.utils import surveyscanner
 
 from rpath_repeater.utils import base_forwarding_plugin as bfp
 
@@ -40,6 +41,7 @@ class CimForwardingPlugin(bfp.BaseForwardingPlugin):
             NS.CIM_TASK_POLLING: PollingTask,
             NS.CIM_TASK_UPDATE: UpdateTask,
             NS.CIM_TASK_CONFIGURATION: ConfigurationTask,
+            NS.CIM_TASK_SURVEY_SCAN: SurveyScanTask,
         }
 
 
@@ -81,7 +83,7 @@ class CimHandler(bfp.BaseHandler):
 
     @classmethod
     def _getArgs(cls, taskType, params, methodArguments, zoneAddresses):
-        if taskType in [ NS.CIM_TASK_REGISTER, NS.CIM_TASK_SHUTDOWN, NS.CIM_TASK_POLLING ]:
+        if taskType in [ NS.CIM_TASK_REGISTER, NS.CIM_TASK_SHUTDOWN, NS.CIM_TASK_POLLING, NS.CIM_TASK_SURVEY_SCAN ]:
             return CimData(params, zoneAddresses)
         if taskType in [ NS.CIM_TASK_UPDATE ]:
             sources = methodArguments['sources']
@@ -118,6 +120,20 @@ class CimHandler(bfp.BaseHandler):
     def configuration(self):
         return self._method(NS.CIM_TASK_CONFIGURATION)
 
+    @bfp.exposed
+    def survey_scan(self):
+        return self._method(NS.CIM_TASK_SURVEY_SCAN)
+
+    def postprocessXmlNode(self, elt):
+        # XXX we really should split the handlers and make this nicer
+        if self.currentTask.task_type == NS.CIM_TASK_SURVEY_SCAN:
+            return self.postprocessXmlNodeAsJob(elt)
+        return super(CimHandler, self).postprocessXmlNode(elt)
+
+    def postprocessXmlNodeAsJob(self, elt):
+        job = self.newJobElement()
+        self.addJobResults(job, elt)
+        return job
 
 class CIMTaskHandler(bfp.BaseTaskHandler):
     InterfaceName = "CIM"
@@ -309,3 +325,28 @@ class ConfigurationTask(CIMTaskHandler):
         ret = server.conn.callMethod(instance.path, 'ApplyToMSE')
         retval = ret[0]
         return (retval == 0)
+
+class SurveyScanTask(CIMTaskHandler):
+    def _run(self, data):
+        self.sendStatus(C.MSG_START,
+            "Contacting host %s on port %d to trigger scan" % (
+                data.p.host, data.p.port))
+
+        server = self.getWbemConnection(data)
+
+        scanner = surveyscanner.CIMSurveyScanner(server)
+        job = scanner.scan()
+        surveys = list(job.properties['JobResults'].value)
+        succeeded = True
+
+        children = [ XML.fromString(s) for s in surveys ]
+        el = XML.Element("surveys", *children)
+
+        data.response = XML.toString(el)
+        self.setData(data)
+
+        if succeeded:
+            self.sendStatus(C.OK, "Host %s scanned" % data.p.host)
+        else:
+            self.sendStatus(C.ERR_GENERIC,
+                "Host %s failed to scan" % data.p.host)

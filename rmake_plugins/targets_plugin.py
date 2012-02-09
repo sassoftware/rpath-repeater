@@ -86,12 +86,6 @@ class BaseHandler(bfp.BaseHandler):
             self.setStatus(C.ERR_ZONE_MISSING, 'Required argument zone missing')
             self.postFailure()
             return
-        self.authToken = self.data.pop('authToken')
-        jobUrl = self.data.pop('jobUrl')
-        if jobUrl:
-            self.jobUrl = models.URL.fromString(jobUrl, host='localhost', port=80)
-        else:
-            self.jobUrl = None
         # Add IP addresses for all nodes in this zone
         self.data['params'].zoneAddresses = self.zoneAddresses
 
@@ -102,10 +96,6 @@ class BaseHandler(bfp.BaseHandler):
 
     def getResultsUrl(self):
         return self.jobUrl
-
-    def postprocessHeaders(self, elt, headers):
-        if self.authToken:
-            headers['X-rBuilder-Job-Token'] = self.authToken
 
     def postprocessXmlNode(self, elt):
         job = self.newJobElement()

@@ -1,6 +1,6 @@
-#!/usr/bin/python2.4
+#!/usr/bin/python
 #
-# Copyright (c) 2009 rPath, Inc.
+# Copyright (c) 2009-2012 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -17,63 +17,21 @@ import time
 
 import pywbem
 import wbemlib
+import cimjobhandler
 
 WBEMException = wbemlib.WBEMException
 
-class CIMUpdater(object):
+class CIMUpdater(cimjobhandler.CIMJobHandler):
     '''
     Class for checking and applying updates to a remote appliance via CIM.
     Exposes both asynchronous and synchronous methods to check for and apply
     updates.
     '''
 
-    DEFAULT_TIMEOUT = 3600
-    WAIT_TIMEOUT = 15
-
     def __init__(self, server, logger=None):
-        self.server = server
-        self._jobStates = None
+        super(CIMUpdater, self).__init__(server, logger=logger)
         self._updateCheckReturnValues = None
         self._elementSoftwareStatusValues = None
-        self.logger = logger
-
-    def _normalizeValueMap(self, values, valueMap, cimType):
-        typeFunc = self._toPythonType(cimType)
-        return dict(zip((typeFunc(x) for x in valueMap), values))
-
-    class WrapType(object):
-        def __init__(self, typeFunc):
-            self.typeFunc = typeFunc
-
-        def __call__(self, value):
-            try:
-                return self.typeFunc(value)
-            except ValueError:
-                return value
-
-    @classmethod
-    def _toPythonType(cls, cimType):
-        if cimType.startswith('int') or cimType.startswith('uint'):
-            return cls.WrapType(int)
-        raise RuntimeError("Unhandled type %s" % cimType)
-
-    def _getJobStates(self, force=False):
-        '''
-        Get the possible job states and format them as an easy to use
-        dictionary.  Will only happen once per session and result is saved as
-        a class property (unless the force parameter is used.)
-        '''
-        if not self._jobStates or force:
-            cimClass = self.server.GetClass('VAMI_UpdateConcreteJob')
-            jobStates = cimClass.properties['JobState'].qualifiers
-
-            # Turn jobStates into key/value pairs of integers and
-            # descriptions so that it's easy to work with.
-            self._jobStates = self._normalizeValueMap(
-                jobStates['Values'].value, jobStates['ValueMap'].value)
-
-        return self._jobStates
-    jobStates = property(_getJobStates)
 
     def _getSoftwareElementStatusValues(self, force = False):
         if not self._elementSoftwareStatusValues or force:
@@ -85,55 +43,6 @@ class CIMUpdater(object):
                 prop.type)
         return self._elementSoftwareStatusValues
     elementSoftwareStatusValues = property(_getSoftwareElementStatusValues)
-
-    def _unexpectedReturnCode(self, CIMClassName, methodName, returnCode,
-        expectedReturnCode):
-
-        returnCodes = self.server.getMethodReturnCodes(CIMClassName, methodName)
-        returnMsg = returnCodes[str(returnCode)]
-        raise wbemlib.WBEMUnexpectedReturnException(
-            expectedReturnCode, returnCode, returnMsg)
-
-    def isJobComplete(self, instance):
-        jobState = instance.properties['JobState'].value
-        # Any state >= 7 (Completed) is final
-        return (jobState >= 7), instance
-
-    def isJobSuccessful(self, instance):
-        if instance is None:
-            return False
-        jobState = instance.properties['JobState'].value
-        return jobState == 7
-
-    def pollJobForCompletion(self, job, timeout = DEFAULT_TIMEOUT):
-        '''
-        Returns when the given job is complete, or when the specified timeout
-        has passed.
-        The call returns None on timeout, or the job instance otherwise.
-        '''
-        timeEnd = time.time() + timeout
-        waited = False
-        while time.time() < timeEnd:
-
-            # If querying for the job instance fails, wait one time and try
-            # again.
-            try:
-                instance = self.server.GetInstance(job)
-            except Exception, e:
-                if not waited:
-                    waited = True
-                    time.sleep(self.WAIT_TIMEOUT)
-                    continue
-                else:
-                    raise e
-
-            jobCompleted, instance = self.isJobComplete(instance)
-            print ("jobCompleted", jobCompleted,
-                instance.properties['JobState'].value)
-            if jobCompleted:
-                return instance
-            time.sleep(1)
-        return None
 
     def getInstalledItemList(self):
         # Select the ones that have Installed and Available as
@@ -174,20 +83,19 @@ class CIMUpdater(object):
         job = result[1]['job']
         return job
 
-    def updateCheck(self, timeout = DEFAULT_TIMEOUT):
+    def updateCheck(self, timeout=None):
         job = self.updateCheckAsync()
         return self.pollJobForCompletion(job, timeout = timeout)
 
     def applyUpdateAsync(self, sources, nodes):
-        conn = self.server.conn
-        result = conn.callMethod('VAMI_SoftwareInstallationService',
+        return self.callMethodAsync('VAMI_SoftwareInstallationService',
             'InstallFromNetworkLocations',
-            ManagementNodeAddresses=nodes,
-            Sources=sources,
-            InstallOptions=[pywbem.Uint16(2),])
-        return result[1]['job']
+            methodKwargs=dict(
+                ManagementNodeAddresses=nodes,
+                Sources=sources,
+                InstallOptions=[pywbem.Uint16(2),]))
 
-    def applyUpdate(self, sources, timeout = DEFAULT_TIMEOUT, nodes=None):
+    def applyUpdate(self, sources, timeout = None, nodes=None):
         job = self.applyUpdateAsync(sources, nodes)
         job = self.pollJobForCompletion(job, timeout = timeout)
         if not self.isJobSuccessful(job):
@@ -196,7 +104,7 @@ class CIMUpdater(object):
             raise RuntimeError('Error while applying updates. The error from '
                 'the managed system was: %s' % error)
 
-    def checkAndApplyUpdate(self, timeout = DEFAULT_TIMEOUT):
+    def checkAndApplyUpdate(self, timeout = None):
         job = self.updateCheck(timeout = timeout)
         if job is None:
             return

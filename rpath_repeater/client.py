@@ -91,8 +91,6 @@ class TargetCommand(BaseCommand):
             jobUrl = None
         # authToken is the "cookie" that will be used for posting data
         # back to the REST interface
-        # authToken and jobUrl should be surfaced to other parts of the
-        # API too
         params = dict(zone=self._zone,
             authToken=RmakeUuid.uuid4(),
             jobUrl=jobUrl,
@@ -101,8 +99,8 @@ class TargetCommand(BaseCommand):
         return client._createRmakeJob(ns, data, uuid=jobUuid)
 
 class RepeaterClient(object):
-    __WMI_PLUGIN_NS = 'com.rpath.sputnik.wmiplugin'
-    __CIM_PLUGIN_NS = 'com.rpath.sputnik.cimplugin'
+    __WMI_PLUGIN_NS = codes.NS.WMI_JOB
+    __CIM_PLUGIN_NS = codes.NS.CIM_JOB
     # FIXME: the following is probably unused
     __ASSIMILATOR_PLUGIN_NS = 'com.rpath.sputnik.assimilatorplugin'
     __LAUNCH_PLUGIN_NS = 'com.rpath.sputnik.launchplugin'
@@ -158,6 +156,10 @@ class RepeaterClient(object):
         return params
 
     def _launchRmakeJob(self, namespace, params, uuid=None):
+        if self.jobUrlTemplate and uuid:
+            jobUrl = self.jobUrlTemplate % dict(job_uuid=uuid)
+            params['jobUrl'] = jobUrl
+        params['authToken'] = RmakeUuid.uuid4()
         data = FrozenImmutableDict(params)
         return self._createRmakeJob(namespace, data, uuid=uuid)
 
@@ -175,6 +177,8 @@ class RepeaterClient(object):
 
     def _cimCallDispatcher(self, method, cimParams, resultsLocation=None,
             zone=None, uuid=None, **kwargs):
+        if uuid is None:
+            uuid = RmakeUuid.uuid4()
         params = self._callParams(method, resultsLocation, zone, **kwargs)
         assert isinstance(cimParams, self.CimParams)
         if cimParams.port is None:
@@ -184,6 +188,8 @@ class RepeaterClient(object):
 
     def _wmiCallDispatcher(self, method, wmiParams, resultsLocation=None,
             zone=None, uuid=None, **kwargs):
+        if uuid is None:
+            uuid = RmakeUuid.uuid4()
         params = self._callParams(method, resultsLocation, zone, **kwargs)
         assert isinstance(wmiParams, self.WmiParams)
         if wmiParams.port is None:
@@ -234,6 +240,14 @@ class RepeaterClient(object):
         method = 'configuration'
         return self._wmiCallDispatcher(method, wmiParams,
             configuration=configuration, **kwargs)
+
+    def survey_scan_cim(self, cimParams, **kwargs):
+        method = 'survey_scan'
+        return self._cimCallDispatcher(method, cimParams, **kwargs)
+
+    def survey_scan_wmi(self, wmiParams, **kwargs):
+        method = 'survey_scan'
+        return self._wmiCallDispatcher(method, wmiParams, **kwargs)
 
     def retireNode(self, node, zone, port = None):
         """ This is a temporary large hammer for handling the retirement
@@ -302,7 +316,6 @@ def main():
         #requiredNetwork="1.1.1.1",
         #clientCert=file("/tmp/reinhold.crt").read(),
         #clientKey=file("/tmp/reinhold.key").read(),
-        zone=zone,
     )
     wmiParams = cli.WmiParams(host=system, port=135,
         eventUuid = eventUuid,
@@ -314,7 +327,9 @@ def main():
     userCredentials = cli.targets.TargetUserCredentials(credentials=dict(
         username="eng", password="password"),
         rbUser="dontcare", rbUserId=1, isAdmin=False, opaqueCredentialsId=1)
-    if 0:
+    if 1:
+        uuid, job = cli.survey_scan_cim(cimParams, zone=zone)
+    elif 0:
         cli.targets.configure(zone, targetConfiguration)
         uuid, job = cli.targets.checkCreate()
     elif 0:

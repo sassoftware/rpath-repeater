@@ -84,6 +84,7 @@ class Options(object):
 
 class BaseHandler(handler.JobHandler, ReportingMixIn):
     X_Event_Uuid_Header = 'X-rBuilder-Event-UUID'
+    X_Job_Token_Header = 'X-rBuilder-Job-Token'
     RegistrationTaskNS = None
     ReportingXmlTag = "system"
 
@@ -109,6 +110,12 @@ class BaseHandler(handler.JobHandler, ReportingMixIn):
         self.methodArguments = self.data.pop('methodArguments', {})
         self.resultsLocation = self.data.pop('resultsLocation', {})
         self.eventUuid = self.data.pop('eventUuid', None)
+        self.authToken = self.data.pop('authToken')
+        jobUrl = self.data.pop('jobUrl')
+        if jobUrl:
+            self.jobUrl = models.URL.fromString(jobUrl, host='localhost', port=80)
+        else:
+            self.jobUrl = None
         self.zoneAddresses = [x + ':8443' for x in self._getZoneAddresses()]
 
     def newTask(self, *args, **kwargs):
@@ -126,6 +133,8 @@ class BaseHandler(handler.JobHandler, ReportingMixIn):
         eventUuid = self.eventUuid
         if eventUuid:
             headers[self.X_Event_Uuid_Header] = eventUuid.encode('ascii')
+        if self.authToken:
+            headers[self.X_Job_Token_Header] = self.authToken
 
     def addEventInfo(self, elt):
         if not self.eventUuid:
@@ -176,11 +185,13 @@ class BaseHandler(handler.JobHandler, ReportingMixIn):
         return d
 
     def _handleTaskCallback(self, task):
+        self.currentTask = task
         if task.status.failed:
             self.setStatus(task.status.thaw())
             self.postFailure()
         else:
             self._handleTaskComplete(task)
+        del self.currentTask
         return 'done'
 
     def _handleTaskComplete(self, task):

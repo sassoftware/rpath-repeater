@@ -62,7 +62,9 @@ class ReportingMixIn(object):
         reactor.connectTCP(host, port, fact)
 
     def getResultsUrl(self):
-        return self.resultsLocation
+        if self.resultsLocation:
+            return self.resultsLocation
+        return self.jobUrl
 
     def _getResultsLocation(self, location):
         if location is None:

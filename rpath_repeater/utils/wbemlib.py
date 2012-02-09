@@ -1,4 +1,4 @@
-#!/usr/bin/python2.4
+#!/usr/bin/python2.4**methodKwargs)
 #
 # Copyright (c) 2009 rPath, Inc.
 #
@@ -151,7 +151,7 @@ class WBEMServer(object):
         return valuesDict
 
     def getMethodReturnCodes(self, className, methodName, force=False):
-        if (className, methodName) not in self.returnCodes or force:
+        if force or ((className, methodName) not in self.returnCodes):
             cimClass = self.conn.GetClass(className)
             returnCodes = cimClass.methods[methodName].qualifiers
 

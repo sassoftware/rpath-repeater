@@ -39,6 +39,7 @@ class WmiForwardingPlugin(bfp.BaseForwardingPlugin):
             NS.WMI_TASK_POLLING: PollingTask,
             NS.WMI_TASK_UPDATE: UpdateTask,
             NS.WMI_TASK_CONFIGURATION: ConfigurationTask,
+            NS.WMI_TASK_SURVEY_SCAN: SurveyScanTask,
         }
 
 
@@ -82,7 +83,7 @@ class WmiHandler(bfp.BaseHandler):
     @classmethod
     def _getArgs(cls, taskType, params, methodArguments, zoneAddresses):
         if taskType in [ NS.WMI_TASK_REGISTER, NS.WMI_TASK_SHUTDOWN,
-                NS.WMI_TASK_POLLING ]:
+                NS.WMI_TASK_POLLING, NS.WMI_TASK_SURVEY_SCAN ]:
             return WmiData(params)
         if taskType in [ NS.WMI_TASK_UPDATE ]:
             sources = methodArguments['sources']
@@ -119,6 +120,20 @@ class WmiHandler(bfp.BaseHandler):
     def configuration(self):
         return self._method(NS.WMI_TASK_CONFIGURATION)
 
+    @bfp.exposed
+    def survey_scan(self):
+        return self._method(NS.WMI_TASK_SURVEY_SCAN)
+
+    def postprocessXmlNode(self, elt):
+        # XXX we really should split the handlers and make this nicer
+        if self.currentTask.task_type == NS.WMI_TASK_SURVEY_SCAN:
+            return self.postprocessXmlNodeAsJob(elt)
+        return super(CimHandler, self).postprocessXmlNode(elt)
+
+    def postprocessXmlNodeAsJob(self, elt):
+        job = self.newJobElement()
+        self.addJobResults(job, elt)
+        return job
 
 class WMITaskHandler(bfp.BaseTaskHandler):
     InterfaceName = "WMI"
@@ -258,3 +273,7 @@ class ConfigurationTask(WMITaskHandler):
         else:
             self.sendStatus(C.OK, 'Host %s has been configured successfully'
                 % data.p.host)
+
+class SurveyScanTask(WMITaskHandler):
+    # XXX IMPLEMENT ME
+    pass

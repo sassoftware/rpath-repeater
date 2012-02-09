@@ -61,6 +61,7 @@ class NS(object):
     CIM_TASK_POLLING = '%s.poll' % CIM_JOB
     CIM_TASK_UPDATE = '%s.update' % CIM_JOB
     CIM_TASK_CONFIGURATION = '%s.configuration' % CIM_JOB
+    CIM_TASK_SURVEY_SCAN = '%s.survey.scan' % CIM_JOB
 
     WMI_JOB = "%s.wmiplugin" % PREFIX
     WMI_TASK_REGISTER = '%s.register' % WMI_JOB
@@ -68,3 +69,4 @@ class NS(object):
     WMI_TASK_POLLING = '%s.poll' % WMI_JOB
     WMI_TASK_UPDATE = '%s.update' % WMI_JOB
     WMI_TASK_CONFIGURATION = '%s.configuration' % WMI_JOB
+    WMI_TASK_SURVEY_SCAN = '%s.survey.scan' % WMI_JOB

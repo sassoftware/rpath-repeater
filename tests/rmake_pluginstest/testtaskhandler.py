@@ -54,7 +54,7 @@ class Client(client.RepeaterClient):
 
     def _launchRmakeJob(self, namespace, params, uuid=None):
         methodName = params.pop('method')
-        key = "%s.%s" % (self.baseNamespace, methodName)
+        key = "%s.%s" % (self.baseNamespace, methodName.replace('_', '.'))
         jobUuid = uuid
         if jobUuid is None:
             jobUuid = self._uuidgen()

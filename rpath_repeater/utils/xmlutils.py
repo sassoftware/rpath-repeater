@@ -38,4 +38,6 @@ class XML(object):
     def toString(cls, elt):
         return elt.toxml(encoding="UTF-8")
 
-
+    @classmethod
+    def fromString(cls, strng):
+        return minidom.parseString(strng).documentElement

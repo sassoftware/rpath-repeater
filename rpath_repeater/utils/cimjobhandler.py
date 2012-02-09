@@ -15,7 +15,6 @@
 
 import time
 
-import pywbem
 import wbemlib
 
 WBEMException = wbemlib.WBEMException
@@ -91,12 +90,14 @@ class CIMJobHandler(object):
         jobState = instance.properties['JobState'].value
         return jobState == 7
 
-    def pollJobForCompletion(self, job, timeout = DEFAULT_TIMEOUT):
+    def pollJobForCompletion(self, job, timeout = None):
         '''
         Returns when the given job is complete, or when the specified timeout
         has passed.
         The call returns None on timeout, or the job instance otherwise.
         '''
+        if timeout is None:
+            timeout = self.DEFAULT_TIMEOUT
         timeEnd = time.time() + timeout
         waited = False
         while time.time() < timeEnd:
@@ -127,7 +128,7 @@ class CIMJobHandler(object):
             **methodKwargs)
         return result[1]['job']
 
-    def handleJob(self, job, timeout=DEFAULT_TIMEOUT):
+    def handleJob(self, job, timeout=None):
         job = self.pollJobForCompletion(job, timeout = timeout)
         if not self.isJobSuccessful(job):
             error = self.server.getError(job)

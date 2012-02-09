@@ -33,6 +33,8 @@ class CimTest(TestBase):
             keybindings=dict(SettingID='/var/lib/iconfig/values.xml'))
         UpdateJob = CIMInstanceName('RPATH_UpdateConcreteJob',
             keybindings=dict(InstanceID='a-b-c-d'))
+        SurveyJob = CIMInstanceName('RPATH_SurveyConcreteJob',
+            keybindings=dict(InstanceID='a-b-c-d'))
 
     _defaultData = dict(
         intrinsic=dict(
@@ -93,6 +95,13 @@ class CimTest(TestBase):
                         properties=dict(JobState=CIMProperty('JobState', 7, type='uint16')),
                         path=OP.UpdateJob),
                 ],
+                RPATH_SurveyConcreteJob = [
+                    CIMInstance(OP.SurveyJob,
+                        properties=dict(JobState=CIMProperty('JobState', 7, type='uint16'),
+                            JobResults=CIMProperty('JobResults',
+                            ['<survey><uuid>aa-bb-cc-dd</uuid></survey>', ])),
+                        path=OP.SurveyJob),
+                ],
             ),
             ModifyInstance = dict(
                 RPATH_Configuration = [
@@ -109,6 +118,9 @@ class CimTest(TestBase):
             ApplyToMSE = (64, dict()),
             InstallFromNetworkLocations = (4096, dict(
                 job=CIMInstanceName('RPATH_UpdateConcreteJob',
+                    keybindings=dict(InstanceID='a-b-c-d')))),
+            Scan = (4096, dict(
+                job=CIMInstanceName('RPATH_SurveyConcreteJob',
                     keybindings=dict(InstanceID='a-b-c-d')))),
         ),
     )
@@ -274,4 +286,21 @@ class CimTest(TestBase):
 <system><local_uuid>6947ee3b-4776-e11b-5d98-5b8284d4f810</local_uuid><generated_uuid>feeddeadbeef</generated_uuid></system>
 """)
 
+    def testScan(self):
+        params = self._cimParams()
+        self.client.survey_scan_cim(params)
+        lastTask = self.results.scan[-1]
+        self.failIf(lastTask.status.detail, lastTask.status.detail)
+        self.failUnlessEqual(
+            [ (x.status.code, x.status.text) for x in self.results.update ],
+            [
+            ])
+        taskData = lastTask.task_data.thaw()
+        self.assertXMLEquals(taskData.object.response, """
+<surveys>
+  <survey>
+    <uuid>aa-bb-cc-dd</uuid>
+  </survey>
+</surveys>
+""")
 testsuite.main()
