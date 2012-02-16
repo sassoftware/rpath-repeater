@@ -590,8 +590,10 @@ class rTIS(object):
         # overwrite the existing system model since it shouldn't exist yet.
         self.system_model = criticalJob.system_model
 
-        logPath = self._smb.pathjoin('Windows', 'Temp', 'rpath_install.log')
-        winLogPath = self._smb.getWindowsPath('Windows/Temp/rpath_install.log')
+        logFileName = 'rpath_install_%s.log' % time.strftime("%Y%m%d-%H%M%S")
+        logPath = self._smb.pathjoin('Windows', 'Temp', logFileName)
+        winLogPath = self._smb.getWindowsPath('Windows/Temp/%s' % logFileName)
+        
         msiexec = r'msiexec.exe /i %%s /quiet /l*vx %s' % winLogPath
 
         manifest = dict((x.name, x) for x in criticalJob.manifest)
@@ -637,18 +639,28 @@ class rTIS(object):
         self.callback.info('waiting for installation to complete')
         rc = None
         done = False
-        magic = 'MainEngineThread is returning'
+        magic_thread = 'MainEngineThread is returning'
+        magic_logging = 'Verbose logging stopped'
         while not done:
             fh = self._smb.pathopen(logPath, codec='utf_16_le')
             for line in fh:
-                if magic in line:
-                    done = True
-                    parts = line[line.find(magic)+len(magic):].split()
+                
+                # magic_thread appears in log multiple times, need to loop over
+                # all and store rc of last one
+                if magic_thread in line:
+                    parts = line[line.find(magic_thread)+len(magic_thread):].split()
                     if len(parts) > 0 and parts[0].isdigit():
                         rc = int(parts[0])
                     else:
                         rc = -1
+                    self.callback.info('main engine thread returned, rc=%s' % rc)
+                        
+                # magic_logging indicates end of log
+                if magic_logging in line:
+                    done = True;
+                    self.callback.info('installation completing", rc=%s' % rc)
                     break
+                        
             fh.close()
             time.sleep(1)
 
@@ -657,7 +669,7 @@ class rTIS(object):
                 'following error code: %s' % rc)
             raise MSIInstallationError
 
-        self.callback.info('critical update installation complete')
+        self.callback.info('critical update installation complete, rc=%s' % rc)
 
         # Wait for PromgraData\rPath\manifest to exist before setting the
         # manifest, it should be created by rPathTools Setup.
@@ -770,7 +782,9 @@ class rTIS(object):
         rc = max([ int(x[2].get('exitCode')) for x in results
             if x[2].get('exitCode') is not None ] + [0, ])
         if rc == 0:
-            self._smb.rmdir(jobDir)
+            pass
+            # don't remove job dirs, needed for debugging
+            #self._smb.rmdir(jobDir)
 
         return results
 
