@@ -16,5 +16,5 @@ class ServiceFailedToStartError(BaseException):
 
 class MSIInstallationError(BaseException):
     error = ('The rPathTools MSI failed to install. Please check the '
-        'installation log in C:\Windows\Temp\rpath_install.log for more '
+        'installation log in C:\Windows\Temp\rpath_install_<date>.log for more '
         'information.')
