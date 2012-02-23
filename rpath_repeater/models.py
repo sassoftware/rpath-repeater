@@ -167,7 +167,7 @@ class ResultsLocation(URL):
     """
 
 class ImageFile(_BaseSlotCompare, _Serializable):
-    __slots__ = [ 'title', 'size', 'sha1', 'fileName', 'url', 'destination', ]
+    __slots__ = [ 'title', 'size', 'sha1', 'file_name', 'url', 'destination', ]
     _tag = "file"
 
 class Image(_BaseSlotCompare):
