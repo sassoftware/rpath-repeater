@@ -315,5 +315,4 @@ class ConfigurationTask(CIMTaskHandler):
             configuration, type="string")
         server.RPATH_Configuration.ModifyInstance(instance)
 
-        ret = server.conn.callMethod(instance.path, 'ApplyToMSE')
         return server.conn.callMethod(instance.path, 'ApplyToMSE')
