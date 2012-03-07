@@ -291,7 +291,8 @@ class ConfigurationTask(CIMTaskHandler):
                 data.p.host, data.p.port))
 
         server = self.getWbemConnection(data)
-        succeeded = self._applyConfigurationChange(server, data.argument)
+        results = self._applyConfigurationChange(server, data.argument)
+        succeeded = results[0]
         children = self._getUuids(server)
 
         el = XML.Element("system", *children)
@@ -299,11 +300,19 @@ class ConfigurationTask(CIMTaskHandler):
         data.response = XML.toString(el)
         self.setData(data)
 
+        # concatenate result streams from CIM operations
+        # which is not supported on older conary-cim-configuration versions
+        logResults = ""
+        if len(results) > 0:
+            logs = results[1].get('operationlogs', None)
+            if logs:
+                logResults = logs[0] + logs[1]
+
         if succeeded:
-            self.sendStatus(C.OK, "Host %s configuration applied" % data.p.host)
+            self.sendStatus(C.OK, "Host %s configuration applied: %s" % (data.p.host, logResults))
         else:
             self.sendStatus(C.ERR_GENERIC,
-                "Host %s configuration failed to apply" % data.p.host)
+                "Host %s configuration failed to apply: %s" % (data.p.host, logResults))
 
     def _applyConfigurationChange(self, server, configuration):
         import pywbem
@@ -315,5 +324,4 @@ class ConfigurationTask(CIMTaskHandler):
         server.RPATH_Configuration.ModifyInstance(instance)
 
         ret = server.conn.callMethod(instance.path, 'ApplyToMSE')
-        retval = ret[0]
-        return (retval == 0)
+        return server.conn.callMethod(instance.path, 'ApplyToMSE')
