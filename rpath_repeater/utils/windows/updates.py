@@ -262,7 +262,7 @@ class UpdateJob(object):
         # We are always installing encapsulated packages, always request
         # absolute changesets since we need the capsule trove info as well.
         updates = [ (a, (None, None), c, True)
-            for a, b, c, d in self._updates  ]
+            for a, b, c, d in self._updates if c[0] ]
 
         cs = self._client.repos.createChangeSet(updates, withFiles=True,
             withFileContents=True, recurse=False,

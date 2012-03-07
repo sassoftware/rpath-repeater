@@ -28,13 +28,13 @@ from rmake3.core import handler
 from rmake3.core import plug_dispatcher
 from rmake3.worker import plug_worker
 
-PREFIX = 'com.rpath.sputnik'
-
-from rpath_repeater.codes import Codes as C
+from rpath_repeater.codes import Codes as C, NS
 from rpath_repeater.utils import nodeinfo
 from rpath_repeater import models
 from rpath_repeater.utils.xmlutils import XML
 from rpath_repeater.utils.reporting import ReportingMixIn
+
+PREFIX = NS.PREFIX
 
 GenericData = types.slottype('GenericData', 'p nodes argument response')
 
@@ -222,6 +222,8 @@ class BaseTaskHandler(plug_worker.TaskHandler):
                 errmsg = _t % (self.InterfaceName, data.p.host)
             self.sendStatus(C.ERR_AUTHENTICATION, errmsg)
         except BaseException, e:
+            typ, value, tb = sys.exc_info()
+            import epdb; epdb.post_mortem(tb, typ, value)
             if e.error:
                 errmsg = e.error
             else:
@@ -229,7 +231,7 @@ class BaseTaskHandler(plug_worker.TaskHandler):
             self.sendStatus(C.ERR_GENERIC, errmsg)
         except:
             typ, value, tb = sys.exc_info()
-            #import epdb; epdb.post_mortem(tb, typ, value)
+            import epdb; epdb.post_mortem(tb, typ, value)
             out = StringIO.StringIO()
             formatTrace(typ, value, tb, stream = out, withLocals = False)
             out.write("\nFull stack:\n")

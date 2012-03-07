@@ -21,13 +21,12 @@ class rPathRepeaterTest(TestPackageRecipe):
         'wmiclient:python',
 
         # testsuites
-        'conary-test:lib',
+        'conary-test:python',
         'testutils:python',
         'testutils:runtime',
     ]
 
     pythonPath = [
-        '%(libdir)s/conary-test',
         '%(libdir)s/rmake3',
     ]
 

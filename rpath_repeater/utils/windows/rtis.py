@@ -19,6 +19,7 @@ from wmiclient import WMIFileNotFoundError
 
 from rpath_repeater.utils.windows.callbacks import BaseCallback
 from rpath_repeater.utils.windows.errors import NotEnoughSpaceError
+from rpath_repeater.utils.windows.errors import MSIInstallationError
 from rpath_repeater.utils.windows.errors import ServiceFailedToStartError
 
 def _filter(func):
@@ -235,6 +236,9 @@ class rTIS(object):
     _reboot_timeout = 600 # in seconds
     _query_sleep = 1
 
+    # success, restart initiated, restart required
+    _success = (0, 1641, 3010)
+
     def __init__(self, wmiclient, smbclient, callback=None):
         self._wmi = wmiclient
         self._smb = smbclient
@@ -284,7 +288,8 @@ class rTIS(object):
         """
 
         try:
-            self._wmi.registryGetKey(self._conary_keypath, 'system_model')
+            self._query(self._wmi.registryGetKey, self._conary_keypath,
+                'system_model', raiseErrors=True)
         except WMIFileNotFoundError:
             self.callback.info('Creating Required Registry Keys')
             self._wmi.registryCreateKey('SOFTWARE', 'rPath')
@@ -585,8 +590,10 @@ class rTIS(object):
         # overwrite the existing system model since it shouldn't exist yet.
         self.system_model = criticalJob.system_model
 
-        logPath = self._smb.pathjoin('Windows', 'Temp', 'rpath_install.log')
-        winLogPath = self._smb.getWindowsPath('Windows/Temp/rpath_install.log')
+        logFileName = 'rpath_install_%s.log' % time.strftime("%Y%m%d-%H%M%S")
+        logPath = self._smb.pathjoin('Windows', 'Temp', logFileName)
+        winLogPath = self._smb.getWindowsPath('Windows/Temp/%s' % logFileName)
+        
         msiexec = r'msiexec.exe /i %%s /quiet /l*vx %s' % winLogPath
 
         manifest = dict((x.name, x) for x in criticalJob.manifest)
@@ -624,27 +631,50 @@ class rTIS(object):
             self.callback.info('installing %s=%s[%s]' % (name, version, flavor))
             result = self._wmi.processCreate(msiexec % remotePath)
 
-        self.wait(allowReboot=False)
-
-        # Wait for PromgraData\rPath\manifest to exist before setting the
-        # manifest, it should be created by rPathTools Setup.
-        if not self._smb.pathexists(self.updatesDir, '..', 'manifest'):
-            time.sleep(1)
-
+        self.callback.info('waiting for installation to start')
         while not self._smb.pathexists(logPath):
             time.sleep(1)
 
         # Wait for MSI to complete the update
         self.callback.info('waiting for installation to complete')
+        rc = None
         done = False
+        magic_thread = 'MainEngineThread is returning'
+        magic_logging = 'Verbose logging stopped'
         while not done:
             fh = self._smb.pathopen(logPath, codec='utf_16_le')
             for line in fh:
-                if 'MainEngineThread is returning 0' in line:
-                    done = True
+                
+                # magic_thread appears in log multiple times, need to loop over
+                # all and store rc of last one
+                if magic_thread in line:
+                    parts = line[line.find(magic_thread)+len(magic_thread):].split()
+                    if len(parts) > 0 and parts[0].isdigit():
+                        rc = int(parts[0])
+                    else:
+                        rc = -1
+                    self.callback.info('main engine thread returned, rc=%s' % rc)
+                        
+                # magic_logging indicates end of log
+                if magic_logging in line:
+                    done = True;
+                    self.callback.info('installation completing", rc=%s' % rc)
+                    break
+                        
             fh.close()
             time.sleep(1)
-        self.callback.info('critical update installation complete')
+
+        if rc not in self._success:
+            self.callback.error('msiexec failed to install rPathTools with the '
+                'following error code: %s' % rc)
+            raise MSIInstallationError
+
+        self.callback.info('critical update installation complete, rc=%s' % rc)
+
+        # Wait for PromgraData\rPath\manifest to exist before setting the
+        # manifest, it should be created by rPathTools Setup.
+        while not self._smb.pathexists(self.updatesDir, '..', 'manifest'):
+            time.sleep(1)
 
         self.manifest = manifest.values()
         self.polling_manifest = criticalJob.polling_manifest
@@ -752,7 +782,9 @@ class rTIS(object):
         rc = max([ int(x[2].get('exitCode')) for x in results
             if x[2].get('exitCode') is not None ] + [0, ])
         if rc == 0:
-            self._smb.rmdir(jobDir)
+            pass
+            # don't remove job dirs, needed for debugging
+            #self._smb.rmdir(jobDir)
 
         return results
 

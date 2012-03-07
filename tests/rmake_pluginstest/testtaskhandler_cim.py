@@ -9,6 +9,8 @@ import cim_forwarding_plugin
 
 from testtaskhandler import TestBase
 
+from rpath_repeater.codes import NS
+
 CIMProperty = pywbem.CIMProperty
 CIMInstanceName = pywbem.CIMInstanceName
 CIMInstance = pywbem.CIMInstance
@@ -17,7 +19,7 @@ Uint16 = pywbem.Uint16
 class CimTest(TestBase):
     # These cannot be defined in setUp, they are needed in the base class
     taskDispatcher = cim_forwarding_plugin.CimForwardingPlugin.worker_get_task_types()
-    baseNamespace = cim_forwarding_plugin.CIM_JOB
+    baseNamespace = NS.CIM_JOB
     handlerClass = cim_forwarding_plugin.CimHandler
 
     class OP(object):
@@ -29,6 +31,8 @@ class CimTest(TestBase):
             keybindings=dict(name="mysystem.example.com"))
         Configuration = CIMInstanceName('RPATH_Configuration',
             keybindings=dict(SettingID='/var/lib/iconfig/values.xml'))
+        UpdateJob = CIMInstanceName('RPATH_UpdateConcreteJob',
+            keybindings=dict(InstanceID='a-b-c-d'))
 
     _defaultData = dict(
         intrinsic=dict(
@@ -84,6 +88,11 @@ class CimTest(TestBase):
                         properties=dict(Value="<oldvalue/>"),
                         path=OP.Configuration),
                 ],
+                RPATH_UpdateConcreteJob = [
+                    CIMInstance(OP.UpdateJob,
+                        properties=dict(JobState=CIMProperty('JobState', 7, type='uint16')),
+                        path=OP.UpdateJob),
+                ],
             ),
             ModifyInstance = dict(
                 RPATH_Configuration = [
@@ -98,6 +107,9 @@ class CimTest(TestBase):
             UpdateManagementConfiguration = (0, dict(errorSummary="", errorDetails="")),
             Shutdown = (0, dict()),
             ApplyToMSE = (64, dict()),
+            InstallFromNetworkLocations = (4096, dict(
+                job=CIMInstanceName('RPATH_UpdateConcreteJob',
+                    keybindings=dict(InstanceID='a-b-c-d')))),
         ),
     )
 
@@ -137,6 +149,11 @@ class CimTest(TestBase):
                         vtype = 'string'
                     elif isinstance(v, int):
                         vtype = 'uint16'
+                    elif isinstance(v, CIMInstanceName):
+                        val.append((k, 'reference', v))
+                        continue
+                    else:
+                        raise Exception("Unknown type for %s" % v)
                     val.append((k, vtype, v))
                 return val
 

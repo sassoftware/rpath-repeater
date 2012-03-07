@@ -42,7 +42,9 @@ class Codes(object):
     PART_RESULT_4 = 804
 
 class NS(object):
-    TARGET = "com.rpath.sputnik.targetsplugin"
+    PREFIX = "com.rpath.sputnik"
+
+    TARGET = "%s.targetsplugin" % PREFIX
     TARGET_TEST_CREATE = "%s.test.create" % TARGET
     TARGET_TEST_CREDENTIALS = "%s.test.credentials" % TARGET
     TARGET_IMAGES_LIST = "%s.images.list" % TARGET
@@ -52,3 +54,17 @@ class NS(object):
     TARGET_IMAGE_DEPLOY_DESCRIPTOR = "%s.images.deploy.descriptor" % TARGET
     TARGET_SYSTEM_LAUNCH = "%s.instances.launch" % TARGET
     TARGET_SYSTEM_LAUNCH_DESCRIPTOR = "%s.instances.launch.descriptor" % TARGET
+
+    CIM_JOB = "%s.cimplugin" % PREFIX
+    CIM_TASK_REGISTER = '%s.register' % CIM_JOB
+    CIM_TASK_SHUTDOWN = '%s.shutdown' % CIM_JOB
+    CIM_TASK_POLLING = '%s.poll' % CIM_JOB
+    CIM_TASK_UPDATE = '%s.update' % CIM_JOB
+    CIM_TASK_CONFIGURATION = '%s.configuration' % CIM_JOB
+
+    WMI_JOB = "%s.wmiplugin" % PREFIX
+    WMI_TASK_REGISTER = '%s.register' % WMI_JOB
+    WMI_TASK_SHUTDOWN = '%s.shutdown' % WMI_JOB
+    WMI_TASK_POLLING = '%s.poll' % WMI_JOB
+    WMI_TASK_UPDATE = '%s.update' % WMI_JOB
+    WMI_TASK_CONFIGURATION = '%s.configuration' % WMI_JOB

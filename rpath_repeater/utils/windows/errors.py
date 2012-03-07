@@ -13,3 +13,8 @@ class NotEnoughSpaceError(BaseException):
 
 class ServiceFailedToStartError(BaseException):
     error = 'The rPath Tools Installer Service failed to start.'
+
+class MSIInstallationError(BaseException):
+    error = ('The rPathTools MSI failed to install. Please check the '
+        'installation log in C:\Windows\Temp\rpath_install_<date>.log for more '
+        'information.')
