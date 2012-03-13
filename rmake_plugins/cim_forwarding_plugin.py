@@ -300,7 +300,7 @@ class ConfigurationTask(CIMTaskHandler):
             if logs:
                 logResults = logs[0] + logs[1]
 
-        if succeeded:
+        if succeeded == 0:
             self.sendStatus(C.OK, "Host %s configuration applied: %s" % (data.p.host, logResults))
         else:
             self.sendStatus(C.ERR_GENERIC,
