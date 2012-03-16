@@ -8,14 +8,15 @@ class rPathRepeater(PackageRecipe):
 
     buildRequires = [
         'lxml:python',
-        'xobj:python',
         'make:runtime',
+        'paramiko:python',
         'pyOpenSSL:python',
         'python:devel',
         'pywbem:python',
         'rmake3:python',
+        'smartform:python',
         'wmiclient:python',
-        'paramiko:python',
+        'xobj:python',
     ]
 
     def setup(r):

@@ -19,9 +19,12 @@ from conary import versions
 from conary.lib import util
 
 from rpath_repeater.utils.xmlutils import XML
+from smartform import descriptor
 
 from rmake3.core.types import SlotCompare, freezify
 from rmake3.lib import chutney
+
+chutney.register(descriptor.ProtectedUnicode)
 
 class ModelMeta(type):
     """Metaclass to automatically register child classes to chutney"""
