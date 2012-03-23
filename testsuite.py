@@ -14,6 +14,7 @@ class Suite(suite.TestSuite):
     suiteClass = testhandler.ConaryTestSuite
 
     execPathVarNames = [
+        'SMARTFORM_PATH',
         'XOBJ_PATH',
     ]
 

@@ -11,14 +11,15 @@ class rPathRepeaterTest(TestPackageRecipe):
 
     buildRequires = [
         'lxml:python',
-        'xobj:python',
         'make:runtime',
         'python:devel',
         'pywbem:python',
         'rmake3:python',
         'rpath-repeater:lib',
         'rpath-repeater:python',
+        'smartform:python',
         'wmiclient:python',
+        'xobj:python',
 
         # testsuites
         'conary-test:python',
