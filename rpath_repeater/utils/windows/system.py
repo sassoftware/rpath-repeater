@@ -88,7 +88,7 @@ class WindowsSystem(object):
         self.callback.info('Updating System')
 
         # Wait for the service to become available.
-        self.rtis.wait(allowReboot=False)
+        self.rtis.wait(allowReboot=False, firstRun=True)
 
         self.callback.info('Retrieving installed software')
 
@@ -114,7 +114,7 @@ class WindowsSystem(object):
     def configure(self, values, jobId):
         self.callback.info('Configuring System')
 
-        self.rtis.wait(allowReboot=False)
+        self.rtis.wait(allowReboot=False, firstRun=True)
 
         results = self.rtis.applyConfiguration(values, jobId)
 

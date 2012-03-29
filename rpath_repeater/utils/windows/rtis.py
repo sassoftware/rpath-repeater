@@ -517,7 +517,7 @@ class rTIS(object):
                 raise (ServiceFailedToStartError, 'The rPath Tools Installer '
                     'service failed to start. %s')
 
-    def wait(self, allowReboot=True, reportStatus=None):
+    def wait(self, allowReboot=True, reportStatus=None, firstRun=False):
         """
         Wait for the install service to become available.
         """
@@ -538,7 +538,7 @@ class rTIS(object):
         statusKey = 'Running'
 
         status = None
-        while status != 'stopped':
+        while status != 'stopped' or (not firstRun and not self.hasRun):
             try:
                 res = self._query(self._wmi.registryGetKey,
                                   self._params_keypath,
