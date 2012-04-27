@@ -52,7 +52,7 @@ class UpdateJob(object):
         if copy:
             return
 
-        self._cfg = conarycfg.ConaryConfiguration(True)
+        self._cfg = conarycfg.ConaryConfiguration(False)
         self._cfg.initializeFlavors()
         self._cfg.dbPath = ':memory:'
         self._cfg.flavor = [self._systemFlavor, ]
