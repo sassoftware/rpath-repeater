@@ -215,7 +215,7 @@ proxyFile.write("conaryProxy https://%s\\n" % server)
 proxyFile.close()
 
 logger.info("updating packages")
-cmd = "conary update conary sblim-sfcb-conary sblim-sfcb-schema-conary"
+cmd = "conary update conary rpm-python sblim-sfcb-conary sblim-sfcb-schema-conary"
 cmd = cmd + " sblim-cmpi-network-conary sblim-cmpi-base-conary"
 cmd = cmd + " conary-cim cmpi-bindings-conary iconfig rpm:python"
 cmd = cmd + " m2crypto-conary openslp-conary info-sfcb --no-deps"
