@@ -283,9 +283,11 @@ class SurveyScanTask(WMITaskHandler):
         if status == 'completed':
             data.response = survey
             self.setData(data)
+            self.sendStatus(C.OK, statusDetail)
         else:
             self.sendStatus(C.ERR_GENERIC, 'Failed to scan remote windows '
                 'system with the following error: %s' % statusDetail)
 
-        system.callack.done()
+        system.callback.info(statusDetail)
+        system.callback.done()
 

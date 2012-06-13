@@ -3,6 +3,7 @@
 #
 
 from lxml import etree
+from lxml.builder import ElementMaker
 
 class Survey(object):
     """
@@ -14,8 +15,12 @@ class Survey(object):
         self._data = survey_data
         self._rtis = rtis
 
+        self.e = ElementMaker()
+
     def tostring(self, prettyPrint=False):
-        return etree.tostring(self._data, pretty_print=prettyPrint)
+        root = self.e.surveys()
+        root.append(self._data)
+        return etree.tostring(root, pretty_print=prettyPrint)
 
     def addPackageInformation(self):
         """
