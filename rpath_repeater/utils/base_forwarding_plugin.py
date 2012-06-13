@@ -235,7 +235,7 @@ class BaseTaskHandler(plug_worker.TaskHandler):
         except BaseException, e:
             typ, value, tb = sys.exc_info()
             # no epdb on the rbuilder, this breaks stuff!
-            import epdb; epdb.post_mortem(tb, typ, value)
+            #import epdb; epdb.post_mortem(tb, typ, value)
             if e.error:
                 errmsg = e.error
             else:
@@ -244,7 +244,7 @@ class BaseTaskHandler(plug_worker.TaskHandler):
         except:
             typ, value, tb = sys.exc_info()
             # no epdb on the rbuilder, this breaks stuff!
-            import epdb; epdb.post_mortem(tb, typ, value)
+            #import epdb; epdb.post_mortem(tb, typ, value)
             out = StringIO.StringIO()
             formatTrace(typ, value, tb, stream = out, withLocals = False)
             out.write("\nFull stack:\n")
