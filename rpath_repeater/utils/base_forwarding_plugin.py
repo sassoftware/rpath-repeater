@@ -87,6 +87,7 @@ class BaseHandler(handler.JobHandler, ReportingMixIn):
     X_Job_Token_Header = 'X-rBuilder-Job-Token'
     RegistrationTaskNS = None
     ReportingXmlTag = "system"
+    slotType = 'inventory'
 
     class __metaclass__(type):
         def __new__(cls, name, bases, attrs):
