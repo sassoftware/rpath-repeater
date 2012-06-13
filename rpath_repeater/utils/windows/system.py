@@ -121,3 +121,15 @@ class WindowsSystem(object):
         self.callback.info('Configuration Complete')
 
         return results
+
+    @cleanup
+    def scan(self, jobId):
+        self.callback.info('Scanning System')
+
+        self.rtis.wait(allowReboot=False, firstRun=True)
+
+        status, statusDetail, survey = self.rtis.scan(jobId)
+
+        self.callback.info('Scanning Complete')
+
+        return status, statusDetail, survey

@@ -17,6 +17,7 @@ from conary.trovetup import TroveTuple
 from wmiclient import WMIBaseError
 from wmiclient import WMIFileNotFoundError
 
+from rpath_repeater.utils.windows.survey import Survey
 from rpath_repeater.utils.windows.callbacks import BaseCallback
 from rpath_repeater.utils.windows.errors import NotEnoughSpaceError
 from rpath_repeater.utils.windows.errors import MSIInstallationError
@@ -83,6 +84,18 @@ class Servicing(object):
         values = obj.e.values()
         obj._cur.append(values)
         obj._cur = values
+        return obj
+
+    @classmethod
+    def createScanJob(cls):
+        obj = cls()
+        obj.updateJobs = obj.e.scanJobs()
+        obj.root = obj.e.update(
+            obj.e.logFile(obj.LOGFILE),
+            obj.updateJobs,
+        )
+        obj._cur = obj.e.scanJob()
+        obj._addJob()
         return obj
 
     def addPackage(self, capsule, oldNVF):
@@ -178,6 +191,15 @@ class Servicing(object):
                 continue
             for hdlr in handlers.iterchildren():
                 yield int(hdlr.exitCode), hdlr.name, hdlr.exitCodeDescription
+
+    def iterscanresults(self, fobj):
+        root = etree.parse(self._handle_unicode_header(fobj)).getroot()
+        scanJobs = self.c2d(root).get('scanJobs')
+
+        for scan in scanJobs.iterchildren():
+            job = self.c2d(scan)
+            yield (job.get('status'), job.get('statusDescription'),
+                job.get('survey'))
 
 
 class Package(namedtuple('Package', 'name version product_code')):
@@ -644,7 +666,7 @@ class rTIS(object):
         while not done:
             fh = self._smb.pathopen(logPath, codec='utf_16_le')
             for line in fh:
-                
+
                 # magic_thread appears in log multiple times, need to loop over
                 # all and store rc of last one
                 if magic_thread in line:
@@ -654,13 +676,13 @@ class rTIS(object):
                     else:
                         rc = -1
                     self.callback.info('main engine thread returned, rc=%s' % rc)
-                        
+
                 # magic_logging indicates end of log
                 if magic_logging in line:
                     done = True;
                     self.callback.info('installation completing", rc=%s' % rc)
                     break
-                        
+
             fh.close()
             time.sleep(1)
 
@@ -806,7 +828,6 @@ class rTIS(object):
         self.callback.debug(servicing.tostring(prettyPrint=True))
         fh = self._smb.pathopen(jobDir, servicing.FILENAME, mode='w')
         fh.write(servicing.tostring())
-        self.callback.info('configure write %s' % fh.fileno())
         fh.close()
 
         # Set rTIS to use the job directory that we just created.
@@ -825,6 +846,47 @@ class rTIS(object):
         fh.close()
 
         return results
+
+    def scan(self, jobId):
+        """
+        Scan a system and retrieve a survey.
+        """
+
+        jobId = 'job-%s' % jobId
+        servicing = Servicing.createScanJob()
+
+        jobDir = self._smb.pathjoin(self.updatesDir, jobId)
+        self._smb.mkdir(jobDir)
+
+        # Write out the servicing.xml to request a scan job.
+        self.callback.debug(servicing.tostring(prettyPrint=True))
+        fh = self._smb.pathopen(jobDir, servicing.FILENAME, mode='w')
+        fh.write(servicing.tostring())
+        fh.close()
+
+        # Set rTIS to use the job directory that we just created.
+        self.commands = jobId
+
+        # Start rTIS
+        self.start()
+
+        # Wait for the service to complete the update job.
+        self.wait(allowReboot=False)
+
+        # Get results from the target system
+        fh = self._smb.pathopen(jobDir, servicing.FILENAME)
+        results = [ x for x in servicing.iterscanresults(fh)]
+        fh.close()
+
+        # Fill in any extra data we need in the survey.
+        assert len(results) == 1
+
+        status, statusDetail, survey_data = results[0]
+        survey = Survey(survey_data, self)
+        survey.addPackageInformation()
+        xml = survey.tostring()
+
+        return status.text, statusDetail.text, xml
 
     def _queryPackages(self, jobId):
         """
