@@ -14,6 +14,7 @@ class rPathRepeater(PackageRecipe):
         'python:devel',
         'pywbem:python',
         'rmake3:python',
+        'rpath-tools:python',
         'smartform:python',
         'wmiclient:python',
         'xobj:python',
