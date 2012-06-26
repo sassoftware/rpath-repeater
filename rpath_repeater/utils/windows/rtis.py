@@ -429,21 +429,19 @@ class rTIS(object):
 
     @property
     def updatesDir(self):
-        if self._updatesDir:
-            return self._updatesDir
+        if not self._updatesDir:
+            self.callback.info('Determining updates directory')
+            result = self._query(
+                self._wmi.registryGetKey,
+                r'SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell '
+                'Folders',
+                'Common AppData'
+            )
 
-        self.callback.info('Determining updates directory')
-        result = self._query(
-            self._wmi.registryGetKey,
-            r'SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders',
-            'Common AppData'
-        )
+            self._updatesDir = result[0]
 
-        updatesDir = result[0]
-        updatesDir = self._smb.getUnixPath(updatesDir)
-        self._updatesDir = self._smb.pathjoin(updatesDir, 'rPath', 'Updates')
-
-        return self._updatesDir
+        path = self._smb.getUnixPath(self._updatesDir)
+        return self._smb.pathjoin(path, 'rPath', 'Updates')
 
     @property
     def isInstalled(self):
