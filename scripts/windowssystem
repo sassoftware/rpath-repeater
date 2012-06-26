@@ -38,4 +38,8 @@ def status(l, p):
 authInfo = windows.WindowsAuthInfo(host, domain, user, password)
 system = windows.WindowsSystem(authInfo, status)
 
+cfg = conarycfg.ConaryConfiguration(True)
+cfg.readUrl('http://localhost/conaryrc')
+client = conaryclient.ConaryClient(cfg)
+
 import epdb; epdb.st()
