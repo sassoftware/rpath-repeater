@@ -845,7 +845,7 @@ class rTIS(object):
 
         return results
 
-    def scan(self, jobId):
+    def scan(self, jobId, updJobXml=None):
         """
         Scan a system and retrieve a survey.
         """
@@ -880,7 +880,7 @@ class rTIS(object):
         assert len(results) == 1
 
         status, statusDetail, survey_data = results[0]
-        survey = Survey(survey_data, self)
+        survey = Survey(self, survey_data, updJobXml)
         survey.addComputedInformation()
         xml = survey.tostring()
 

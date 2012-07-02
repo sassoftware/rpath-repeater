@@ -99,16 +99,16 @@ class Survey(object):
     Class for adding any additional information to a Windows survey.
     """
 
-    def __init__(self, survey_data, rtis):
-        # survey_data is a etree element
-        self._data = survey_data
-        self._rtis = rtis
+    def __init__(self, rtis, survey_data, updJobXml=None):
+        self.rtis = rtis
+        self.data = survey_data
+        self.updJobXml = updJobXml
 
         self.e = ElementMaker()
 
     def tostring(self, prettyPrint=False):
         root = self.e.surveys()
-        root.append(self._data)
+        root.append(self.data)
         return etree.tostring(root, pretty_print=prettyPrint)
 
     def _getConaryClient(self):
@@ -120,6 +120,7 @@ class Survey(object):
     def addComputedInformation(self):
         self.addPackageInformation()
         self.addSystemModel()
+        self.addPreview()
 
     def addPackageInformation(self):
         """
@@ -135,7 +136,7 @@ class Survey(object):
         productCodes = dict((x.msi.productCode, x)
             for x in conaryInfo.itervalues() if x.msi)
 
-        windowsPkgs = children(self._data).get('windows_packages')
+        windowsPkgs = children(self.data).get('windows_packages')
         windowsInfo = WindowsScanner(windowsPkgs).scan()
 
         idGen = IDFactory()
@@ -159,14 +160,19 @@ class Survey(object):
             node.append(self.e.encapsulated(str(bool(cnyPkg)).lower()))
             windows_packages.append(node)
 
-        self._data.remove(children(self._data).get('windows_packages'))
-        self._data.append(conary_packages)
-        self._data.append(windows_packages)
+        self.data.remove(children(self.data).get('windows_packages'))
+        self.data.append(conary_packages)
+        self.data.append(windows_packages)
 
     def addSystemModel(self):
-        node = children(self._data).get('system_model')
+        node = children(self.data).get('system_model')
         if not node:
             node = self.e.system_model()
-            self._data.append(node)
+            self.data.append(node)
 
         node.append(self.e.content('\n'.join(self._rtis.system_model)))
+
+    def addPreview(self):
+        if self.updJobXml:
+            node = etree.fromstring(self.updJobXml)
+            self.data.append(node)

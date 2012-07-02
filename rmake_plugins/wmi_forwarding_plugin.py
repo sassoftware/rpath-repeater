@@ -86,8 +86,11 @@ class WmiHandler(bfp.BaseHandler):
                 NS.WMI_TASK_POLLING, NS.WMI_TASK_SURVEY_SCAN ]:
             return WmiData(params)
         if taskType in [ NS.WMI_TASK_UPDATE ]:
-            sources = methodArguments['sources']
-            return bfp.GenericData(params, zoneAddresses, sources)
+            args = dict(
+                sources=methodArguments.get('sources'),
+                test=methodArguments.get('test', False),
+            )
+            return bfp.GenericData(params, zoneAddresses, args)
         if taskType in [ NS.WMI_TASK_CONFIGURATION ]:
             configuration = methodArguments['configuration']
             return bfp.GenericData(params, zoneAddresses, configuration)
@@ -221,7 +224,8 @@ class UpdateTask(WMITaskHandler):
         system = self.getSystem(data)
         system.callback.start()
 
-        results = system.update(data.argument, str(self.task.job_uuid))
+        results = system.update(data.argument.get('soruces'),
+            str(self.task.job_uuid), test=data.argument.get('test'))
 
         data.response = etree.tostring(self._poll(system))
         self.setData(data)

@@ -22,6 +22,7 @@ from conary.errors import TroveSpecsNotFound
 
 from rpath_repeater.utils.windows.rtis import Servicing
 from rpath_repeater.utils.windows.callbacks import BaseCallback
+from rpath_repeater.utils.update_job_formatter import Formatter
 
 class CapsuleContents(namedtuple('FileContents', 'name info msi nvf content operation')):
     __slots__ = ()
@@ -119,6 +120,12 @@ class UpdateJob(object):
     @property
     def jobId(self):
         return 'job-%s' % self._jobId
+
+    def toxml(self):
+        assert self._updJob, 'must call prepare update first'
+        formatter = Formatter(self._updJob)
+        formatter.format()
+        return formatter.toxml()
 
     def getCriticalJob(self):
         """
