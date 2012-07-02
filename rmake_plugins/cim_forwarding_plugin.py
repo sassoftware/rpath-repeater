@@ -87,7 +87,8 @@ class CimHandler(bfp.BaseHandler):
             return CimData(params, zoneAddresses)
         if taskType in [ NS.CIM_TASK_UPDATE ]:
             sources = methodArguments['sources']
-            return bfp.GenericData(params, zoneAddresses, sources)
+            arguments = dict(sources=sources, test=methodArguments.get('test', False))
+            return bfp.GenericData(params, zoneAddresses, arguments)
         if taskType in [ NS.CIM_TASK_CONFIGURATION ]:
             configuration = methodArguments['configuration']
             return bfp.GenericData(params, zoneAddresses, configuration)
@@ -277,19 +278,20 @@ class UpdateTask(CIMTaskHandler):
 
         server = self.getWbemConnection(data)
         self._applySoftwareUpdate(server, data.argument, sorted(data.nodes))
-        children = self._getUuids(server)
-        children.extend(self._getServerCert())
-        children.append(self._getSoftwareVersions(server))
-
-        el = XML.Element("system", *children)
-
-        data.response = XML.toString(el)
+#        children = self._getUuids(server)
+#        children.extend(self._getServerCert())
+#        children.append(self._getSoftwareVersions(server))
+#
+#        el = XML.Element("system", *children)
+#
+#        data.response = XML.toString(el)
+        data.response = "<ignored/>"
         self.setData(data)
         self.sendStatus(C.OK, "Host %s has been updated" % data.p.host)
 
-    def _applySoftwareUpdate(self, server, sources, nodes):
+    def _applySoftwareUpdate(self, server, arguments, nodes):
         cimUpdater = cimupdater.CIMUpdater(server)
-        cimUpdater.applyUpdate(sources, nodes=nodes)
+        cimUpdater.applyUpdate(nodes=nodes, **arguments)
         return None
 
 class ConfigurationTask(CIMTaskHandler):
