@@ -275,5 +275,19 @@ class ConfigurationTask(WMITaskHandler):
                 % data.p.host)
 
 class SurveyScanTask(WMITaskHandler):
-    # XXX IMPLEMENT ME
-    pass
+    def _run(self, data):
+        system = self.getSystem(data)
+        system.callback.start()
+
+        status, statusDetail, survey = system.scan(str(self.task.job_uuid))
+        if status == 'completed':
+            data.response = survey
+            self.setData(data)
+            self.sendStatus(C.OK, statusDetail)
+        else:
+            self.sendStatus(C.ERR_GENERIC, 'Failed to scan remote windows '
+                'system with the following error: %s' % statusDetail)
+
+        system.callback.info(statusDetail)
+        system.callback.done()
+

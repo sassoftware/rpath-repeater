@@ -50,6 +50,7 @@ class LaunchHandler(handler.JobHandler):
     timeout = 7200
 
     jobType = LAUNCH_JOB
+    slotType = 'inventory'
 
     def setup(self):
         pass
