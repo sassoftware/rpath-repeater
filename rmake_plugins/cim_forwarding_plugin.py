@@ -126,7 +126,7 @@ class CimHandler(bfp.BaseHandler):
 
     def postprocessXmlNode(self, elt):
         # XXX we really should split the handlers and make this nicer
-        if self.currentTask.task_type == NS.CIM_TASK_SURVEY_SCAN:
+        if self.currentTask.task_type in [NS.CIM_TASK_SURVEY_SCAN, NS.CIM_TASK_UPDATE]:
             return self.postprocessXmlNodeAsJob(elt)
         return super(CimHandler, self).postprocessXmlNode(elt)
 
