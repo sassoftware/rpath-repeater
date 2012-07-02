@@ -87,16 +87,19 @@ class CIMUpdater(cimjobhandler.CIMJobHandler):
         job = self.updateCheckAsync()
         return self.pollJobForCompletion(job, timeout = timeout)
 
-    def applyUpdateAsync(self, sources, nodes):
+    def applyUpdateAsync(self, sources, test, nodes):
+        opts = [pywbem.Uint16(2)] # Migrate.
+        if test:
+            opts.append(pywbem.Uint16(4))
         return self.callMethodAsync('VAMI_SoftwareInstallationService',
             'InstallFromNetworkLocations',
             methodKwargs=dict(
                 ManagementNodeAddresses=nodes,
                 Sources=sources,
-                InstallOptions=[pywbem.Uint16(2),]))
+                InstallOptions=opts))
 
-    def applyUpdate(self, sources, timeout = None, nodes=None):
-        job = self.applyUpdateAsync(sources, nodes)
+    def applyUpdate(self, sources, test, timeout = None, nodes=None):
+        job = self.applyUpdateAsync(sources, test, nodes)
         job = self.pollJobForCompletion(job, timeout = timeout)
         if not self.isJobSuccessful(job):
             error = self.server.getError(job)
