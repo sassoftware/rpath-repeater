@@ -54,6 +54,7 @@ class NodeReportingPlugin(plug_dispatcher.DispatcherPlugin):
             return
         node = bfp.XML.Element('management_nodes', *children)
         data = self.toXml(node)
+        log.debug("Updating inventory with %d management nodes", len(children))
         self.postResults(data)
 
     @classmethod
@@ -110,7 +111,7 @@ class NodeReportingPlugin(plug_dispatcher.DispatcherPlugin):
             headers = headers)
         @fact.deferred.addCallback
         def processResult(result):
-            print "Received result for %s: %s" % (host, result)
+            log.debug("Management node list updated")
             return result
 
         @fact.deferred.addErrback
@@ -118,7 +119,8 @@ class NodeReportingPlugin(plug_dispatcher.DispatcherPlugin):
             err = error.value
             if isinstance(err, internet_error.ConnectionDone):
                 return
-            print "Error: %s" % error.getErrorMessage()
+            log.error("Unable to update management node list: %s",
+                    error.getErrorMessage())
 
         reactor.connectTCP(host, port, fact)
 

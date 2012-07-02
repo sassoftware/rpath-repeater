@@ -115,8 +115,6 @@ class CIMJobHandler(object):
                     raise e
 
             jobCompleted, instance = self.isJobComplete(instance)
-            print ("jobCompleted", jobCompleted,
-                instance.properties['JobState'].value)
             if jobCompleted:
                 return instance
             time.sleep(1)
