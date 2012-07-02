@@ -32,7 +32,7 @@ class ConaryScanner(_ConaryScanner):
     def __init__(self, pkglist, client):
         _ConaryScanner.__init__(self)
         self.pkglist = pkglist
-        self.client = client
+        self._client = client
 
     def _getDb(self):
         return DbShim(self.client.repos, self.pkglist)
@@ -117,6 +117,10 @@ class Survey(object):
         return UpdateJob(self._rtis.flavor, self._rtis.manifest,
             None, callback=self._rtis.callback)._client
 
+    def addComputedInformation(self):
+        self.addPackageInformation()
+        self.addSystemModel()
+
     def addPackageInformation(self):
         """
         Add the conary package information to the survey.
@@ -158,3 +162,11 @@ class Survey(object):
         self._data.remove(children(self._data).get('windows_packages'))
         self._data.append(conary_packages)
         self._data.append(windows_packages)
+
+    def addSystemModel(self):
+        node = children(self._data).get('system_model')
+        if not node:
+            node = self.e.system_model()
+            self._data.append(node)
+
+        node.append(self.e.content('\n'.join(self._rtis.system_model)))

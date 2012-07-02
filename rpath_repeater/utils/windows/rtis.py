@@ -881,7 +881,7 @@ class rTIS(object):
 
         status, statusDetail, survey_data = results[0]
         survey = Survey(survey_data, self)
-        survey.addPackageInformation()
+        survey.addComputedInformation()
         xml = survey.tostring()
 
         return status.text, statusDetail.text, xml
