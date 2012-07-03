@@ -83,8 +83,12 @@ class WmiHandler(bfp.BaseHandler):
     @classmethod
     def _getArgs(cls, taskType, params, methodArguments, zoneAddresses):
         if taskType in [ NS.WMI_TASK_REGISTER, NS.WMI_TASK_SHUTDOWN,
-                NS.WMI_TASK_POLLING, NS.WMI_TASK_SURVEY_SCAN ]:
+                NS.WMI_TASK_POLLING ]:
             return WmiData(params)
+        if taskType in [ NS.WMI_TASK_SURVEY_SCAN]:
+            arguments = dict(desiredTopLevelItems=methodArguments.get(
+                'desiredTopLevelItems', None))
+            return bfp.GenericData(params, zoneAddresses, arguments)
         if taskType in [ NS.WMI_TASK_UPDATE ]:
             args = dict(
                 sources=methodArguments.get('sources'),
