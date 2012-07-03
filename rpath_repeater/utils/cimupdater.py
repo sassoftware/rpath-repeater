@@ -106,6 +106,7 @@ class CIMUpdater(cimjobhandler.CIMJobHandler):
             self.log_error(error)
             raise RuntimeError('Error while applying updates. The error from '
                 'the managed system was: %s' % error)
+        return job
 
     def checkAndApplyUpdate(self, timeout = None):
         job = self.updateCheck(timeout = timeout)

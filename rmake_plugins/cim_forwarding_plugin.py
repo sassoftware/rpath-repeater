@@ -281,7 +281,7 @@ class UpdateTask(CIMTaskHandler):
             data.p.host, data.p.port))
 
         server = self.getWbemConnection(data)
-        self._applySoftwareUpdate(server, data.argument, sorted(data.nodes))
+        job = self._applySoftwareUpdate(server, data.argument, sorted(data.nodes))
 #        children = self._getUuids(server)
 #        children.extend(self._getServerCert())
 #        children.append(self._getSoftwareVersions(server))
@@ -289,14 +289,21 @@ class UpdateTask(CIMTaskHandler):
 #        el = XML.Element("system", *children)
 #
 #        data.response = XML.toString(el)
-        data.response = "<ignored/>"
+        jobResults = job.properties['JobResults'].value
+        if jobResults:
+            data.response = jobResults[0]
+        if data.argument['test']:
+            msg = "Host %s preview generated"
+        else:
+            msg = "Host %s has been updated"
+
         self.setData(data)
-        self.sendStatus(C.OK, "Host %s has been updated" % data.p.host)
+        self.sendStatus(C.OK, msg % data.p.host)
 
     def _applySoftwareUpdate(self, server, arguments, nodes):
         cimUpdater = cimupdater.CIMUpdater(server)
-        cimUpdater.applyUpdate(nodes=nodes, **arguments)
-        return None
+        job = cimUpdater.applyUpdate(nodes=nodes, **arguments)
+        return job
 
 class ConfigurationTask(CIMTaskHandler):
     def _run(self, data):
