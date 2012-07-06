@@ -291,7 +291,7 @@ class UpdateTask(CIMTaskHandler):
 #        data.response = XML.toString(el)
         jobResults = job.properties['JobResults'].value
         if jobResults:
-            data.response = jobResults[0]
+            data.response = str(jobResults[0])
         if data.argument['test']:
             msg = "Host %s preview generated"
         else:
