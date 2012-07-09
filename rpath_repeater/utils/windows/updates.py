@@ -20,9 +20,10 @@ from conary.conaryclient import cmdline
 from conary.conaryclient import modelupdate
 from conary.errors import TroveSpecsNotFound
 
+from rpath_tools.client.utils.update_job_formatter import Formatter
+
 from rpath_repeater.utils.windows.rtis import Servicing
 from rpath_repeater.utils.windows.callbacks import BaseCallback
-from rpath_repeater.utils.update_job_formatter import Formatter
 
 class CapsuleContents(namedtuple('FileContents', 'name info msi nvf content operation')):
     __slots__ = ()
