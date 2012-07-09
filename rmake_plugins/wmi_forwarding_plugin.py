@@ -228,7 +228,7 @@ class UpdateTask(WMITaskHandler):
         system = self.getSystem(data)
         system.callback.start()
 
-        results, preview = system.update(data.argument.get('soruces'),
+        results, preview = system.update(data.argument.get('sources'),
             str(self.task.job_uuid), test=data.argument.get('test'))
 
         data.response = preview
@@ -287,7 +287,9 @@ class SurveyScanTask(WMITaskHandler):
         system = self.getSystem(data)
         system.callback.start()
 
-        status, statusDetail, survey = system.scan(str(self.task.job_uuid))
+        status, statusDetail, survey = system.scan(str(self.task.job_uuid),
+            troveSpecs=data.argument.get('desiredTopLevelItems'))
+
         if status == 'completed':
             data.response = survey
             self.setData(data)
