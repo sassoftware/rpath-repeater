@@ -228,10 +228,10 @@ class UpdateTask(WMITaskHandler):
         system = self.getSystem(data)
         system.callback.start()
 
-        results = system.update(data.argument.get('soruces'),
+        results, preview = system.update(data.argument.get('soruces'),
             str(self.task.job_uuid), test=data.argument.get('test'))
 
-        data.response = etree.tostring(self._poll(system))
+        data.response = preview
         self.setData(data)
 
         if not results:

@@ -100,7 +100,7 @@ class WindowsSystem(object):
         updJob.prepareUpdate(troveSpecs)
 
         if test:
-            return updJob.toxml()
+            return None, updJob.toxml()
 
         if not self.rtis.isInstalled:
             if 'rPathTools:msi' not in updJob:
@@ -114,7 +114,7 @@ class WindowsSystem(object):
         results = self.rtis.applyUpdate(updJob)
 
         self.callback.info('Update Complete')
-        return results
+        return results, updJob.toxml()
 
     @cleanup
     def configure(self, values, jobId):

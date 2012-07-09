@@ -122,8 +122,9 @@ class UpdateJob(object):
         return 'job-%s' % self._jobId
 
     def toxml(self):
-        assert self._updJob, 'must call prepare update first'
-        formatter = Formatter(self._updJob)
+        assert self._uJob, 'must call prepare update first'
+        formatter = Formatter(None)
+        formatter.jobs = [self._updates, ]
         formatter.format()
         return formatter.toxml()
 
