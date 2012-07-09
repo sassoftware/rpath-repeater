@@ -114,8 +114,8 @@ class Survey(object):
     def _getConaryClient(self):
         # Import here to avoid import loop
         from rpath_repeater.utils.windows.updates import UpdateJob
-        return UpdateJob(self._rtis.flavor, self._rtis.manifest,
-            None, callback=self._rtis.callback)._client
+        return UpdateJob(self.rtis.flavor, self.rtis.manifest,
+            None, callback=self.rtis.callback)._client
 
     def addComputedInformation(self):
         self.addPackageInformation()
@@ -131,7 +131,7 @@ class Survey(object):
         # 2. get troveInfo for all packages from teh repository
         # 3. map conary packages to windows packages and vice versa
 
-        manifest = self._rtis.manifest
+        manifest = self.rtis.manifest
         conaryInfo = ConaryScanner(manifest, self._getConaryClient()).scan()
         productCodes = dict((x.msi.productCode, x)
             for x in conaryInfo.itervalues() if x.msi)
@@ -170,7 +170,7 @@ class Survey(object):
             node = self.e.system_model()
             self.data.append(node)
 
-        node.append(self.e.content('\n'.join(self._rtis.system_model)))
+        node.append(self.e.content('\n'.join(self.rtis.system_model)))
 
     def addPreview(self):
         if self.updJobXml:
