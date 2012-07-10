@@ -30,7 +30,7 @@ class CIMSurveyScanner(cimjobhandler.CIMJobHandler):
         return self.callMethodAsync('RPATH_SystemSurveyService',
             'Scan',
             methodKwargs=dict(
-                desiredTopLevelItems=desiredTopLevelItems))
+                DesiredPackages=desiredTopLevelItems))
 
     def scan(self, desiredTopLevelItems, timeout=None):
         job = self.scanAsync(desiredTopLevelItems)
