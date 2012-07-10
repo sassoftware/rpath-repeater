@@ -124,6 +124,10 @@ class CIMJobHandler(object):
         conn = self.server.conn
         result = conn.callMethod(cimClassName, methodName,
             **methodKwargs)
+        if result[0] != 4096L:
+            self._unexpectedReturnCode(cimClassName, methodName,
+                result[0], 4096L)
+
         return result[1]['job']
 
     def handleJob(self, job, timeout=None):
