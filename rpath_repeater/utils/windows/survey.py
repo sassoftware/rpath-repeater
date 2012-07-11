@@ -161,6 +161,8 @@ class Survey(object):
             windows_packages.append(node)
 
         self.data.remove(children(self.data).get('windows_packages'))
+        if 'conary_packages' in children(self.data):
+            self.data.remove(children(self.data).get('conary_packages'))
         self.data.append(conary_packages)
         self.data.append(windows_packages)
 
