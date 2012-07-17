@@ -489,10 +489,6 @@ class PayloadCalculator(object):
     def __init__(self, client=None, labels=None, troves=[], flavor='x86'):
         self.conaryClient = client
         self.troves       = troves
-        for label in labels:
-            print "my label = %s" % label
-            lc = Label(label)
-
         self.labels       = [ Label(label) for label in labels ]
         self.flavor       = flavor # string 
         self.repos        = self.conaryClient.repos  

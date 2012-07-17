@@ -83,11 +83,16 @@ class CimHandler(bfp.BaseHandler):
 
     @classmethod
     def _getArgs(cls, taskType, params, methodArguments, zoneAddresses):
-        if taskType in [ NS.CIM_TASK_REGISTER, NS.CIM_TASK_SHUTDOWN, NS.CIM_TASK_POLLING, NS.CIM_TASK_SURVEY_SCAN ]:
+        if taskType in [ NS.CIM_TASK_REGISTER, NS.CIM_TASK_SHUTDOWN, NS.CIM_TASK_POLLING ]:
             return CimData(params, zoneAddresses)
+        if taskType in [ NS.CIM_TASK_SURVEY_SCAN ]:
+            arguments = dict(desiredTopLevelItems=methodArguments.get(
+                'desiredTopLevelItems', None))
+            return bfp.GenericData(params, zoneAddresses, arguments)
         if taskType in [ NS.CIM_TASK_UPDATE ]:
             sources = methodArguments['sources']
-            return bfp.GenericData(params, zoneAddresses, sources)
+            arguments = dict(sources=sources, test=methodArguments.get('test', False))
+            return bfp.GenericData(params, zoneAddresses, arguments)
         if taskType in [ NS.CIM_TASK_CONFIGURATION ]:
             configuration = methodArguments['configuration']
             return bfp.GenericData(params, zoneAddresses, configuration)
@@ -126,7 +131,7 @@ class CimHandler(bfp.BaseHandler):
 
     def postprocessXmlNode(self, elt):
         # XXX we really should split the handlers and make this nicer
-        if self.currentTask.task_type == NS.CIM_TASK_SURVEY_SCAN:
+        if self.currentTask.task_type in [NS.CIM_TASK_SURVEY_SCAN, NS.CIM_TASK_UPDATE]:
             return self.postprocessXmlNodeAsJob(elt)
         return super(CimHandler, self).postprocessXmlNode(elt)
 
@@ -276,21 +281,29 @@ class UpdateTask(CIMTaskHandler):
             data.p.host, data.p.port))
 
         server = self.getWbemConnection(data)
-        self._applySoftwareUpdate(server, data.argument, sorted(data.nodes))
-        children = self._getUuids(server)
-        children.extend(self._getServerCert())
-        children.append(self._getSoftwareVersions(server))
+        job = self._applySoftwareUpdate(server, data.argument, sorted(data.nodes))
+#        children = self._getUuids(server)
+#        children.extend(self._getServerCert())
+#        children.append(self._getSoftwareVersions(server))
+#
+#        el = XML.Element("system", *children)
+#
+#        data.response = XML.toString(el)
+        jobResults = job.properties['JobResults'].value
+        if jobResults:
+            data.response = str(jobResults[0])
+        if data.argument['test']:
+            msg = "Host %s preview generated"
+        else:
+            msg = "Host %s has been updated"
 
-        el = XML.Element("system", *children)
-
-        data.response = XML.toString(el)
         self.setData(data)
-        self.sendStatus(C.OK, "Host %s has been updated" % data.p.host)
+        self.sendStatus(C.OK, msg % data.p.host)
 
-    def _applySoftwareUpdate(self, server, sources, nodes):
+    def _applySoftwareUpdate(self, server, arguments, nodes):
         cimUpdater = cimupdater.CIMUpdater(server)
-        cimUpdater.applyUpdate(sources, nodes=nodes)
-        return None
+        job = cimUpdater.applyUpdate(nodes=nodes, **arguments)
+        return job
 
 class ConfigurationTask(CIMTaskHandler):
     def _run(self, data):
@@ -341,8 +354,9 @@ class SurveyScanTask(CIMTaskHandler):
 
         server = self.getWbemConnection(data)
 
+        desiredTopLevelItems = data.argument['desiredTopLevelItems']
         scanner = surveyscanner.CIMSurveyScanner(server)
-        job = scanner.scan()
+        job = scanner.scan(desiredTopLevelItems)
         surveys = list(job.properties['JobResults'].value)
         succeeded = True
 

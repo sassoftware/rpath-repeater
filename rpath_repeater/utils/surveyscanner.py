@@ -26,16 +26,12 @@ class CIMSurveyScanner(cimjobhandler.CIMJobHandler):
     '''
 
 
-    def scanAsync(self):
-        result = self.server.RPATH_SystemSurveyService.Scan()
+    def scanAsync(self, desiredTopLevelItems):
+        return self.callMethodAsync('RPATH_SystemSurveyService',
+            'Scan',
+            methodKwargs=dict(
+                DesiredPackages=desiredTopLevelItems))
 
-        if result[0] != 4096L:
-            self._unexpectedReturnCode('RPATH_SystemSurveyService',
-                'Scan', result[0], 4096L)
-
-        job = result[1]['job']
-        return job
-
-    def scan(self, timeout=None):
-        job = self.scanAsync()
+    def scan(self, desiredTopLevelItems, timeout=None):
+        job = self.scanAsync(desiredTopLevelItems)
         return self.pollJobForCompletion(job, timeout=timeout)

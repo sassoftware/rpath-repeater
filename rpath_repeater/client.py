@@ -163,15 +163,19 @@ class RepeaterClient(object):
         data = FrozenImmutableDict(params)
         return self._createRmakeJob(namespace, data, uuid=uuid)
 
-    def _createRmakeJob(self, namespace, data, uuid=None):
+    def _createRmakeJob(self, namespace, data, uuid=None,
+            expiresAfter='1 day'):
         if uuid is None:
             uuid = RmakeUuid.uuid4()
         job = RmakeJob(uuid, namespace, owner='nobody',
                        data=data,
-                       ).freeze()
+                       )
+        # Repeater job results are copied somewhere else on completion, so
+        # expire them from the rmake database shortly thereafter
+        job.times.expires_after = expiresAfter
 
         uuid = job.job_uuid
-        job = self.client.createJob(job)
+        job = self.client.createJob(job.freeze())
 
         return (uuid, job.thaw())
 

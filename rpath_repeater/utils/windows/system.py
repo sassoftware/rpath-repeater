@@ -83,8 +83,12 @@ class WindowsSystem(object):
             'Windows systems')
         raise NotImplementedError
 
+    def _getUpdateJob(self, jobId):
+        return UpdateJob(self.rtis.flavor, self.rtis.manifest,
+            jobId, callback=self.callback)
+
     @cleanup
-    def update(self, troveSpecs, jobId):
+    def update(self, troveSpecs, jobId, test=False):
         self.callback.info('Updating System')
 
         # Wait for the service to become available.
@@ -92,9 +96,11 @@ class WindowsSystem(object):
 
         self.callback.info('Retrieving installed software')
 
-        updJob = UpdateJob(self.rtis.flavor, self.rtis.manifest,
-            jobId, callback=self.callback)
+        updJob = self._getUpdateJob(jobId)
         updJob.prepareUpdate(troveSpecs)
+
+        if test:
+            return None, updJob.toxml()
 
         if not self.rtis.isInstalled:
             if 'rPathTools:msi' not in updJob:
@@ -108,7 +114,7 @@ class WindowsSystem(object):
         results = self.rtis.applyUpdate(updJob)
 
         self.callback.info('Update Complete')
-        return results
+        return results, updJob.toxml()
 
     @cleanup
     def configure(self, values, jobId):
@@ -121,3 +127,20 @@ class WindowsSystem(object):
         self.callback.info('Configuration Complete')
 
         return results
+
+    @cleanup
+    def scan(self, jobId, troveSpecs=None):
+        self.callback.info('Scanning System')
+
+        self.rtis.wait(allowReboot=False, firstRun=True)
+
+        updJob = self._getUpdateJob(jobId)
+        if troveSpecs:
+            updJob.prepareUpdate(troveSpecs)
+
+        status, statusDetail, survey = self.rtis.scan(jobId,
+            troveSpecs and updJob.toxml() or None)
+
+        self.callback.info('Scanning Complete')
+
+        return status, statusDetail, survey

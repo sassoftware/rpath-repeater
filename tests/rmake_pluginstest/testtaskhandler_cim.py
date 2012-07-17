@@ -92,7 +92,9 @@ class CimTest(TestBase):
                 ],
                 RPATH_UpdateConcreteJob = [
                     CIMInstance(OP.UpdateJob,
-                        properties=dict(JobState=CIMProperty('JobState', 7, type='uint16')),
+                        properties=dict(JobState=CIMProperty('JobState', 7, type='uint16'),
+                            JobResults=CIMProperty('JobResults',
+                            ['<preview/>', ])),
                         path=OP.UpdateJob),
                 ],
                 RPATH_SurveyConcreteJob = [
@@ -288,7 +290,9 @@ class CimTest(TestBase):
 
     def testScan(self):
         params = self._cimParams()
-        self.client.survey_scan_cim(params)
+        methodArguments = dict(
+            desiredTopLevelItems=['group-a=h@ns:1/1-2-3', 'group-b=h@ns:2/1-2-3'])
+        self.client.survey_scan_cim(params, **methodArguments)
         lastTask = self.results.scan[-1]
         self.failIf(lastTask.status.detail, lastTask.status.detail)
         self.failUnlessEqual(

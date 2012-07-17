@@ -83,11 +83,18 @@ class WmiHandler(bfp.BaseHandler):
     @classmethod
     def _getArgs(cls, taskType, params, methodArguments, zoneAddresses):
         if taskType in [ NS.WMI_TASK_REGISTER, NS.WMI_TASK_SHUTDOWN,
-                NS.WMI_TASK_POLLING, NS.WMI_TASK_SURVEY_SCAN ]:
+                NS.WMI_TASK_POLLING ]:
             return WmiData(params)
+        if taskType in [ NS.WMI_TASK_SURVEY_SCAN]:
+            arguments = dict(desiredTopLevelItems=methodArguments.get(
+                'desiredTopLevelItems', None))
+            return bfp.GenericData(params, zoneAddresses, arguments)
         if taskType in [ NS.WMI_TASK_UPDATE ]:
-            sources = methodArguments['sources']
-            return bfp.GenericData(params, zoneAddresses, sources)
+            args = dict(
+                sources=methodArguments.get('sources'),
+                test=methodArguments.get('test', False),
+            )
+            return bfp.GenericData(params, zoneAddresses, args)
         if taskType in [ NS.WMI_TASK_CONFIGURATION ]:
             configuration = methodArguments['configuration']
             return bfp.GenericData(params, zoneAddresses, configuration)
@@ -221,9 +228,10 @@ class UpdateTask(WMITaskHandler):
         system = self.getSystem(data)
         system.callback.start()
 
-        results = system.update(data.argument, str(self.task.job_uuid))
+        results, preview = system.update(data.argument.get('sources'),
+            str(self.task.job_uuid), test=data.argument.get('test'))
 
-        data.response = etree.tostring(self._poll(system))
+        data.response = preview
         self.setData(data)
 
         if not results:
@@ -275,5 +283,21 @@ class ConfigurationTask(WMITaskHandler):
                 % data.p.host)
 
 class SurveyScanTask(WMITaskHandler):
-    # XXX IMPLEMENT ME
-    pass
+    def _run(self, data):
+        system = self.getSystem(data)
+        system.callback.start()
+
+        status, statusDetail, survey = system.scan(str(self.task.job_uuid),
+            troveSpecs=data.argument.get('desiredTopLevelItems'))
+
+        if status == 'completed':
+            data.response = survey
+            self.setData(data)
+            self.sendStatus(C.OK, statusDetail)
+        else:
+            self.sendStatus(C.ERR_GENERIC, 'Failed to scan remote windows '
+                'system with the following error: %s' % statusDetail)
+
+        system.callback.info(statusDetail)
+        system.callback.done()
+

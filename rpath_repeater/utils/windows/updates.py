@@ -20,6 +20,8 @@ from conary.conaryclient import cmdline
 from conary.conaryclient import modelupdate
 from conary.errors import TroveSpecsNotFound
 
+from rpath_tools.client.utils.update_job_formatter import Formatter
+
 from rpath_repeater.utils.windows.rtis import Servicing
 from rpath_repeater.utils.windows.callbacks import BaseCallback
 
@@ -119,6 +121,13 @@ class UpdateJob(object):
     @property
     def jobId(self):
         return 'job-%s' % self._jobId
+
+    def toxml(self):
+        assert self._uJob, 'must call prepare update first'
+        formatter = Formatter(None)
+        formatter.jobs = [self._updates, ]
+        formatter.format()
+        return formatter.toxml()
 
     def getCriticalJob(self):
         """
