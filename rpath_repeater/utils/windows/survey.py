@@ -11,7 +11,7 @@ from lxml.builder import ElementMaker
 from rpath_tools.client.sysdisco.packages import IDFactory
 from rpath_tools.client.sysdisco.packages import ConaryScanner as _ConaryScanner
 from rpath_tools.client.sysdisco.packages import WindowsScanner as _WindowsScanner
-
+from rpath_tools.client.utils.config_descriptor_cache import ConfigDescriptorCache
 
 def children(node):
     return dict((x.tag, x) for x in node.iterchildren())
@@ -121,6 +121,7 @@ class Survey(object):
         self.addPackageInformation()
         self.addSystemModel()
         self.addPreview()
+        self.addConfigurationDescriptor()
 
     def addPackageInformation(self):
         """
@@ -178,3 +179,33 @@ class Survey(object):
         if self.updJobXml:
             node = etree.fromstring(self.updJobXml)
             self.data.append(node)
+
+    def addConfigurationDescriptor(self):
+        # get installed software
+        manifest = self.rtis.manifest
+
+        # Find the top level group.
+        groups = [ x for x in manifest
+            if x.name.startswith('group-') and x.name.endswith('-appliance') ]
+
+        # if no top level group abort
+        if not groups:
+            return
+
+        group = groups[0]
+
+        # Get the config descriptor from the repository.
+        repos = self._getConaryClient().repos
+        desc = ConfigDescriptorCache(repos).getDescriptor(group)
+        if not desc:
+            return
+
+        desc.setDisplayName('Configuration Descriptor')
+        desc.addDescription('Configuration Descriptor')
+
+        chldrn = children(self.data)
+        if 'configuration_descriptor' in chldrn:
+            self.data.remove(chldrn.get('configuration_descriptor'))
+
+        node = self.e.configuration_descriptor(desc.toxml(validate=False))
+        self.data.append(node)
