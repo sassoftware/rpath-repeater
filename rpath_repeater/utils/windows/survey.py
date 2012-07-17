@@ -204,8 +204,8 @@ class Survey(object):
         desc.addDescription('Configuration Descriptor')
 
         chldrn = children(self.data)
-        if 'configuration_descriptor' in chldrn:
-            self.data.remove(chldrn.get('configuration_descriptor'))
+        if 'config_properties_descriptor' in chldrn:
+            self.data.remove(chldrn.get('config_properties_descriptor'))
 
-        node = self.e.configuration_descriptor(desc.toxml(validate=False))
+        node = self.e.config_properties_descriptor(desc.toxml(validate=False))
         self.data.append(node)
