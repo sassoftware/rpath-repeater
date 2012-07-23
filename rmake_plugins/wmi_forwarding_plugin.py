@@ -132,7 +132,10 @@ class WmiHandler(bfp.BaseHandler):
         return self._method(NS.WMI_TASK_SURVEY_SCAN)
 
     def postprocessXmlNode(self, elt):
-        return self.postprocessXmlNodeAsJob(elt)
+        if self.currentTask.task_type == NS.WMI_TASK_REGISTER:
+            return super(WmiHandler, self).postprocessXmlNode(elt)
+        else:
+            return self.postprocessXmlNodeAsJob(elt)
 
     def postprocessXmlNodeAsJob(self, elt):
         job = self.newJobElement()
