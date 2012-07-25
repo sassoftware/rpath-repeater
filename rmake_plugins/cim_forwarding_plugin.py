@@ -357,14 +357,17 @@ class SurveyScanTask(CIMTaskHandler):
         desiredTopLevelItems = data.argument['desiredTopLevelItems']
         scanner = surveyscanner.CIMSurveyScanner(server)
         job = scanner.scan(desiredTopLevelItems)
-        surveys = list(job.properties['JobResults'].value)
-        succeeded = True
 
-        children = [ XML.fromString(s) for s in surveys ]
-        el = XML.Element("surveys", *children)
+        succeeded = False
+        if job.properties['JobResults'].value:
+            succeeded = True
+            surveys = list(job.properties['JobResults'].value)
 
-        data.response = XML.toString(el)
-        self.setData(data)
+            children = [ XML.fromString(s) for s in surveys ]
+            el = XML.Element("surveys", *children)
+
+            data.response = XML.toString(el)
+            self.setData(data)
 
         if succeeded:
             self.sendStatus(C.OK, "Host %s scanned" % data.p.host)
