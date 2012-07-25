@@ -18,6 +18,7 @@ from conary.trovetup import TroveTuple
 from conary.conaryclient import cml
 from conary.conaryclient import cmdline
 from conary.conaryclient import modelupdate
+from conary.errors import ParseError
 from conary.errors import TroveSpecsNotFound
 
 from rpath_tools.client.utils.update_job_formatter import Formatter
@@ -190,9 +191,12 @@ class UpdateJob(object):
         newTroveSpecs = [ cmdline.parseTroveSpec(x)
             for x in updateTroveSpecs if x ]
 
-        newTroveTups = self._client.repos.findTroves(None, newTroveSpecs)
-        newTroveTups = [ TroveTuple(x) for x in
-            itertools.chain(*newTroveTups.values()) ]
+        try:
+            newTroveTups = [ TroveTuple(x) for x in newTroveSpecs ]
+        except (ValueError, ParseError):
+            newTroveTups = self._client.repos.findTroves(None, newTroveSpecs)
+            newTroveTups = [ TroveTuple(x) for x in
+                itertools.chain(*newTroveTups.values()) ]
 
         self._newSystemModel = [ 'install %s=%s' % (x.name, x.version)
             for x in newTroveTups ]
