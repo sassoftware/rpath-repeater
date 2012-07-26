@@ -5,6 +5,7 @@
 import os
 import time
 import statvfs
+import logging
 from collections import namedtuple
 
 from lxml import etree
@@ -22,6 +23,8 @@ from rpath_repeater.utils.windows.callbacks import BaseCallback
 from rpath_repeater.utils.windows.errors import NotEnoughSpaceError
 from rpath_repeater.utils.windows.errors import MSIInstallationError
 from rpath_repeater.utils.windows.errors import ServiceFailedToStartError
+
+log = logging.getLogger('rpath_repeater.utils.windows.rtis')
 
 def _filter(func):
     """
@@ -145,8 +148,10 @@ class Servicing(object):
     def addValue(self, value):
         self._cur.append(value)
 
-    def tostring(self, prettyPrint=False):
-        return etree.tostring(self.root, pretty_print=prettyPrint)
+    def tostring(self, prettyPrint=True):
+        out = etree.tostring(self.root, pretty_print=prettyPrint)
+        log.info(out)
+        return out
 
     @staticmethod
     def c2d(node):
@@ -159,8 +164,14 @@ class Servicing(object):
             fobj.seek(0)
         return fobj
 
+    def _parse(self, fobj):
+        xml = self._handle_unicode_header(fobj).read()
+        root = etree.fromstring(xml).getroot()
+        log.info(xml)
+        return root
+
     def iterpackageresults(self, fobj):
-        root = etree.parse(self._handle_unicode_header(fobj)).getroot()
+        root = self._parse(fobj)
         updateJobs = self.c2d(root).get('updateJobs')
 
         for update in updateJobs.iterchildren():
@@ -182,7 +193,7 @@ class Servicing(object):
                 yield operation, trvSpec.text, status
 
     def iterconfigresults(self, fobj):
-        root = etree.parse(self._handle_unicode_header(fobj)).getroot()
+        root = self._parse(fobj)
         updateJobs = self.c2d(root).get('updateJobs')
 
         for config in updateJobs.iterchildren():
@@ -193,7 +204,7 @@ class Servicing(object):
                 yield int(hdlr.exitCode), hdlr.name, hdlr.exitCodeDescription
 
     def iterscanresults(self, fobj):
-        root = etree.parse(self._handle_unicode_header(fobj)).getroot()
+        root = self._parse(fobj)
         scanJobs = self.c2d(root).get('scanJobs')
 
         for scan in scanJobs.iterchildren():
@@ -365,7 +376,11 @@ class rTIS(object):
 
     def _set_manifest(self, data):
         self.callback.info('Writing system manifest')
-        data = [ '|'.join(x.asString(withTimestamp=True), y) for x, y in data ]
+
+        # Generate new format if all timestamps are not 0.
+        if [ x for x in data if x[1] ]:
+            data = [ '|'.join((x.asString(withTimestamp=True), y))
+                for x, y in data ]
 
         fh = self._smb.pathopen(self.updatesDir, '..', 'manifest', mode='w',
             codec='utf-8-sig')
@@ -783,7 +798,6 @@ class rTIS(object):
             remote.close()
 
         # Write out the servicing xml for this job.
-        self.callback.debug(servicing.tostring(prettyPrint=True))
         fh = self._smb.pathopen(jobDir, servicing.FILENAME, mode='w')
         fh.write(servicing.tostring())
         fh.flush()
@@ -839,7 +853,6 @@ class rTIS(object):
         self._smb.mkdir(jobDir)
 
         # Write out the servicing xml for this job.
-        self.callback.debug(servicing.tostring(prettyPrint=True))
         fh = self._smb.pathopen(jobDir, servicing.FILENAME, mode='w')
         fh.write(servicing.tostring())
         fh.close()
@@ -873,7 +886,6 @@ class rTIS(object):
         self._smb.mkdir(jobDir)
 
         # Write out the servicing.xml to request a scan job.
-        self.callback.debug(servicing.tostring(prettyPrint=True))
         fh = self._smb.pathopen(jobDir, servicing.FILENAME, mode='w')
         fh.write(servicing.tostring())
         fh.close()
