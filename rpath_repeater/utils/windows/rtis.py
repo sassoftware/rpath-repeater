@@ -346,11 +346,26 @@ class rTIS(object):
             lines = [ x.strip() for x in fh ]
             fh.close()
 
-        return [ TroveTuple(x) for x in lines ]
+        manifest = []
+        for x in lines:
+            parts = x.split('|')
+
+            if len(parts) == 1:
+                spec = x
+                install_time = 0.0
+            elif len(parts) == 2:
+                spec = parts[0]
+                install_time = float(parts[1])
+            else:
+                continue
+
+            manifest.append((TroveTuple(spec), install_time))
+
+        return manifest
 
     def _set_manifest(self, data):
         self.callback.info('Writing system manifest')
-        data = [ x.asString(withTimestamp=True) for x in data ]
+        data = [ '|'.join(x.asString(withTimestamp=True), y) for x, y in data ]
 
         fh = self._smb.pathopen(self.updatesDir, '..', 'manifest', mode='w',
             codec='utf-8-sig')
@@ -613,10 +628,10 @@ class rTIS(object):
         logFileName = 'rpath_install_%s.log' % time.strftime("%Y%m%d-%H%M%S")
         logPath = self._smb.pathjoin('Windows', 'Temp', logFileName)
         winLogPath = self._smb.getWindowsPath('Windows/Temp/%s' % logFileName)
-        
+
         msiexec = r'msiexec.exe /i %%s /quiet /l*vx %s' % winLogPath
 
-        manifest = dict((x.name, x) for x in criticalJob.manifest)
+        manifest = dict((x[0].name, x) for x in criticalJob.manifest)
 
         # Install rTIS
         result = None
@@ -624,7 +639,8 @@ class rTIS(object):
         for job in criticalJob:
             name, _, (version, flavor), _ = job
 
-            manifest[name] = TroveTuple(name, version, flavor)
+            manifest[name] = (TroveTuple(name, version, flavor),
+                str(time.time()))
 
             # Skip over packages
             if ':' not in name:

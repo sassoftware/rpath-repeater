@@ -69,7 +69,7 @@ class UpdateJob(object):
             self._client.getRepos(),
         )
 
-        self._manifest = [ TroveTuple(*x) for x in manifest ]
+        self._manifest = manifest
 
         self._populateDatabase()
 
@@ -77,7 +77,8 @@ class UpdateJob(object):
         db = self._client.getDatabase()
 
         try:
-            troves = self._model_cache.getTroves(self._manifest)
+            troves = self._model_cache.getTroves(
+                [ x[0] for x in self._manifest ])
         except TroveSpecsNotFound:
             self.callback.error('This system is associated with an '
                 'appliance that can not be accessed: %s' % (self._manifest, ))

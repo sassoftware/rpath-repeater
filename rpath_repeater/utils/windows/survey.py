@@ -20,12 +20,17 @@ def children(node):
 class DbShim(object):
     def __init__(self, repos, pkglist):
         self.repos = repos
-        self.pkglist = pkglist
-
-        self.getTrove = self.repos.getTrove
+        self.pkglist = [ x[0] for x in pkglist ]
+        self._manifest = dict((x, y) for x, y in pkglist)
 
     def iterAllTroves(self):
         return iter(self.pkglist)
+
+    def getTrove(self, name, version, flavor):
+        trv = self.repos.getTrove(name, version, flavor)
+        install_time = self._manifest.get((name, version, flavor))
+        trv.troveInfo.installTime = lambda: install_time
+        return trv
 
 
 class ConaryScanner(_ConaryScanner):
@@ -185,8 +190,9 @@ class Survey(object):
         manifest = self.rtis.manifest
 
         # Find the top level group.
-        groups = [ x for x in manifest
-            if x.name.startswith('group-') and x.name.endswith('-appliance') ]
+        groups = [ x[0] for x in manifest
+            if x[0].name.startswith('group-') and 
+               x[0].name.endswith('-appliance') ]
 
         # if no top level group abort
         if not groups:
