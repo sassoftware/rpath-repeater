@@ -12,6 +12,8 @@
 # full details.
 #
 
+import logging
+
 from lxml import etree
 from lxml.builder import ElementMaker
 
@@ -25,6 +27,8 @@ from rpath_repeater.utils import base_forwarding_plugin as bfp
 
 # These are just the starting point attributes
 WmiData = types.slottype('WmiData', 'p response')
+
+log = logging.getLogger('wmi_forwarding_plugin')
 
 class WmiForwardingPlugin(bfp.BaseForwardingPlugin):
 
@@ -231,6 +235,8 @@ class UpdateTask(WMITaskHandler):
         results, preview = system.update(data.argument.get('sources'),
             str(self.task.job_uuid), test=data.argument.get('test'))
 
+        log.info('response')
+        log.info(preview)
         data.response = preview
         self.setData(data)
 
@@ -266,9 +272,6 @@ class ConfigurationTask(WMITaskHandler):
         values = etree.fromstring(data.argument).getchildren()
         results = system.configure(str(self.task.job_uuid), values)
 
-        data.response = etree.tostring(self._poll(system))
-        self.setData(data)
-
         errors = [ x for x in results if x[0] != 0 ]
 
         if errors:
@@ -291,6 +294,8 @@ class SurveyScanTask(WMITaskHandler):
             troveSpecs=data.argument.get('desiredTopLevelItems'))
 
         if status == 'completed':
+            log.info('response')
+            log.info(survey)
             data.response = survey
             self.setData(data)
             self.sendStatus(C.OK, statusDetail)
