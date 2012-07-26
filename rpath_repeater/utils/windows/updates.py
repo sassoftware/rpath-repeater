@@ -132,6 +132,10 @@ class UpdateJob(object):
         formatter.format()
         return formatter.toxml()
 
+    def hasCritical(self):
+        return bool([ x for x in self._updates
+            if x[0] in self.CRITICAL_PACKAGES ])
+
     def getCriticalJob(self):
         """
         Extract any components that are considered "critical".

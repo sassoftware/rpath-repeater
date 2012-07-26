@@ -490,11 +490,19 @@ class rTIS(object):
         """
 
         runcount = self.runcount
-        if self._runcount is not None and runcount != self._runcount:
-            return True
+        if self._runcount is not None:
+            if self.hasCritical and runcount == 0:
+                self._runcount = runcount
+                return False
+            elif runcount != self._runcount:
+                return True
         else:
             self._runcount = runcount
             return False
+
+    @property
+    def hasCritical(self):
+        return getattr(self, '_hasCritical', False)
 
     def resetRunStatus(self):
         """
@@ -749,6 +757,8 @@ class rTIS(object):
         contents = updJob.getFileContents()
 
         servicing = Servicing.createUpdateJob()
+
+        self._hasCritical = updJob.hasCritical()
 
         jobDir = self._smb.pathjoin(self.updatesDir, updJob.jobId)
         self._smb.mkdir(jobDir)
