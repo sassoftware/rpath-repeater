@@ -274,6 +274,9 @@ class ConfigurationTask(WMITaskHandler):
 
         errors = [ x for x in results if x[0] != 0 ]
 
+        data.response = etree.tostring(self._poll(system))
+        self.setData(data)
+
         if errors:
             self.sendStatus(C.ERR_GENERIC, '%s Applying configuration failed:'
                 % data.p.host)
