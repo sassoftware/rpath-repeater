@@ -14,6 +14,7 @@ from conary import files
 from conary import trove
 from conary import conarycfg
 from conary import conaryclient
+from conary.trovetup import TroveSpec
 from conary.trovetup import TroveTuple
 from conary.conaryclient import cml
 from conary.conaryclient import cmdline
@@ -193,10 +194,12 @@ class UpdateJob(object):
             for x in updateTroveSpecs if x ]
 
         try:
-            newTroveTups = [ TroveTuple(x) for x in newTroveSpecs ]
+            newTroveSpecs = [ TroveSpec(TroveTuple(x).asString(withTimestamp=False))
+                for x in newTroveSpecs ]
         except (ValueError, ParseError):
-            newTroveTups = self._client.repos.findTroves(None, newTroveSpecs)
-            newTroveTups = [ TroveTuple(x) for x in
+            pass
+        newTroveTups = self._client.repos.findTroves(None, newTroveSpecs)
+        newTroveTups = [ TroveTuple(x) for x in
                 itertools.chain(*newTroveTups.values()) ]
 
         self._newSystemModel = [ 'install %s=%s' % (x.name, x.version)

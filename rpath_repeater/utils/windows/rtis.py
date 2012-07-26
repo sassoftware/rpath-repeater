@@ -166,7 +166,7 @@ class Servicing(object):
 
     def _parse(self, fobj):
         xml = self._handle_unicode_header(fobj).read()
-        root = etree.fromstring(xml).getroot()
+        root = etree.fromstring(xml)
         log.info(xml)
         return root
 
