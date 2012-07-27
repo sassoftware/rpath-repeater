@@ -6,6 +6,7 @@ import os
 import copy
 import itertools
 from collections import namedtuple
+from xml.etree import cElementTree as etree
 
 import logging
 log = logging.getLogger('windows.update')
@@ -52,6 +53,9 @@ class UpdateJob(object):
         self._newPollingManifest = None
         self._newSystemModel = None
         self._contents = {}
+
+        self._desired = ''
+        self._observed = ''
 
         if copy:
             return
@@ -130,6 +134,13 @@ class UpdateJob(object):
         formatter = Formatter(None)
         formatter.jobs = [self._updates, ]
         formatter.format()
+
+        desired = etree.SubElement(formatter.root, 'desired')
+        observed = etree.SubElement(formatter.root, 'observed')
+
+        desired.text = self._desired
+        observed.text = self._observed
+
         return formatter.toxml()
 
     def hasCritical(self):
@@ -177,6 +188,15 @@ class UpdateJob(object):
         model = cml.CML(self._cfg)
         model.parse(system_model)
 
+        # FIXME: This is an ungly hack, but it will probably work.
+        observed_name = system_model[0].split()[-1].split('=')[0]
+        topLevel = [ x[0].asString(withTimestamp=False)
+            for x in self._manifest if x[0].name == observed_name ]
+        if len(topLevel):
+            self._observed = topLevel[0]
+        else:
+            self._observed = ''
+
         updJob = self._client.newUpdateJob()
         troveSetGraph = self._client.cmlGraph(model)
         self._client._updateFromTroveSetGraph(updJob, troveSetGraph,
@@ -205,6 +225,8 @@ class UpdateJob(object):
         newTroveTups = self._client.repos.findTroves(None, newTroveSpecs)
         newTroveTups = [ TroveTuple(x) for x in
                 itertools.chain(*newTroveTups.values()) ]
+
+        self._desired = newTroveTups[0].asString(withTimestamp=False)
 
         self._newSystemModel = [ 'install %s=%s' % (x.name, x.version)
             for x in newTroveTups ]
