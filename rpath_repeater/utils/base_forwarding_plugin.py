@@ -189,18 +189,20 @@ class BaseHandler(handler.JobHandler, ReportingMixIn):
         self.currentTask = task
         if task.status.failed:
             self.setStatus(task.status.thaw())
-            self.postFailure()
+            d = self.postFailure()
         else:
-            self._handleTaskComplete(task)
+            d = self._handleTaskComplete(task)
         del self.currentTask
-        return 'done'
+        d.addCallback(lambda _: 'done')
+        return d
 
     def _handleTaskComplete(self, task):
+        self._taskStatusCodeWatchers.clear()
         response = task.task_data.getObject().response
         self.job.data = response
-        self.setStatus(C.OK, "Done")
-        self.postResults()
-        self._taskStatusCodeWatchers.clear()
+        d = self.setStatus(C.OK, "Done")
+        d.addCallback(lambda _: self.postResults())
+        return d
 
     def _handleTaskError(self, reason):
         """
@@ -208,7 +210,7 @@ class BaseHandler(handler.JobHandler, ReportingMixIn):
         Clean errors from the repeater do not see this function.
         """
         d = self.failJob(reason)
-        self.postFailure()
+        d.addCallback(lambda _: self.postFailure())
         self._taskStatusCodeWatchers.clear()
         return d
 

@@ -60,6 +60,7 @@ class ReportingMixIn(object):
             log.error("Error: %s", error.getErrorMessage())
 
         reactor.connectTCP(host, port, fact)
+        return fact.deferred
 
     def getResultsUrl(self):
         if self.resultsLocation:
@@ -78,7 +79,7 @@ class ReportingMixIn(object):
 
     def postFailure(self, method=None):
         el = XML.Element(self.ReportingXmlTag)
-        self.postResults(el, method=method)
+        return self.postResults(el, method=method)
 
     def postprocessXmlNode(self, elt):
         return elt
