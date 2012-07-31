@@ -192,8 +192,10 @@ class BaseHandler(handler.JobHandler, ReportingMixIn):
             d = self.postFailure()
         else:
             d = self._handleTaskComplete(task)
-        del self.currentTask
-        d.addCallback(lambda _: 'done')
+        @d.addBoth
+        def _cleanup(result):
+            del self.currentTask
+            return 'done'
         return d
 
     def _handleTaskComplete(self, task):
