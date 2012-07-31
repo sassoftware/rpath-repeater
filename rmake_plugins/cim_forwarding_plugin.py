@@ -338,7 +338,7 @@ class ConfigurationTask(CIMTaskHandler):
     def _applyConfigurationChange(self, server, configuration):
         import pywbem
         op = pywbem.CIMInstanceName('RPATH_Configuration',
-            keybindings=dict(SettingID='/var/lib/iconfig/values.xml'))
+            keybindings=dict(SettingID='/var/lib/rpath-tools/values.xml'))
         instance = server.RPATH_Configuration.GetInstance(op)
         instance.properties['Value'] = pywbem.CIMProperty('Value',
             configuration, type="string")
