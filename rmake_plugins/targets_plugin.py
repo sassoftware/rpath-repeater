@@ -133,7 +133,7 @@ class TargetsImageDeployHandler(BaseHandler):
         targetImageXml = targetImageXmlTemplate % dict(image=imageXml)
         imageFileUpdateUrl = params['imageFileUpdateUrl']
         location = models.URL.fromString(imageFileUpdateUrl, port=80)
-        return self.postResults(targetImageXml, location=location)
+        self.postResults(targetImageXml, location=location)
 
 class TargetsSystemLaunchHandler(TargetsImageDeployHandler):
     jobType = NS.TARGET_SYSTEM_LAUNCH
@@ -149,7 +149,7 @@ class TargetsSystemLaunchHandler(TargetsImageDeployHandler):
         response = task.task_data.thaw().getObject()
         systemsXml = response.response
         location = models.URL.fromString(systemsCreateUrl, port=80)
-        return self.postResults(systemsXml, method='POST', location=location)
+        self.postResults(systemsXml, method='POST', location=location)
 
 class TargetsImageDeployDescriptorHandler(BaseHandler):
     jobType = NS.TARGET_IMAGE_DEPLOY_DESCRIPTOR
