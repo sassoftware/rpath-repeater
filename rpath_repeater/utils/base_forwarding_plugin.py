@@ -173,6 +173,7 @@ class BaseHandler(handler.JobHandler, ReportingMixIn):
             # for us
             return
         self.setStatus(status)
+        self.postStatus()
         watcher = self._taskStatusCodeWatchers.get(status.code)
         if watcher is not None:
             watcher(task)
@@ -181,18 +182,17 @@ class BaseHandler(handler.JobHandler, ReportingMixIn):
         """
         Handle responses for a task execution
         """
+        self.currentTask = task
         d = self.waitForTask(task)
         d.addCallbacks(self._handleTaskCallback, self._handleTaskError)
         return d
 
     def _handleTaskCallback(self, task):
-        self.currentTask = task
         if task.status.failed:
             self.setStatus(task.status.thaw())
             self.postFailure()
         else:
             self._handleTaskComplete(task)
-        del self.currentTask
         return 'done'
 
     def _handleTaskComplete(self, task):
