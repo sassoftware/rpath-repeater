@@ -146,8 +146,12 @@ class RepeaterClient(object):
             jobUrlTemplate = "http://localhost/api/v1/jobs/%(job_uuid)s"
         self.jobUrlTemplate = jobUrlTemplate
 
-    def _callParams(self, method, resultsLocation, zone, **kwargs):
-        params = dict(method=method, zone=zone or self.zone)
+    def _callParams(self, method, resultsLocation, zone, jobToken, **kwargs):
+        params = dict(
+                method=method,
+                zone=zone or self.zone,
+                authToken=jobToken,
+                )
         if kwargs:
             params['methodArguments'] = kwargs
         if resultsLocation is not None:
@@ -159,7 +163,8 @@ class RepeaterClient(object):
         if self.jobUrlTemplate and uuid:
             jobUrl = self.jobUrlTemplate % dict(job_uuid=uuid)
             params['jobUrl'] = jobUrl
-        params['authToken'] = RmakeUuid.uuid4()
+        if not params.get('authToken'):
+            params['authToken'] = RmakeUuid.uuid4()
         data = FrozenImmutableDict(params)
         return self._createRmakeJob(namespace, data, uuid=uuid)
 
@@ -180,10 +185,11 @@ class RepeaterClient(object):
         return (uuid, job.thaw())
 
     def _cimCallDispatcher(self, method, cimParams, resultsLocation=None,
-            zone=None, uuid=None, **kwargs):
+            zone=None, uuid=None, jobToken=None, **kwargs):
         if uuid is None:
             uuid = RmakeUuid.uuid4()
-        params = self._callParams(method, resultsLocation, zone, **kwargs)
+        params = self._callParams(method, resultsLocation, zone, jobToken,
+                **kwargs)
         assert isinstance(cimParams, self.CimParams)
         if cimParams.port is None:
             cimParams.port = 5989
@@ -191,10 +197,11 @@ class RepeaterClient(object):
         return self._launchRmakeJob(self.__CIM_PLUGIN_NS, params, uuid=uuid)
 
     def _wmiCallDispatcher(self, method, wmiParams, resultsLocation=None,
-            zone=None, uuid=None, **kwargs):
+            zone=None, uuid=None, jobToken=None, **kwargs):
         if uuid is None:
             uuid = RmakeUuid.uuid4()
-        params = self._callParams(method, resultsLocation, zone, **kwargs)
+        params = self._callParams(method, resultsLocation, zone, jobToken,
+                **kwargs)
         assert isinstance(wmiParams, self.WmiParams)
         if wmiParams.port is None:
             wmiParams.port = 135
@@ -210,9 +217,9 @@ class RepeaterClient(object):
         return self._wmiCallDispatcher(method, wmiParams, **kwargs)
 
     def bootstrap(self, assimilatorParams, resultsLocation=None, zone=None,
-            uuid=None, **kwargs):
+            uuid=None, jobToken=None, **kwargs):
         '''this will only be valid for Linux, and adopts an unmanaged system'''
-        params = self._callParams('bootstrap', resultsLocation, zone)
+        params = self._callParams('bootstrap', resultsLocation, zone, jobToken)
         assert isinstance(assimilatorParams, self.AssimilatorParams)
         if assimilatorParams.port is None:
             assimilatorParams.port = 22
@@ -271,8 +278,11 @@ class RepeaterClient(object):
         return self._wmiCallDispatcher(method, wmiParams, **kwargs)
 
     def launchWaitForNetwork(self, cimParams, resultsLocation=None, zone=None,
-                             uuid=None, **kwargs):
-        params = dict(zone=zone or self.zone)
+            uuid=None, jobToken=None, **kwargs):
+        params = dict(
+                zone=zone or self.zone,
+                jobToken=jobToken,
+                )
         if kwargs:
             params['methodArguments'] = kwargs
         assert isinstance(cimParams, self.CimParams)
@@ -287,11 +297,15 @@ class RepeaterClient(object):
         return (uuid, job)
 
     def detectMgmtInterface(self, mgmtParams, resultsLocation=None,
-            zone=None, uuid=None, **kwargs):
+            zone=None, uuid=None, jobToken=None, **kwargs):
         """
         ifaceParamList is a list of ManagementInterfaceParams to be probed
         """
-        params = dict(zone=zone or self.zone, params=mgmtParams.toDict())
+        params = dict(
+                zone=zone or self.zone,
+                authToken=jobToken,
+                params=mgmtParams.toDict(),
+                )
 
         if resultsLocation is not None:
             assert isinstance(resultsLocation, self.ResultsLocation)

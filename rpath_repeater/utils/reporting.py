@@ -104,7 +104,7 @@ class ReportingMixIn(object):
 
     def postStatus(self):
         el = self.newJobElement()
-        return self.postResults(el)
+        return self.postResults(el, location=self.jobUrl)
 
     def postFailure(self, method=None):
         el = XML.Element(self.ReportingXmlTag)
