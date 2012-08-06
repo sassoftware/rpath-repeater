@@ -120,7 +120,7 @@ class Survey(object):
         # Import here to avoid import loop
         from rpath_repeater.utils.windows.updates import UpdateJob
         return UpdateJob(self.rtis.flavor, self.rtis.manifest,
-            None, callback=self.rtis.callback)._client
+            self.rtis.system_model, None, callback=self.rtis.callback)._client
 
     def addComputedInformation(self):
         self.addPackageInformation()

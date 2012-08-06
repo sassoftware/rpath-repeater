@@ -85,7 +85,7 @@ class WindowsSystem(object):
 
     def _getUpdateJob(self, jobId):
         return UpdateJob(self.rtis.flavor, self.rtis.manifest,
-            jobId, callback=self.callback)
+            self.rtis.system_model, jobId, callback=self.callback)
 
     @cleanup
     def update(self, troveSpecs, jobId, test=False):
