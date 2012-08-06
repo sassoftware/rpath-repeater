@@ -99,8 +99,12 @@ class WindowsSystem(object):
         updJob = self._getUpdateJob(jobId)
         updJob.prepareUpdate(troveSpecs)
 
+        # Have to calculate the preview early so that in the case of initial
+        # install of rPathTools, rPathTools will be included in the preview.
+        preview = updJob.toxml()
+
         if test:
-            return None, updJob.toxml()
+            return None, preview
 
         if not self.rtis.isInstalled:
             if 'rPathTools:msi' not in updJob:
@@ -114,7 +118,7 @@ class WindowsSystem(object):
         results = self.rtis.applyUpdate(updJob)
 
         self.callback.info('Update Complete')
-        return results, updJob.toxml()
+        return results, preview
 
     @cleanup
     def configure(self, values, jobId):
