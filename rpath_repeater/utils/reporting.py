@@ -126,11 +126,15 @@ class ReportingMixIn(object):
             state = 'Completed'
         else:
             state = 'Running'
+        if status.code == 0:
+            code, text = 100, 'Job queued'
+        else:
+            code, text = status.code, status.text
         return XML.Element("job",
             T("job_uuid", self.job.job_uuid),
             T("job_state", state),
-            T("status_code", status.code),
-            T("status_text", status.text),
+            T("status_code", code),
+            T("status_text", text),
             T("status_detail", status.detail or ''),
             )
 
