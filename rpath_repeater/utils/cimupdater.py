@@ -85,7 +85,7 @@ class CIMUpdater(cimjobhandler.CIMJobHandler):
 
     def updateCheck(self, timeout=None):
         job = self.updateCheckAsync()
-        return self.pollJobForCompletion(job, timeout = timeout)
+        return self.handleJob(job, timeout = timeout)
 
     def applyUpdateAsync(self, sources, test, nodes):
         opts = [pywbem.Uint16(2)] # Migrate.
@@ -100,13 +100,7 @@ class CIMUpdater(cimjobhandler.CIMJobHandler):
 
     def applyUpdate(self, sources, test, timeout = None, nodes=None):
         job = self.applyUpdateAsync(sources, test, nodes)
-        job = self.pollJobForCompletion(job, timeout = timeout)
-        if not self.isJobSuccessful(job):
-            error = self.server.getError(job)
-            self.log_error(error)
-            raise RuntimeError('Error while applying updates. The error from '
-                'the managed system was: %s' % error)
-        return job
+        return self.handleJob(job, timeout = timeout)
 
     def checkAndApplyUpdate(self, timeout = None):
         job = self.updateCheck(timeout = timeout)

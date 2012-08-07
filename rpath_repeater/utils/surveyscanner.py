@@ -34,4 +34,4 @@ class CIMSurveyScanner(cimjobhandler.CIMJobHandler):
 
     def scan(self, desiredTopLevelItems, timeout=None):
         job = self.scanAsync(desiredTopLevelItems)
-        return self.pollJobForCompletion(job, timeout=timeout)
+        return self.handleJob(job, timeout=timeout)
