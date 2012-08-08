@@ -325,8 +325,6 @@ class ConfigurationTask(CIMTaskHandler):
         data.response = XML.toString(el)
         self.setData(data)
 
-        # concatenate result streams from CIM operations
-        # which is not supported on older conary-cim-configuration versions
         logResults = ""
         if len(results) > 0:
             logs = results[1].get('operationlogs', None)
@@ -334,10 +332,12 @@ class ConfigurationTask(CIMTaskHandler):
                 logResults = logs[0] + logs[1]
 
         if succeeded == 0:
-            self.sendStatus(C.OK, "Host %s configuration applied: %s" % (data.p.host, logResults))
+            self.sendStatus(C.OK, "Host %s configuration applied" %
+                    (data.p.host,), detail=logResults)
         else:
             self.sendStatus(C.ERR_GENERIC,
-                "Host %s configuration failed to apply: %s" % (data.p.host, logResults))
+                "Host %s configuration failed to apply, check rpath-tools.log"
+                % (data.p.host), detail=logResults)
 
     def _applyConfigurationChange(self, server, configuration):
         import pywbem
