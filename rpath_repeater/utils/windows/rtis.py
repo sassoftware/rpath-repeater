@@ -918,11 +918,17 @@ class rTIS(object):
         assert len(results) == 1
 
         status, statusDetail, survey_data = results[0]
-        survey = Survey(self, survey_data, updJobXml)
-        survey.addComputedInformation()
-        xml = survey.tostring()
 
-        return status.text, statusDetail.text, xml
+        if survey_data:
+            detail = statusDetail.text
+            survey = Survey(self, survey_data, updJobXml)
+            survey.addComputedInformation()
+            xml = survey.tostring()
+        else:
+            xml = ''
+            detail = 'Failed to find survey results'
+
+        return status.text, detail, xml
 
     def _queryPackages(self, jobId):
         """
