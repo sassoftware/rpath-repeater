@@ -151,8 +151,8 @@ class Survey(object):
         for pkg in conaryInfo.itervalues():
             nodeId = idGen.getId(pkg)
             node = etree.fromstring(et.tostring(pkg.toxml(nodeId)))
-            if pkg.msi:
-                winPkg = windowsInfo[pkg.msi.productCode]
+            winPkg = windowsInfo.get(pkg.msi.productCode) if pkg.msi else None
+            if winPkg:
                 child = node.find('.//conary_package_info')
                 child.append(copy.copy(winPkg.node))
             conary_packages.append(node)
