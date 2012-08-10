@@ -35,7 +35,7 @@ class ReportingMixIn(object):
     retryInterval = 3
 
     def postResults(self, elt=None, method=None, location=None,
-            collapsible=False, retry=True):
+            collapsible=False, retry=True, failHard=False):
         if method is None:
             method = 'PUT'
         if location is None:
@@ -64,13 +64,20 @@ class ReportingMixIn(object):
                 headers=headers)
         retries = self.retryCount if retry else 0
         return self._serializer.call(self._doPost, collapsible=collapsible,
-                args=(connArgs, factArgs, retries))
+                args=(connArgs, factArgs, retries, failHard))
 
-    def _doPost(self, connArgs, factArgs, retries=0):
+    def _doPost(self, connArgs, factArgs, retries, failHard):
+        headers = ''.join('%s: %s\n' % (k.title(), v)
+                for (k, v) in sorted(factArgs['headers'].items()))
+        log.debug("OUT: %s %s\n%s\n%s\n", factArgs['method'], factArgs['url'],
+                headers, factArgs['postdata'])
         fact = HTTPClientFactory(**factArgs)
         @fact.deferred.addCallback
         def processResult(result):
-            log.debug("Received result for %s: %s", host, result)
+            body, code, headers = result
+            headers = ''.join('%s: %s\n' % (k.title(), ', '.join(v))
+                    for (k, v) in sorted(headers.items()))
+            log.debug("IN %s:\n%s\n%s\n", code, headers, body)
             return result
         @fact.deferred.addErrback
         def processError(error):
@@ -79,10 +86,14 @@ class ReportingMixIn(object):
                 log.debug("Got authorization error posting status update, "
                         "trying again")
                 return ti_task.deferLater(reactor, self.retryInterval,
-                        self._doPost, connArgs, factArgs, retries - 1)
-            log.error("Error posting status update for job %s of type %s: %s",
-                    self.job.job_uuid, self.job.job_type,
-                    error.getErrorMessage())
+                        self._doPost, connArgs, factArgs, retries - 1,
+                        failHard)
+            elif failHard:
+                return error
+            else:
+                log.error("Error posting status update "
+                        "for job %s of type %s: %s", self.job.job_uuid,
+                        self.job.job_type, error.getErrorMessage())
         host, port = connArgs
         reactor.connectTCP(host, port, fact)
         return fact.deferred

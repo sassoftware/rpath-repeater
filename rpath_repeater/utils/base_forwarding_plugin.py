@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2010 rPath, Inc.
+# Copyright (c) rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -20,12 +20,14 @@ import StringIO
 import socket
 import sys
 import tempfile
+from twisted.internet.defer import maybeDeferred
 
 from conary.lib.formattrace import formatTrace
 
 from rmake3.core import types
 from rmake3.core import handler
 from rmake3.core import plug_dispatcher
+from rmake3.lib.logger import logFailure
 from rmake3.worker import plug_worker
 
 from rpath_repeater.codes import Codes as C, NS
@@ -191,16 +193,29 @@ class BaseHandler(handler.JobHandler, ReportingMixIn):
         if task.status.failed:
             self.setStatus(task.status.thaw())
             self.postFailure()
+            return 'done'
         else:
-            self._handleTaskComplete(task)
-        return 'done'
+            return self._handleTaskComplete(task)
 
     def _handleTaskComplete(self, task):
         response = task.task_data.getObject().response
         self.job.data = response
-        self.setStatus(C.OK, "Done")
-        self.postResults()
         self._taskStatusCodeWatchers.clear()
+        # Post results first, if results processing fails then set the job as
+        # failed and try to post the failure.
+        self.job.status = types.JobStatus(C.OK, "Done")
+        d = maybeDeferred(self.postResults, failHard=True)
+        d.addCallback(lambda _: self.setStatus(self.job.status))
+        d.addCallback(lambda _: 'done')
+        @d.addErrback
+        def _postFailed(reason):
+            log.error("Error posting results for job %s of type %s: %s",
+                    self.job.job_uuid, self.job.job_type,
+                    reason.getErrorMessage())
+            return self._handleTaskError(reason)
+        d.addErrback(logFailure)
+        d.addBoth(lambda _: 'done')
+        return d
 
     def _handleTaskError(self, reason):
         """
