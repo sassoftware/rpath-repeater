@@ -64,10 +64,12 @@ class TargetCommand(BaseCommand):
             instanceId=instanceId, params=params)
 
     def imageDeploymentDescriptor(self):
-        return self._invoke(codes.NS.TARGET_IMAGE_DEPLOY_DESCRIPTOR)
+        return self._invoke(codes.NS.TARGET_IMAGE_DEPLOY_DESCRIPTOR,
+                jobUrl=None)
 
     def systemLaunchDescriptor(self):
-        return self._invoke(codes.NS.TARGET_SYSTEM_LAUNCH_DESCRIPTOR)
+        return self._invoke(codes.NS.TARGET_SYSTEM_LAUNCH_DESCRIPTOR,
+                jobUrl=None)
 
     def deployImage(self, params):
         return self._invoke(codes.NS.TARGET_IMAGE_DEPLOY, params=params)
@@ -78,17 +80,19 @@ class TargetCommand(BaseCommand):
     def _invoke(self, ns, **kwargs):
         client = self.getClient()
 
+        jobUuid = RmakeUuid.uuid4()
+        if 'jobUrl' in kwargs:
+            jobUrl = kwargs.pop('jobUrl')
+        elif client.jobUrlTemplate:
+            jobUrl = client.jobUrlTemplate % dict(job_uuid=jobUuid)
+        else:
+            jobUrl = None
         params = models.TargetCommandArguments(
             targetConfiguration=self._targetConfig,
             targetUserCredentials=self._userCredentials,
             args=kwargs,
             targetAllUserCredentials=self._allUserCredentials,
         )
-        jobUuid = RmakeUuid.uuid4()
-        if client.jobUrlTemplate:
-            jobUrl = client.jobUrlTemplate % dict(job_uuid=jobUuid)
-        else:
-            jobUrl = None
         # authToken is the "cookie" that will be used for posting data
         # back to the REST interface
         params = dict(zone=self._zone,
