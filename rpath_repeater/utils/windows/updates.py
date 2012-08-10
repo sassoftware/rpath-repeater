@@ -218,13 +218,13 @@ class UpdateJob(object):
         newTroveTups = [ TroveTuple(x) for x in
                 itertools.chain(*newTroveTups.values()) ]
 
-        self._desired = newTroveTups[0].asString(withTimestamp=False)
+        self._desired = newTroveTups[0].asString(withTimestamp=True)
 
         # FIXME: This is an ungly hack, but it will probably work.
         self._observed = ''
         if self._system_model:
             observed_name = self._system_model[0].split()[-1].split('=')[0]
-            topLevel = [ x[0].asString(withTimestamp=False)
+            topLevel = [ x[0].asString(withTimestamp=True)
                 for x in self._manifest if x[0].name == observed_name ]
             if len(topLevel):
                 self._observed = topLevel[0]
