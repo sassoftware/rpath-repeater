@@ -198,14 +198,31 @@ class RegisterTask(WMITaskHandler):
         system.callback.start()
 
         localUUID, generatedUUID, computerName = system.register()
+        status, statusDetail, surveyXml = system.scan(str(self.task.job_uuid))
 
         e = ElementMaker()
+
+        survey = e.survey()
+        if surveyXml:
+            surveys = etree.fromstring(surveyXml).getchildren()
+            if surveys:
+                survey = surveys[0]
 
         data.response = etree.tostring(e.system(
             e.local_uuid(localUUID),
             e.generated_uuid(generatedUUID),
             e.hostname(computerName),
+            survey,
         ))
+
+        if status == 'completed':
+            log.info('response')
+            log.info(surveyXml)
+            self.setData(data)
+            self.sendStatus(C.OK, statusDetail)
+        else:
+            self.sendStatus(C.ERR_GENERIC, 'Registration failed while scanning '
+                'windows system with the following error: %s' % statusDetail)
 
         self.setData(data)
         system.callback.done()
