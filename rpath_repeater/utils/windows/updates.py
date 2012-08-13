@@ -195,7 +195,7 @@ class UpdateJob(object):
             self._model_cache)
         return updJob
 
-    def prepareUpdate(self, updateTroveSpecs):
+    def prepareUpdate(self, updateTroveSpecs, test=False):
         """
         Lookup update information from the conary repository to figure out what
         needs to be changed on the remote system.
@@ -220,14 +220,19 @@ class UpdateJob(object):
 
         self._desired = newTroveTups[0].asString(withTimestamp=True)
 
-        # FIXME: This is an ungly hack, but it will probably work.
-        self._observed = ''
-        if self._system_model:
-            observed_name = self._system_model[0].split()[-1].split('=')[0]
-            topLevel = [ x[0].asString(withTimestamp=True)
-                for x in self._manifest if x[0].name == observed_name ]
-            if len(topLevel):
-                self._observed = topLevel[0]
+        if test:
+            # FIXME: This is an ungly hack, but it will probably work.
+            self._observed = ''
+            if self._system_model:
+                observed_name = self._system_model[0].split()[-1].split('=')[0]
+                topLevel = [ x[0].asString(withTimestamp=True)
+                    for x in self._manifest if x[0].name == observed_name ]
+                if len(topLevel):
+                    self._observed = topLevel[0]
+        else:
+            # When actually applying updates, the final observed state will
+            # match the desired state.
+            self._observed = self._desired
 
         self._newSystemModel = [ 'install %s=%s' % (x.name, x.version)
             for x in newTroveTups ]

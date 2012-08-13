@@ -97,7 +97,7 @@ class WindowsSystem(object):
         self.callback.info('Retrieving installed software')
 
         updJob = self._getUpdateJob(jobId)
-        updJob.prepareUpdate(troveSpecs)
+        updJob.prepareUpdate(troveSpecs, test=test)
 
         # Have to calculate the preview early so that in the case of initial
         # install of rPathTools, rPathTools will be included in the preview.
@@ -140,7 +140,7 @@ class WindowsSystem(object):
 
         updJob = self._getUpdateJob(jobId)
         if troveSpecs:
-            updJob.prepareUpdate(troveSpecs)
+            updJob.prepareUpdate(troveSpecs, test=True)
 
         status, statusDetail, survey = self.rtis.scan(jobId,
             troveSpecs and updJob.toxml() or None)
