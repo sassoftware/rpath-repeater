@@ -48,6 +48,8 @@ class WmiTest(TestBase):
         running = ('registry', 'getkey', rtisPath, 'Running')
         setRoot = ('registry', 'setkey', rtisPath, 'Root', 'C:\\Program Files\\rPath\\Updates')
         getFlavor = ('registry', 'getkey', 'SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment', 'PROCESSOR_ARCHITECTURE')
+        runcount = ('registry', 'getkey', rtisPath, 'Runcount')
+        commands = ('registry', 'setkey', rtisPath, 'Commands')
 
     class MultiChoice(object):
         def __init__(self, choices):
@@ -90,6 +92,7 @@ class WmiTest(TestBase):
         K.setRoot: 'bla',
         K.appData: 'ProgramData',
         K.getFlavor: 'x64',
+        K.runcount: '0',
     }
 
     class WMICommand(object):
@@ -153,6 +156,7 @@ class WmiTest(TestBase):
         return self.client.WmiParams(**defaults)
 
     def testRegister(self):
+        raise testsuite.SkipTestException("need to mock more")
         params = self._wmiParams()
 
         self.client.register_wmi(params)
