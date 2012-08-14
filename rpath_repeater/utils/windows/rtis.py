@@ -928,7 +928,12 @@ class rTIS(object):
             xml = ''
             detail = 'Failed to find survey results'
 
-        return status.text, detail, xml
+        if status is not None:
+            status = status.text
+        else:
+            status = ''
+
+        return status, detail, xml
 
     def _queryPackages(self, jobId):
         """
