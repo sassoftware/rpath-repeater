@@ -24,7 +24,7 @@ from rpath_repeater.utils.windows.errors import NotEnoughSpaceError
 from rpath_repeater.utils.windows.errors import MSIInstallationError
 from rpath_repeater.utils.windows.errors import ServiceFailedToStartError
 
-log = logging.getLogger('rpath_repeater.utils.windows.rtis')
+log = logging.getLogger('windows.rtis')
 
 def _filter(func):
     """
@@ -306,7 +306,7 @@ class rTIS(object):
                 break
             except WMIBaseError:
                 if queries <= retries:
-                    self.callback.info('retrying')
+                    log.info('retrying')
                     self._sleep()
                     continue
                 raise
@@ -324,7 +324,7 @@ class rTIS(object):
             self._query(self._wmi.registryGetKey, self._conary_keypath,
                 'system_model', raiseErrors=True)
         except WMIFileNotFoundError:
-            self.callback.info('Creating Required Registry Keys')
+            log.info('Creating Required Registry Keys')
             self._wmi.registryCreateKey('SOFTWARE', 'rPath')
             self._wmi.registryCreateKey(r'SOFTWARE\rPath', 'rTIS.NET')
             self._wmi.registryCreateKey(r'SOFTWARE\rPath\rTIS.NET', 'conary')
@@ -333,13 +333,13 @@ class rTIS(object):
 
     @_filter
     def _get_system_model(self):
-        self.callback.info('Retrieving current system model')
+        log.info('Retrieving current system model')
         result = self._query(self._wmi.registryGetKey, self._conary_keypath,
             'system_model', default=[])
         return result
 
     def _set_system_model(self, model):
-        self.callback.info('Writing system model')
+        log.info('Writing system model')
         self._query(self._wmi.registrySetKey, self._conary_keypath,
             'system_model', model)
 
@@ -347,7 +347,7 @@ class rTIS(object):
 
     @_filter
     def _get_manifest(self):
-        self.callback.info('Retrieving current system manifest')
+        log.info('Retrieving current system manifest')
 
         lines = []
         if self._smb.pathexists(self.updatesDir, '..', 'manifest'):
@@ -375,7 +375,7 @@ class rTIS(object):
         return manifest
 
     def _set_manifest(self, data):
-        self.callback.info('Writing system manifest')
+        log.info('Writing system manifest')
 
         # Generate new format if all timestamps are not 0.
         if [ x for x in data if x[1] ]:
@@ -393,13 +393,13 @@ class rTIS(object):
 
     @_filter
     def _get_polling_manifest(self):
-        self.callback.info('Retrieving polling manifest')
+        log.info('Retrieving polling manifest')
         result = self._query(self._wmi.registryGetKey, self._conary_keypath,
             'polling_manifest', default=[])
         return result
 
     def _set_polling_manifest(self, data):
-        self.callback.info('Writing polling manifest')
+        log.info('Writing polling manifest')
         self._query(self._wmi.registrySetKey, self._conary_keypath,
             'polling_manifest', data)
 
@@ -407,27 +407,27 @@ class rTIS(object):
 
     @_filter
     def _get_commands(self):
-        self.callback.info('Retrieving commands')
+        log.info('Retrieving commands')
         result = self._query(self._wmi.registryGetKey, self._params_keypath,
             'Commands', default=[])
         return result
 
     def _set_commands(self, data):
-        self.callback.info('Setting commands %s' % data)
+        log.info('Setting commands %s' % data)
         self._query(self._wmi.registrySetKey, self._params_keypath,
             'Commands', data)
 
     commands = property(_get_commands, _set_commands)
 
     def _get_runcount(self):
-        self.callback.info('Retrieving runcount')
+        log.info('Retrieving runcount')
         result = self._query(self._wmi.registryGetKey, self._params_keypath,
             'Runcount', default='')
         assert len(result) == 1
         return result[0]
 
     def _set_runcount(self, data):
-        self.callback.info('Setting runcount %s' % data)
+        log.info('Setting runcount %s' % data)
         self._query(self._wmi.registrySetKey, self._params_keypath,
             'Runcount', data)
 
@@ -442,7 +442,7 @@ class rTIS(object):
         if self._flavor is not None:
             return self._flavor
 
-        self.callback.info('Determinig System Flavor')
+        log.info('Determinig System Flavor')
         result = self._query(
             self._wmi.registryGetKey,
             r'SYSTEM\CurrentControlSet\Control\Session Manager\Environment',
@@ -460,7 +460,7 @@ class rTIS(object):
     @property
     def updatesDir(self):
         if not self._updatesDir:
-            self.callback.info('Determining updates directory')
+            log.info('Determining updates directory')
             result = self._query(
                 self._wmi.registryGetKey,
                 r'SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell '
@@ -589,7 +589,7 @@ class rTIS(object):
         if self.hasRun:
             return
 
-        self.callback.info('Waiting for the %s to exit' % self._service_name)
+        log.info('Waiting for the %s to exit' % self._service_name)
 
         rebootStartTime = 0
 
@@ -625,7 +625,7 @@ class rTIS(object):
                 rebootStartTime = 0
             elif status == "rebooting":
                 rebootStartTime = 0
-                self.callback.info('Reboot successfull, waiting for software '
+                self.callback.info('Reboot successful, waiting for software '
                     'installation to complete')
 
             if reportStatus:
@@ -712,12 +712,12 @@ class rTIS(object):
                         rc = int(parts[0])
                     else:
                         rc = -1
-                    self.callback.info('main engine thread returned, rc=%s' % rc)
+                    log.info('main engine thread returned, rc=%s' % rc)
 
                 # magic_logging indicates end of log
                 if magic_logging in line:
                     done = True;
-                    self.callback.info('installation completing", rc=%s' % rc)
+                    log.info('installation completing", rc=%s' % rc)
                     break
 
             fh.close()
@@ -828,17 +828,17 @@ class rTIS(object):
         self.wait(allowReboot=True, reportStatus=jobDir)
 
         # Parse results
-        self.callback.info('Parsing Results')
+        log.info('Parsing Results')
         fh = self._smb.pathopen(jobDir, servicing.FILENAME)
         results = [ x for x in servicing.iterpackageresults(fh) ]
-        self.callback.info('applyupdate read %s' % fh.fileno())
+        log.info('applyupdate read %s' % fh.fileno())
         fh.close()
 
         # write this at the end, after all updates have completed successfully.
         self.polling_manifest = updJob.polling_manifest
 
         # get return code
-        self.callback.info('Cleaning up')
+        log.info('Cleaning up')
         rc = max([ int(x[2].get('exitCode')) for x in results
             if x[2].get('exitCode') is not None ] + [0, ])
         if rc == 0:
@@ -879,7 +879,7 @@ class rTIS(object):
         # Get results from the target system
         fh = self._smb.pathopen(jobDir, servicing.FILENAME)
         results = [ x for x in servicing.iterconfigresults(fh)]
-        self.callback.info('configure read %s' % fh.fileno())
+        log.info('configure read %s' % fh.fileno())
         fh.close()
 
         return results
@@ -940,7 +940,7 @@ class rTIS(object):
         Query the list of packages from a remote Windows machine.
         """
 
-        self.callback.info('Querying Windows system for package information.')
+        log.info('Querying Windows system for package information.')
 
         if not jobId.startswith('job-'):
             jobId = 'job-%s' % jobId

@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2011 rPath, Inc.
+# Copyright (c) rPath, Inc.
 #
 
 """
@@ -7,6 +7,7 @@ Basic abstraction around coordinating smb mounts and copying files to a
 Windows system.
 """
 
+import logging
 import os
 import time
 import codecs
@@ -18,6 +19,9 @@ from conary.lib import util
 
 from rpath_repeater.utils.windows import errors
 from rpath_repeater.utils.windows.callbacks import BaseCallback
+
+log = logging.getLogger('windows.smbclient')
+
 
 class SMBClientError(errors.BaseException):
     pass
@@ -92,7 +96,7 @@ class SMBClient(object):
         if self._rootdir:
             return
 
-        self.callback.info('mounting windows share')
+        log.info('mounting windows share')
 
         retries = 10
         self._rootdir = tempfile.mkdtemp()
@@ -115,7 +119,7 @@ class SMBClient(object):
         if not self._rootdir:
             return
 
-        self.callback.info('unmounting windows share')
+        log.info('unmounting windows share')
 
         try:
             self._runCmd(self._umount_cmd + [ self._rootdir, ])

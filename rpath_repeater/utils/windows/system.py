@@ -1,11 +1,12 @@
 #
-# Copyright (c) 2011 rPath, Inc.
+# Copyright (c) rPath, Inc.
 #
 
 """
 Representation of a Windows system.
 """
 
+import logging
 from rmake3.lib import uuid
 
 from wmiclient import WMIClient
@@ -18,6 +19,8 @@ from rpath_repeater.utils.windows.inventory import Inventory
 from rpath_repeater.utils.windows.smbclient import SMBClient
 from rpath_repeater.utils.windows.errors import AuthenticationError
 from rpath_repeater.utils.windows.callbacks import RepeaterWMICallback
+
+log = logging.getLogger('windows.system')
 
 def cleanup(func):
     def wrapper(self, *args, **kwargs):
@@ -79,7 +82,7 @@ class WindowsSystem(object):
 
     @cleanup
     def shutdown(self):
-        self.callback.error('Shutdown is not support for managed '
+        self.callback.error('Shutdown is not supported for managed '
             'Windows systems')
         raise NotImplementedError
 
@@ -89,12 +92,15 @@ class WindowsSystem(object):
 
     @cleanup
     def update(self, troveSpecs, jobId, test=False):
-        self.callback.info('Updating System')
+        if test:
+            self.callback.info("Preparing to preview update")
+        else:
+            self.callback.info("Preparing to update system")
 
         # Wait for the service to become available.
         self.rtis.wait(allowReboot=False, firstRun=True)
 
-        self.callback.info('Retrieving installed software')
+        log.info('Retrieving installed software')
 
         updJob = self._getUpdateJob(jobId)
         updJob.prepareUpdate(troveSpecs, test=test)

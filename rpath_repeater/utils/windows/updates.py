@@ -204,7 +204,7 @@ class UpdateJob(object):
         # NOTE: This assumes that updateTroveSpecs will only ever be top
         #       level items.
 
-        self.callback.info('Preparing updates')
+        self.callback.info('Checking for updates')
 
         newTroveSpecs = [ cmdline.parseTroveSpec(x)
             for x in updateTroveSpecs if x ]
@@ -322,7 +322,7 @@ class UpdateJob(object):
         info = {}
         for trvCs in cs.iterNewTroveList():
             if trvCs.getName() not in names:
-                self.callback.debug('skipping %s since it was not in the '
+                log.debug('skipping %s since it was not in the '
                     'request' % trvCs.getName())
                 continue
 
