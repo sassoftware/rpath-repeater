@@ -184,7 +184,6 @@ class WmiTest(TestBase):
             [ (x.status.code, x.status.text) for x in self.results.poll ],
             [(101, '1.2.3.4: '),
              (110, '1.2.3.4: Polling System'),
-             (110, '1.2.3.4: Retrieving polling manifest'),
              (110, '1.2.3.4: Polling Complete'),
              (200, '1.2.3.4: ')]
             )
