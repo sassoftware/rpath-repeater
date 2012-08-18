@@ -213,5 +213,7 @@ class Survey(object):
         if 'config_properties_descriptor' in chldrn:
             self.data.remove(chldrn.get('config_properties_descriptor'))
 
-        node = self.e.config_properties_descriptor(desc.toxml(validate=False))
+        node = self.e.config_properties_descriptor(
+                                    etree.fromstring(
+                                        desc.toxml(validate=False)))
         self.data.append(node)
