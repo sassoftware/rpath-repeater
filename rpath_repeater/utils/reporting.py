@@ -44,7 +44,7 @@ class ReportingMixIn(object):
         if not path:
             return
         if elt is None:
-            dom = minidom.parseString(self.job.data)
+            dom = minidom.parseString(self.job.data.getObject())
             elt = dom.firstChild
         if isinstance(elt, basestring):
             # We were given an XML string, no need to postprocess it

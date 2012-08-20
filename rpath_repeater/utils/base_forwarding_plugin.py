@@ -199,7 +199,7 @@ class BaseHandler(handler.JobHandler, ReportingMixIn):
 
     def _handleTaskComplete(self, task):
         response = task.task_data.getObject().response
-        self.job.data = response
+        self.job.data = types.FrozenObject.fromObject(response)
         self._taskStatusCodeWatchers.clear()
         # Post results first, if results processing fails then set the job as
         # failed and try to post the failure.

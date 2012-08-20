@@ -68,7 +68,7 @@ class LaunchHandler(handler.JobHandler):
             self.setStatus(task.status.thaw())
         else:
             response = task.task_data.getObject().response
-            self.job.data = response
+            self.job.data = types.FrozenObject.fromObject(response)
             self.setStatus(C.OK, "Done. %s" % response)
             jobState = jobmodels.JobState.objects.get(name=jobmodels.JobState.COMPLETED)
             job = jobmodels.Job.objects.get(job_uuid=self.job.job_uuid)
