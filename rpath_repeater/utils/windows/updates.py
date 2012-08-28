@@ -97,8 +97,8 @@ class UpdateJob(object):
 
     def __copy__(self):
         cls = self.__class__
-        obj = cls(self._systemFlavor, None, self._jobId, callback=self.callback,
-            copy=True)
+        obj = cls(self._systemFlavor, None, self._system_model, self._jobId,
+            callback=self.callback, copy=True)
         obj._cfg = self._cfg
         obj._client = self._client
         obj._model_cache = self._model_cache
