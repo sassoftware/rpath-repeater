@@ -142,6 +142,11 @@ class WindowsSystem(object):
     def scan(self, jobId, troveSpecs=None):
         self.callback.info('Scanning System')
 
+        if not self.rtis.isInstalled:
+            msg = ('rPathTools is not installed on the target system, not '
+                'performing system scan.')
+            return 'completed', msg, ''
+
         self.rtis.wait(allowReboot=False, firstRun=True)
 
         updJob = self._getUpdateJob(jobId)
