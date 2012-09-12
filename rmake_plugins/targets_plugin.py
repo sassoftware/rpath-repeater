@@ -354,9 +354,13 @@ class TargetsImageDeployTask(JobProgressTaskHandler):
         imageFileInfo = params['imageFileInfo']
         descriptorData = params['descriptorData']
         imageDownloadUrl = params['imageDownloadUrl']
-        imgObj = self.driver.imageFromFileInfo(imageFileInfo, imageDownloadUrl)
-        self.image = imgObj
-        img = self.driver.deployImageFromUrl(job, imgObj, descriptorData)
+        img = self._isImageDeployed()
+        if img is None:
+            img = self.driver.imageFromFileInfo(imageFileInfo, imageDownloadUrl)
+        else:
+            self.driver.updateImageFromFileInfo(img, imageFileInfo)
+        self.image = img
+        img = self.driver.deployImageFromUrl(job, img, descriptorData)
         return img
 
     def linkTargetImageToImage(self, rbuilderImageId, targetImageId):
@@ -365,6 +369,16 @@ class TargetsImageDeployTask(JobProgressTaskHandler):
 
         io = XmlStringIO(imageXml)
         self.finishCall(io, "Linking image", C.PART_RESULT_1)
+
+    def _isImageDeployed(self):
+        targetImageIdList = self.cmdArgs['params']['targetImageIdList']
+        if targetImageIdList is None:
+            return None
+        images = self.driver.getImagesFromTarget(targetImageIdList)
+        if images:
+            return images[0]
+        return None
+
 
 class System(object):
     def __init__(self, **kwargs):
@@ -418,7 +432,6 @@ class TargetsSystemLaunchTask(TargetsImageDeployTask):
         imageDownloadUrl = params['imageDownloadUrl']
         img = self._isImageDeployed()
         if img is None:
-            params = self.cmdArgs['params']
             img = self.driver.imageFromFileInfo(imageFileInfo, imageDownloadUrl)
         else:
             self.driver.updateImageFromFileInfo(img, imageFileInfo)
@@ -426,15 +439,6 @@ class TargetsSystemLaunchTask(TargetsImageDeployTask):
         instanceIdList = self.driver.launchSystemSynchronously(job, img, descriptorData)
         io = XmlStringIO(xobj2.Document.serialize(self.driver.inventoryHandler.systems))
         self.finishCall(io, "Systems launched")
-
-    def _isImageDeployed(self):
-        targetImageIdList = self.cmdArgs['params']['targetImageIdList']
-        if targetImageIdList is None:
-            return None
-        images = self.driver.getImagesFromTarget(targetImageIdList)
-        if images:
-            return images[0]
-        return None
 
 class XmlStringIO(StringIO.StringIO):
     def toXml(self):
