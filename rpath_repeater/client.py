@@ -80,7 +80,8 @@ class TargetCommand(BaseCommand):
     def _invoke(self, ns, **kwargs):
         client = self.getClient()
 
-        jobUuid = RmakeUuid.uuid4()
+        # Use the supplied jobUuid if possible
+        jobUuid = kwargs.pop('uuid', RmakeUuid.uuid4())
         if 'jobUrl' in kwargs:
             jobUrl = kwargs.pop('jobUrl')
         elif client.jobUrlTemplate:
