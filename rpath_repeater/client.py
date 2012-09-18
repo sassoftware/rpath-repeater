@@ -47,35 +47,38 @@ class TargetCommand(BaseCommand):
         self._userCredentials = userCredentials
         self._allUserCredentials = allUserCredentials
 
-    def checkCreate(self):
-        return self._invoke(codes.NS.TARGET_TEST_CREATE)
+    def checkCreate(self, **kwargs):
+        return self._invoke(codes.NS.TARGET_TEST_CREATE, **kwargs)
 
-    def checkCredentials(self):
-        return self._invoke(codes.NS.TARGET_TEST_CREDENTIALS)
+    def checkCredentials(self, **kwargs):
+        return self._invoke(codes.NS.TARGET_TEST_CREDENTIALS, **kwargs)
 
-    def listImages(self, imageIds=None):
-        return self._invoke(codes.NS.TARGET_IMAGES_LIST, imageIds=imageIds)
+    def listImages(self, imageIds=None, **kwargs):
+        return self._invoke(codes.NS.TARGET_IMAGES_LIST, imageIds=imageIds, **kwargs)
 
-    def listInstances(self, instanceIds=None):
-        return self._invoke(codes.NS.TARGET_INSTANCES_LIST, instanceIds=instanceIds)
+    def listInstances(self, instanceIds=None, **kwargs):
+        return self._invoke(codes.NS.TARGET_INSTANCES_LIST,
+            instanceIds=instanceIds, **kwargs)
 
-    def captureSystem(self, instanceId, params):
+    def captureSystem(self, instanceId, params, **kwargs):
         return self._invoke(codes.NS.TARGET_SYSTEM_CAPTURE,
-            instanceId=instanceId, params=params)
+            instanceId=instanceId, params=params, **kwargs)
 
-    def imageDeploymentDescriptor(self):
+    def imageDeploymentDescriptor(self, **kwargs):
         return self._invoke(codes.NS.TARGET_IMAGE_DEPLOY_DESCRIPTOR,
-                jobUrl=None)
+                jobUrl=None, **kwargs)
 
-    def systemLaunchDescriptor(self):
+    def systemLaunchDescriptor(self, **kwargs):
         return self._invoke(codes.NS.TARGET_SYSTEM_LAUNCH_DESCRIPTOR,
-                jobUrl=None)
+                jobUrl=None, **kwargs)
 
-    def deployImage(self, params):
-        return self._invoke(codes.NS.TARGET_IMAGE_DEPLOY, params=params)
+    def deployImage(self, params, **kwargs):
+        return self._invoke(codes.NS.TARGET_IMAGE_DEPLOY, params=params,
+            **kwargs)
 
-    def launchSystem(self, params):
-        return self._invoke(codes.NS.TARGET_SYSTEM_LAUNCH, params=params)
+    def launchSystem(self, params, **kwargs):
+        return self._invoke(codes.NS.TARGET_SYSTEM_LAUNCH, params=params,
+            **kwargs)
 
     def _invoke(self, ns, **kwargs):
         client = self.getClient()
