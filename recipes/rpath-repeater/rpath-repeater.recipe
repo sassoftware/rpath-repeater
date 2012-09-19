@@ -1,12 +1,14 @@
 #
-# Copyright (c) 2010 rPath, Inc.
+# Copyright (c) rPath, Inc.
 #
+
 
 class rPathRepeater(PackageRecipe):
     name = 'rpath-repeater'
     version = '0.1'
 
     buildRequires = [
+        'catalog-service:python',
         'lxml:python',
         'make:runtime',
         'paramiko:python',
