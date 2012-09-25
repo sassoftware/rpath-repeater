@@ -8,7 +8,6 @@ class rPathRepeater(PackageRecipe):
     version = '0.1'
 
     buildRequires = [
-        'catalog-service:python',
         'lxml:python',
         'make:runtime',
         'paramiko:python',
