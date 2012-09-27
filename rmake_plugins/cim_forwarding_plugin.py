@@ -331,9 +331,9 @@ class ConfigurationTask(CIMTaskHandler):
             if logs:
                 # Old style output: only stdout and stderr
                 if len(logs) == 2:
-                    logResults = models.ScriptOutput(stdout=logs[0], stderr=logs[1])
+                    logResults = ScriptOutput(stdout=logs[0], stderr=logs[1])
                 elif len(logs) == 3:
-                    logResults = models.ScriptOutput(errorCode=logs[0],
+                    logResults = ScriptOutput(errorCode=logs[0],
                         stdout=logs[1], stderr=logs[2])
 
         if succeeded == 0:
