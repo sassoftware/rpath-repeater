@@ -238,3 +238,6 @@ class TargetCommandArguments(_BaseSlotCompare):
     __slots__ = ['jobUrl', 'authToken',
         'targetConfiguration', 'targetUserCredentials', 'args',
         'targetAllUserCredentials', 'zoneAddresses', ]
+
+class ScriptOutput(_BaseSlotCompare):
+    __slots__ = [ 'returnCode', 'stdout', 'stderr' ]

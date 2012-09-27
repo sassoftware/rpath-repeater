@@ -15,7 +15,7 @@
 from rmake3.core import types
 from rmake3.core import handler
 
-from rpath_repeater.models import CimParams
+from rpath_repeater.models import CimParams, ScriptOutput
 from rpath_repeater.codes import Codes as C, NS
 from rpath_repeater.utils import wbemlib
 from rpath_repeater.utils import nodeinfo
@@ -325,11 +325,16 @@ class ConfigurationTask(CIMTaskHandler):
         data.response = XML.toString(el)
         self.setData(data)
 
-        logResults = ""
+        logResults = None
         if len(results) > 0:
             logs = results[1].get('operationlogs', None)
             if logs:
-                logResults = logs[0] + logs[1]
+                # Old style output: only stdout and stderr
+                if len(logs) == 2:
+                    logResults = models.ScriptOutput(stdout=logs[0], stderr=logs[1])
+                elif len(logs) == 3:
+                    logResults = models.ScriptOutput(errorCode=logs[0],
+                        stdout=logs[1], stderr=logs[2])
 
         if succeeded == 0:
             self.sendStatus(C.OK, "Host %s configuration applied" %
