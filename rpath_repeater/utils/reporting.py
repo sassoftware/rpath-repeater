@@ -18,7 +18,6 @@ log = logging.getLogger(__name__)
 from twisted.internet import reactor
 from twisted.internet import task as ti_task
 from twisted.web import error as tw_error
-from xml.dom import minidom
 
 from rmake3.lib.twisted_extras import tools
 from rpath_repeater.utils.http import HTTPClientFactory
@@ -44,8 +43,7 @@ class ReportingMixIn(object):
         if not path:
             return
         if elt is None:
-            dom = minidom.parseString(self.job.data.getObject())
-            elt = dom.firstChild
+            elt = XML.fromString(self.job.data.getObject())
         if isinstance(elt, basestring):
             # We were given an XML string, no need to postprocess it
             data = elt

@@ -6,7 +6,7 @@ import os
 import copy
 import itertools
 from collections import namedtuple
-from xml.etree import cElementTree as etree
+from lxml import etree
 
 import logging
 log = logging.getLogger('windows.update')

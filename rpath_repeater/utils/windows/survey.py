@@ -3,8 +3,6 @@
 #
 
 import copy
-from xml.etree import cElementTree as et
-
 from lxml import etree
 from lxml.builder import ElementMaker
 
@@ -150,7 +148,8 @@ class Survey(object):
         conary_packages = self.e.conary_packages()
         for pkg in conaryInfo.itervalues():
             nodeId = idGen.getId(pkg)
-            node = etree.fromstring(et.tostring(pkg.toxml(nodeId)))
+            # toxml here is a misnomer, it really returns an etree node
+            node = pkg.toxml(nodeId)
             winPkg = windowsInfo.get(pkg.msi.productCode) if pkg.msi else None
             if winPkg:
                 child = node.find('.//conary_package_info')

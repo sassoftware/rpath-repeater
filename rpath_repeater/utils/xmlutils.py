@@ -11,33 +11,32 @@
 # full details.
 #
 
-from xml.dom import minidom
+from lxml import etree
 
 class XML(object):
     @classmethod
     def Text(cls, tagName, text):
-        txt = minidom.Text()
-        txt.data = text
-        return cls.Element(tagName, txt)
-
-    @classmethod
-    def Element(cls, tagName, *children, **attributes):
-        node = cls._Node(tagName, minidom.Element)
-        for child in children:
-            node.appendChild(child)
-        for k, v in attributes.items():
-            node.setAttribute(k, unicode(v).encode("utf-8"))
+        node = etree.Element(tagName)
+        node.text = text
         return node
 
     @classmethod
-    def _Node(cls, tagName, factory):
-        node = factory(tagName)
+    def CDATA(cls, tagName, text):
+        node = etree.Element(tagName)
+        node.text = etree.CDATA(text)
+        return node
+
+    @classmethod
+    def Element(cls, tagName, *children, **attributes):
+        node = etree.Element(tagName,
+            dict((k, unicode(v)) for k, v in attributes.items()))
+        node.extend(children)
         return node
 
     @classmethod
     def toString(cls, elt):
-        return elt.toxml(encoding="UTF-8")
+        return etree.tostring(elt, encoding='UTF-8')
 
     @classmethod
     def fromString(cls, strng):
-        return minidom.parseString(strng).documentElement
+        return etree.fromstring(strng)

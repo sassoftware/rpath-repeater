@@ -156,9 +156,7 @@ class WMITaskHandler(bfp.BaseTaskHandler):
         return system
 
     def _trove(self, trvSpec):
-        xml = bfp.BaseTaskHandler._trove(trvSpec).toxml()
-        doc = etree.fromstring(xml)
-        return doc
+        return bfp.BaseTaskHandler._trove(trvSpec)
 
     def _poll(self, system):
         uuids, hostname, softwareVersions, netInfo = system.poll()
