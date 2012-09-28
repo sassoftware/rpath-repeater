@@ -17,13 +17,13 @@ class XML(object):
     @classmethod
     def Text(cls, tagName, text):
         node = etree.Element(tagName)
-        node.text = text
+        node.text = unicode(text)
         return node
 
     @classmethod
     def CDATA(cls, tagName, text):
         node = etree.Element(tagName)
-        node.text = etree.CDATA(text)
+        node.text = etree.CDATA(unicode(text))
         return node
 
     @classmethod

@@ -149,7 +149,7 @@ class ReportingMixIn(object):
 
     def addJobResults(self, job, results):
         resultsNode = XML.Element("results", results)
-        job.appendChild(resultsNode)
+        job.append(resultsNode)
         return job
 
     @classmethod

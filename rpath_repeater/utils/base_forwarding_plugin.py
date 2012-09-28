@@ -142,13 +142,13 @@ class BaseHandler(handler.JobHandler, ReportingMixIn):
     def addEventInfo(self, elt):
         if not self.eventUuid:
             return
-        elt.appendChild(XML.Text("event_uuid", self.eventUuid))
+        elt.append(XML.Text("event_uuid", self.eventUuid))
         return elt
 
     def addJobInfo(self, elt):
         # Parse the data, we need to insert the job uuid
         job = self.newJobElement()
-        elt.appendChild(XML.Element("jobs", job))
+        elt.append(XML.Element("jobs", job))
 
     def _getZoneAddresses(self):
         """Return set of IP addresses of all nodes in this zone."""
