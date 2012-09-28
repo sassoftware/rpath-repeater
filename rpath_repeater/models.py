@@ -69,7 +69,12 @@ class _Serializable(object):
             if not isinstance(val, (basestring, int, long, float)):
                 continue
             # Assume string
-            children.append(XML.Text(slot, unicode(val)))
+            val = unicode(val)
+            # Crude attempt to not doubly-encode xml
+            if val.lstrip().startswith('<') and val.rstrip().endswith('>'):
+                children.append(XML.CDATA(slot, val))
+            else:
+                children.append(XML.Text(slot, val))
         return XML.Element(tag, *children)
 
     def toXml(self):
@@ -239,5 +244,6 @@ class TargetCommandArguments(_BaseSlotCompare):
         'targetConfiguration', 'targetUserCredentials', 'args',
         'targetAllUserCredentials', 'zoneAddresses', ]
 
-class ScriptOutput(_BaseSlotCompare):
+class ScriptOutput(_BaseSlotCompare, _Serializable):
     __slots__ = [ 'returnCode', 'stdout', 'stderr' ]
+    _tag = 'scriptOutput'

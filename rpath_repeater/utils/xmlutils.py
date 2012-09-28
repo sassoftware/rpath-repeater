@@ -22,8 +22,11 @@ class XML(object):
 
     @classmethod
     def CDATA(cls, tagName, text):
+        CDATA = getattr(etree, 'CDATA', None)
+        if CDATA is None:
+            return cls.Text(tagName, text)
         node = etree.Element(tagName)
-        node.text = etree.CDATA(unicode(text))
+        node.text = CDATA(unicode(text))
         return node
 
     @classmethod

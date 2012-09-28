@@ -320,11 +320,6 @@ class ConfigurationTask(CIMTaskHandler):
         succeeded = results[0]
         children = self._getUuids(server)
 
-        el = XML.Element("system", *children)
-
-        data.response = XML.toString(el)
-        self.setData(data)
-
         logResults = None
         if len(results) > 0:
             logs = results[1].get('operationlogs', None)
@@ -333,16 +328,23 @@ class ConfigurationTask(CIMTaskHandler):
                 if len(logs) == 2:
                     logResults = ScriptOutput(stdout=logs[0], stderr=logs[1])
                 elif len(logs) == 3:
-                    logResults = ScriptOutput(errorCode=logs[0],
+                    logResults = ScriptOutput(returnCode=logs[0],
                         stdout=logs[1], stderr=logs[2])
+
+        if logResults:
+            children.append(logResults.toXmlDom())
+        el = XML.Element("system", *children)
+
+        data.response = XML.toString(el)
+        self.setData(data)
 
         if succeeded == 0:
             self.sendStatus(C.OK, "Host %s configuration applied" %
-                    (data.p.host,), detail=logResults)
+                    (data.p.host,))
         else:
             self.sendStatus(C.ERR_GENERIC,
                 "Host %s configuration failed to apply, check rpath-tools.log"
-                % (data.p.host), detail=logResults)
+                % (data.p.host))
 
     def _applyConfigurationChange(self, server, configuration):
         import pywbem
