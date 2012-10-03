@@ -300,6 +300,7 @@ sys.exit(0)
             "rpath-tools",
             "m2crypto-conary", # not in group-rpath-tools, this is a bug
             "pywbem-conary",
+            "rpm:python"
         ]
         self.caCert = caCert
         self.rLabels = self._install_labels(osFamily)
@@ -440,6 +441,7 @@ sys.exit(0)
         assimConfig = assimConfig + "ignoreDependencies abi soname file" + \
              " trove userinfo groupinfo CIL java python perl ruby php rpm" + \
              " rpmlib\n"
+        assimConfig = assimConfig + "syncCapsuleDatabase false\n"
         self._writeFileInBuildRoot(
             'etc/conary/config.d', 'assimilator',
             assimConfig
