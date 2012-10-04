@@ -19,7 +19,7 @@ from rpath_repeater.codes import Codes as C
 class LinuxAssimilator(object):
     """
     Assimiles a Linux system
-    
+
     usage:
         sshConn = utils.SshConnection(...)
         asim = LinuxAssimilator(sshConnector=sshConn, caCert=str, 
@@ -94,7 +94,7 @@ class LinuxAssimilator(object):
         '''Parse SuSE version from /etc/SuSE-release data'''
         matches = re.findall('\d+', output.split("\n")[0])
         return ('SLES', matches[0])
-        
+
     def _commands(self):
         '''
         Once an assimilation payload has been deployed on a system
@@ -134,7 +134,7 @@ class LinuxAssimilator(object):
         self.status(C.MSG_GENERIC, 'transferring archive')
         self.ssh.putFile(self.payload, "/tmp/rpath_assimilator.tar")
         self.status(C.MSG_GENERIC, 'assimilating system')
-        
+
         commands  = self._commands()
 
         # run the series of assimilation commands
@@ -279,8 +279,8 @@ runCmd("rpath-register --event-uuid=%s" % sys.argv[1], must_succeed=True)
 sys.exit(0)
 '''
 
-    def __init__(self, osFamily=None, caCert=None, 
-        flavor='x86', status=None, forceRebuild=False, platformLabels=None):
+    def __init__(self, osFamily=None, caCert=None, flavor='x86',
+                    status=None, forceRebuild=False, platformLabels=None):
 
         '''Does not build the payload, just gets parameters ready'''
         self._status = status    
@@ -332,7 +332,7 @@ sys.exit(0)
         conaryCfg.autoResolve = False
         conaryCfg.configLine('trustedKeys []')
         conaryCfg.configLine('trustThreshold 0')
-         
+
         return ConaryClient(conaryCfg)
 
     def _install_labels(self, osFamily):
@@ -444,7 +444,7 @@ sys.exit(0)
             'etc/conary/config.d', 'assimilator',
             assimConfig
         )
-        
+
         self._writeFileInBuildRoot(
             'etc/conary/rpath-tools/certs', 'rbuilder-hg.pem',
             self.caCert
@@ -491,17 +491,23 @@ class PayloadCalculator(object):
         self.troves       = troves
         self.labels       = [ Label(label) for label in labels ]
         self.flavor       = flavor # string 
-        self.repos        = self.conaryClient.repos  
-        self.matched      = self._allMatchingTroves()               
+        self.repos        = self.conaryClient.repos
+        self.matched      = self._allMatchingTroves()
 
     def _allMatchingTroves(self):
         ''' 
         Returns matched troves (name, version, label) sorted by
         name (first priority) and then version (second).
         '''
-        troves = [ (name, None, None) for name in self.troves ] 
+        troves = [ (name, None, None) for name in self.troves ]
+        # FIX for 32 bit assimilation
+        if self.flavor == 'x86':
+            flavor = 'is: x86(i486,i586,i686)'
+        else:
+            flavor = "is: %s" % self.flavor
+
         results = self.repos.findTroves(self.labels, troves,
-            defaultFlavor=deps.parseFlavor("is: %s" % self.flavor))
+            defaultFlavor=deps.parseFlavor(flavor), bestFlavor=True)
         withVersions = [sorted(x)[-1] for x in results.values()]
         return withVersions
 
