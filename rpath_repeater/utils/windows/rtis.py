@@ -383,7 +383,7 @@ class rTIS(object):
 
         # Generate new format if all timestamps are not 0.
         if [ x for x in data if x[1] ]:
-            data = [ '|'.join((x.asString(withTimestamp=True), y))
+            data = [ '|'.join((x.asString(withTimestamp=True), str(y)))
                 for x, y in data ]
 
         fh = self._smb.pathopen(self.updatesDir, '..', 'manifest', mode='w',
