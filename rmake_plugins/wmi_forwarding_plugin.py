@@ -22,6 +22,7 @@ from rmake3.core import handler
 
 from rpath_repeater.utils import windows
 from rpath_repeater.models import WmiParams
+from rpath_repeater.models import ScriptOutput
 from rpath_repeater.codes import Codes as C, NS
 from rpath_repeater.utils import base_forwarding_plugin as bfp
 
@@ -287,12 +288,34 @@ class ConfigurationTask(WMITaskHandler):
         values = etree.fromstring(data.argument).getchildren()
         results = system.configure(str(self.task.job_uuid), values)
 
-        errors = [ x for x in results if x[0] != 0 ]
+        # Handle old return values.
+        errors = []
+        success = True
+        if results and isinstance(results[0], tuple):
+            errors = [ x for x in results if x[0] != 0 ]
+            if errors:
+                success = False
 
-        data.response = etree.tostring(self._poll(system))
+        result_system = self._poll(system)
+
+        # New return types.
+        if results and isinstance(results[0], etree._Element):
+            if [ x for x in results[0].iterchildren()
+                if x.tag == 'status' and x.text == 'fail' ]:
+                success = False
+            rc = success and 1 or 0
+            result_system.append(
+                ScriptOutput(
+                    stdout=etree.tostring(results[0]), returnCode=rc
+                ).toXmlDom()
+            )
+
+        log.debug(etree.tostring(result_system, pretty_print=True))
+
+        data.response = etree.tostring(result_system)
         self.setData(data)
 
-        if errors:
+        if not success:
             self.sendStatus(C.ERR_GENERIC, '%s Applying configuration failed:'
                 % data.p.host)
             for rc, handler, msg in errors:

@@ -197,6 +197,10 @@ class Servicing(object):
         updateJobs = self.c2d(root).get('updateJobs')
 
         for config in updateJobs.iterchildren():
+            results = self.c2d(config).get('results')
+            if results:
+                yield self.c2d(results).get('write_status')
+                continue
             handlers = self.c2d(config).get('handlers')
             if not handlers:
                 continue
