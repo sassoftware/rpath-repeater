@@ -504,12 +504,12 @@ class PayloadCalculator(object):
         troves = [ (name, None, None) for name in self.troves ]
         # FIX for 32 bit assimilation
         if self.flavor == 'x86':
-            flavor = 'is: x86(i486,i586,i686)'
+            flavor = deps.parseFlavor('is: x86(i486,i586,i686)')
         else:
-            flavor = "is: %s" % self.flavor
+            flavor = deps.parseFlavor('is: %s' % self.flavor)
 
         results = self.repos.findTroves(self.labels, troves,
-            defaultFlavor=deps.parseFlavor(flavor), bestFlavor=True)
+            defaultFlavor=flavor, bestFlavor=True)
         withVersions = [sorted(x)[-1] for x in results.values()]
         return withVersions
 
