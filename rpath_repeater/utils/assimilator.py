@@ -502,15 +502,14 @@ class PayloadCalculator(object):
         name (first priority) and then version (second).
         '''
         troves = [ (name, None, None) for name in self.troves ]
-        # FIX for 32 bit assimilation
-        if self.flavor == 'x86':
-            flavor = deps.parseFlavor('is: x86(i486,i586,i686)')
-        else:
-            flavor = deps.parseFlavor('is: %s' % self.flavor)
-
-        results = self.repos.findTroves(self.labels, troves,
-            defaultFlavor=flavor, bestFlavor=True)
-        withVersions = [sorted(x)[-1] for x in results.values()]
+        flavor = deps.parseFlavor('is: %s' % self.flavor)
+        results = self.repos.findTroves(self.labels, troves)
+        withVersions = []
+        for _, trvTupList in results.items():
+            satisfies = sorted(x for x in trvTupList
+                    if flavor is None or x[2].satisfies(flavor))
+            if satisfies:
+                withVersions.append(satisfies[-1])
         return withVersions
 
     def digestVersion(self):
