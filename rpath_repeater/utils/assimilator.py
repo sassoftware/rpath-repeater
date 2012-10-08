@@ -215,9 +215,9 @@ proxyFile.write("conaryProxy https://%s\\n" % server)
 proxyFile.close()
 
 logger.info("updating packages")
-cmd = "conary update conary rpm:python sblim-sfcb-conary sblim-sfcb-schema-conary"
-cmd = cmd + " sblim-cmpi-network-conary sblim-cmpi-base-conary"
-cmd = cmd + " conary-cim cmpi-bindings-conary iconfig rpm:python"
+cmd = "conary update conary rpm rpm-python sblim-sfcb-conary sblim-sfcb-schema-conary"
+cmd = cmd + " sblim-cmpi-network-conary sblim-cmpi-base-conary python-lxml-conary"
+cmd = cmd + " conary-cim cmpi-bindings-conary iconfig libxml2 libxslt smartform-conary"
 cmd = cmd + " m2crypto-conary openslp-conary info-sfcb --no-deps"
 runCmd(cmd)
 
@@ -274,6 +274,8 @@ logger.info("registering")
 if projectLabel != "None":
     runCmd("conary migrate --replace-unmanaged-files '%s'" % (installTrove,),
             must_succeed=True)
+runCmd("rm -f /var/lib/rpm/__db*")
+runCmd("rpm --rebuilddb")
 runCmd("rpath-register --event-uuid=%s" % sys.argv[1], must_succeed=True)
 
 sys.exit(0)
@@ -300,7 +302,11 @@ sys.exit(0)
             "rpath-tools",
             "m2crypto-conary", # not in group-rpath-tools, this is a bug
             "pywbem-conary",
-            "rpm:python"
+            "rpm",
+            "rpm-python",
+            "libxml2",
+            "libxslt",
+            "python-lxml-conary",
         ]
         self.caCert = caCert
         self.rLabels = self._install_labels(osFamily)
@@ -455,7 +461,7 @@ sys.exit(0)
             'var/spool/rpath', 'assimilator.digest',
             digestVersion,
         )
- 
+
     def _buildTarball(self, digestVersion, trovesNeeded):
         '''
         Builds assimilator tarball on the worker node
