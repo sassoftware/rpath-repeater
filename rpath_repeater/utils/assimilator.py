@@ -215,7 +215,7 @@ proxyFile.write("conaryProxy https://%s\\n" % server)
 proxyFile.close()
 
 logger.info("updating packages")
-cmd = "conary update conary rpm rpm-python sblim-sfcb-conary sblim-sfcb-schema-conary"
+cmd = "conary update conary rpm sblim-sfcb-conary sblim-sfcb-schema-conary"
 cmd = cmd + " sblim-cmpi-network-conary sblim-cmpi-base-conary python-lxml-conary"
 cmd = cmd + " conary-cim cmpi-bindings-conary iconfig libxml2 libxslt smartform-conary"
 cmd = cmd + " m2crypto-conary openslp-conary info-sfcb --no-deps"
@@ -303,7 +303,6 @@ sys.exit(0)
             "m2crypto-conary", # not in group-rpath-tools, this is a bug
             "pywbem-conary",
             "rpm",
-            "rpm-python",
             "libxml2",
             "libxslt",
             "python-lxml-conary",
