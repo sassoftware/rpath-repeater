@@ -57,7 +57,7 @@ class SMBClient(object):
 
         # Older mount.cifs don't seem to support passing the user via an
         # environment variable
-        self._mount_cmd = [ 'sudo', '/bin/mount', '-n', '-t', 'cifs', '-o',
+        self._mount_cmd = [ '/bin/mount', '-n', '-t', 'cifs', '-o',
             'user=%(user)s,password=%(password)s,forcedirectio',
             '//%%(host)s/%s$' % self._driveLetter ]
         self._mount_env = dict(PASSWD=self._authInfo.password)
