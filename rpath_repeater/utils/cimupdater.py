@@ -16,8 +16,6 @@
 #
 
 
-import time
-
 import pywbem
 import wbemlib
 import cimjobhandler
