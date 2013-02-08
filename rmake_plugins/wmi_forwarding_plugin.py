@@ -276,8 +276,8 @@ class UpdateTask(WMITaskHandler):
             else:
                 msg = status.get('status')
                 if status.get('exitCode') not in (None, '0'):
-                    msg += ' with exit code %s' % status.get('exitCode')
-                    msg += ' (' + status.get('exitCodeDescription') + ')'
+                    msg += (' with exit code %s (%s)' % (status.get('exitCode'),
+                        status.get('exitCodeDescription')))
                     code = C.ERR_GENERIC
             self.sendStatus(code, '%s of %s %s' % (op, nvf, msg))
 
