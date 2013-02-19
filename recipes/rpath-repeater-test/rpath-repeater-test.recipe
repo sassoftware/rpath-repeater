@@ -15,7 +15,7 @@
 #
 
 
-loadSuperClass('testpackage=testbits.rb.rpath.com@rpl:1')
+loadSuperClass('testpackage')
 class rPathRepeaterTest(TestPackageRecipe):
     name = 'rpath-repeater-test'
     version = '0.1'
@@ -23,9 +23,9 @@ class rPathRepeaterTest(TestPackageRecipe):
     testDir = '.'
 
     buildRequires = [
-        'lxml:python',
-        'make:runtime',
-        'python:devel',
+        'conary-test:python',
+        'make',
+        'python-devel',
         'pywbem:python',
         'rmake3:python',
         'rpath-repeater:lib',
@@ -33,23 +33,13 @@ class rPathRepeaterTest(TestPackageRecipe):
         'smartform:python',
         'wmiclient:python',
         'xobj:python',
-
-        # testsuites
-        'conary-test:python',
-        'testutils:python',
-        'testutils:runtime',
     ]
 
     pythonPath = [
         '%(libdir)s/rmake3',
     ]
 
-    codeDirs = {
-        'rpath-repeater' : '%(libdir)s/python2.4/site-packages/rpath_repeater',
-        'rpath-repeater-plugins' : '%(libdir)s/rmake3',
-    }
-
-
-    def setup(r):
+    def setupSource(r):
         r.addMercurialSnapshot()
-        r.test()
+        # Force use of installed code
+        r.Remove('rpath_repeater', 'rmake_plugins', recursive=True)
