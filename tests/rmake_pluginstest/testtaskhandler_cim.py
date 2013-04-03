@@ -109,7 +109,7 @@ class CimTest(TestBase):
                     CIMInstance(OP.UpdateJob,
                         properties=dict(JobState=CIMProperty('JobState', 7, type='uint16'),
                             JobResults=CIMProperty('JobResults',
-                            ['<preview/>', ])),
+                                ['<preview id="foo:a-b-c-d"/>', ])),
                         path=OP.UpdateJob),
                 ],
                 RPATH_SurveyConcreteJob = [
@@ -139,6 +139,10 @@ class CimTest(TestBase):
             Scan = (4096, dict(
                 job=CIMInstanceName('RPATH_SurveyConcreteJob',
                     keybindings=dict(InstanceID='a-b-c-d')))),
+            UpdateFromSystemModel = (4096, dict(
+                job=CIMInstanceName('RPATH_UpdateConcreteJob',
+                    keybindings=dict(InstanceID='a-b-c-d')))),
+            ApplyUpdate = (0, dict()),
         ),
     )
 
@@ -278,15 +282,50 @@ class CimTest(TestBase):
             "group-top2=/conary.rpath.com@rpl:2/2-2-2" ]
         self.client.update_cim(params, sources=sources)
         lastTask = self.results.update[-1]
-        raise testsuite.SkipTestException("Need to mock conaryclient")
         self.failIf(lastTask.status.detail, lastTask.status.detail)
         self.failUnlessEqual(
             [ (x.status.code, x.status.text) for x in self.results.update ],
             [
+                (101, 'Contacting host 1.2.3.4 on port 8135 to update it'),
+                (200, 'Host 1.2.3.4 has been updated')
             ])
         taskData = lastTask.task_data.thaw()
-        self.assertXMLEquals(taskData.object.response, """
-""")
+        self.assertEquals(taskData.object.response, '<preview id="foo:a-b-c-d"/>')
+        self.assertEquals(self.results.update[-1].task_data.thaw().object.argument, {'sources': ['group-top1=/conary.rpath.com@rpl:2/1-1-1', 'group-top2=/conary.rpath.com@rpl:2/2-2-2']})
+
+    def testUpdateWithSystemModel(self):
+        params = self._cimParams()
+        systemModel = """\
+install group-top1=/conary.rpath.com@rpl:2/1-1-1
+install group-top2=/conary.rpath.com@rpl:2/2-2-2
+"""
+        self.client.update_cim(params, systemModel=systemModel)
+        lastTask = self.results.update[-1]
+        self.failIf(lastTask.status.detail, lastTask.status.detail)
+        self.failUnlessEqual(
+            [ (x.status.code, x.status.text) for x in self.results.update ],
+            [
+                (101, 'Contacting host 1.2.3.4 on port 8135 to generate an update preview'),
+                (200, 'Host 1.2.3.4 preview generated')
+            ])
+        taskData = lastTask.task_data.thaw()
+        previewId = "foo:a-b-c-d"
+        self.assertEquals(taskData.object.response, '<preview id="%s"/>' % previewId)
+        task = self.results.update[-1]
+        self.assertEquals(task.task_data.thaw().object.argument, dict(systemModel=systemModel))
+
+        # Apply update
+        self.client.update_cim(params, previewId=previewId)
+        lastTask = self.results.update[-1]
+        self.failIf(lastTask.status.detail, lastTask.status.detail)
+        self.failUnlessEqual(
+            [ (x.status.code, x.status.text) for x in self.results.update ],
+            [
+                (101, 'Contacting host 1.2.3.4 on port 8135 to generate an update preview'),
+                (200, 'Host 1.2.3.4 preview generated'),
+                (101, 'Contacting host 1.2.3.4 on port 8135 to update it'),
+                (200, 'Host 1.2.3.4 has been updated'),
+            ])
 
     def testConfiguration(self):
         params = self._cimParams()

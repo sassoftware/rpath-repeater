@@ -26,6 +26,8 @@ class WBEMException(Exception):
     '''
     pass
 
+def createObjectPath(className, keybindings):
+    return pywbem.CIMInstanceName(className, keybindings=keybindings)
 
 class WBEMUnexpectedReturnException(WBEMException):
     def __init__(self, expectedReturnCode, returnCode, returnMsg, *args,

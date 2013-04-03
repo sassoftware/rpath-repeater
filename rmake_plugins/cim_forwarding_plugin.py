@@ -93,9 +93,7 @@ class CimHandler(bfp.BaseHandler):
                 'desiredTopLevelItems', None))
             return bfp.GenericData(params, zoneAddresses, arguments)
         if taskType in [ NS.CIM_TASK_UPDATE ]:
-            sources = methodArguments['sources']
-            arguments = dict(sources=sources, test=methodArguments.get('test', False))
-            return bfp.GenericData(params, zoneAddresses, arguments)
+            return bfp.GenericData(params, zoneAddresses, methodArguments)
         if taskType in [ NS.CIM_TASK_CONFIGURATION ]:
             configuration = methodArguments['configuration']
             return bfp.GenericData(params, zoneAddresses, configuration)
@@ -284,8 +282,14 @@ class PollingTask(CIMTaskHandler):
 
 class UpdateTask(CIMTaskHandler):
     def _run(self, data):
-        self.sendStatus(C.MSG_START, "Contacting host %s on port %d to update it" % (
-            data.p.host, data.p.port))
+        if data.argument.get('test') or data.argument.get('systemModel'):
+            msgStart = "Contacting host %s on port %d to generate an update preview"
+            msgFinal = "Host %s preview generated"
+        else:
+            msgStart = "Contacting host %s on port %d to update it"
+            msgFinal = "Host %s has been updated"
+
+        self.sendStatus(C.MSG_START, msgStart % (data.p.host, data.p.port))
 
         server = self.getWbemConnection(data)
         job = self._applySoftwareUpdate(server, data.argument, sorted(data.nodes))
@@ -299,13 +303,9 @@ class UpdateTask(CIMTaskHandler):
         jobResults = job.properties['JobResults'].value
         if jobResults:
             data.response = str(jobResults[0])
-        if data.argument['test']:
-            msg = "Host %s preview generated"
-        else:
-            msg = "Host %s has been updated"
 
         self.setData(data)
-        self.sendStatus(C.OK, msg % data.p.host)
+        self.sendStatus(C.OK, msgFinal % data.p.host)
 
     def _applySoftwareUpdate(self, server, arguments, nodes):
         cimUpdater = cimupdater.CIMUpdater(server)

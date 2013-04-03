@@ -28,6 +28,7 @@ class CIMUpdater(cimjobhandler.CIMJobHandler):
     Exposes both asynchronous and synchronous methods to check for and apply
     updates.
     '''
+    _unset = object()
 
     def __init__(self, server, logger=None):
         super(CIMUpdater, self).__init__(server, logger=logger)
@@ -75,10 +76,10 @@ class CIMUpdater(cimjobhandler.CIMJobHandler):
         return insts
 
     def updateCheckAsync(self):
-        result = self.server.VAMI_SoftwareInstallationService.CheckAvailableUpdates()
+        result = self.server.RPATH_SoftwareInstallationService.CheckAvailableUpdates()
 
         if result[0] != 4096L:
-            self._unexpectedReturnCode('VAMI_SoftwareInstallationService', 
+            self._unexpectedReturnCode('RPATH_SoftwareInstallationService', 
                 'CheckAvailableUpdates', result[0], 4096L)
 
         job = result[1]['job']
@@ -88,19 +89,37 @@ class CIMUpdater(cimjobhandler.CIMJobHandler):
         job = self.updateCheckAsync()
         return self.handleJob(job, timeout = timeout)
 
-    def applyUpdateAsync(self, sources, test, nodes):
-        opts = [pywbem.Uint16(2)] # Migrate.
-        if test:
-            opts.append(pywbem.Uint16(4))
-        return self.callMethodAsync('VAMI_SoftwareInstallationService',
-            'InstallFromNetworkLocations',
-            methodKwargs=dict(
-                ManagementNodeAddresses=nodes,
-                Sources=sources,
-                InstallOptions=opts))
+    def applyUpdateAsync(self, nodes, test=False, sources=_unset,
+            systemModel=_unset, previewId=_unset, **kwargs):
+        if sources is not self._unset:
+            opts = [pywbem.Uint16(2)] # Migrate.
+            if test:
+                opts.append(pywbem.Uint16(4))
+            return self.callMethodAsync('RPATH_SoftwareInstallationService',
+                'InstallFromNetworkLocations',
+                methodKwargs=dict(
+                    ManagementNodeAddresses=nodes,
+                    Sources=sources,
+                    InstallOptions=opts))
+        if systemModel is not self._unset:
+            return self.callMethodAsync('RPATH_SoftwareInstallationService',
+                'UpdateFromSystemModel',
+                methodKwargs=dict(
+                    ManagementNodeAddresses=nodes,
+                    SystemModel=systemModel,
+                    InstallOptions=[]))
+        if previewId is not self._unset:
+            methodName = 'ApplyUpdate'
+            objectPath = cimjobhandler.createObjectPath(
+                    'RPATH_UpdateConcreteJob', keybindings=dict(InstanceID=previewId))
+            ret, _ = self.callExtrinsicMethod(objectPath, methodName)
+            if ret != 0:
+                self._unexpectedReturnCode(objectPath.classname, methodName,
+                        ret, 0)
+            return objectPath
 
-    def applyUpdate(self, sources, test, timeout = None, nodes=None):
-        job = self.applyUpdateAsync(sources, test, nodes)
+    def applyUpdate(self, timeout = None, nodes=None, **kwargs):
+        job = self.applyUpdateAsync(nodes, **kwargs)
         return self.handleJob(job, timeout = timeout)
 
     def checkAndApplyUpdate(self, timeout = None):
