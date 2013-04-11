@@ -197,8 +197,11 @@ class EndPoint(resource.Resource):
         def on_reply(replies):
             for reply in replies:
                 dict = chutney.loads(reply.payload)
-
                 request.setResponseCode(dict['status'])
+                for key, value in dict['headers'].items():
+                    if key.lower() in ('connection', 'transfer-encoding'):
+                        continue
+                    request.setHeader(key, value)
 
                 responseBody = dict['body']
                 if responseBody:
