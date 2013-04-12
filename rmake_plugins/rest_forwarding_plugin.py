@@ -142,7 +142,12 @@ class RepeaterMessageHandler(message.MessageHandler):
         def processError(error):
             # There was an error talking upstream. Return a 502 Bad Gateway
             # XXX Ideally we want to explain what the original error was
-            reply = { 'status' : 502, 'body' : '' }
+            reply = dict(
+                    status=502,
+                    message='Bad Gateway',
+                    headers={},
+                    body='',
+                    )
             neighbor.send(message.Message(self.namespace, chutney.dumps(reply),
                                            in_reply_to=msg))
 
@@ -198,7 +203,7 @@ class EndPoint(resource.Resource):
             for reply in replies:
                 dict = chutney.loads(reply.payload)
                 request.setResponseCode(dict['status'])
-                for key, value in dict['headers'].items():
+                for key, value in dict.get('headers', {}).items():
                     if key.lower() in ('connection', 'transfer-encoding'):
                         continue
                     request.setHeader(key, value)
