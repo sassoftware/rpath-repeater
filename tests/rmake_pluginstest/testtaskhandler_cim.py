@@ -149,6 +149,12 @@ class CimTest(TestBase):
     class WBEMServer(cim_forwarding_plugin.CIMTaskHandler.WBEMServerFactory):
         class WBEMConnectionFactory(cim_forwarding_plugin.CIMTaskHandler.WBEMServerFactory.WBEMConnectionFactory):
             _data = {}
+            _invocations = []
+
+            @classmethod
+            def fixtureReset(cls):
+                cls._data.clear()
+                del cls._invocations[:]
 
             def _getAccessor(self, params):
                 accessors =  ['ClassName', 'InstanceName', 'ModifiedInstance']
@@ -170,6 +176,8 @@ class CimTest(TestBase):
                 if val is None:
                     raise Exception("Mock me: %s %s" % (methodname,
                         classname))
+                self._invocations.append(IntrinsicMethodInvocation(methodname,
+                    params, response=val))
                 return ('IMETHODRESPONSE', dict(NAME=methodname), val)
             def methodcall(self, methodname, localobject, **params):
                 mmock = self._data['extrinsic'].get(methodname, None)
@@ -188,14 +196,17 @@ class CimTest(TestBase):
                     else:
                         raise Exception("Unknown type for %s" % v)
                     val.append((k, vtype, v))
+                self._invocations.append(ExtrinsicMethodInvocation(methodname,
+                    localobject, params, response=val))
                 return val
 
     def getClassOverrides(self, namespace):
         wbemServerClass = self.WBEMServer
-        wbemServerClass.WBEMConnectionFactory._data.clear()
+        wbemServerClass.WBEMConnectionFactory.fixtureReset()
         wbemServerClass.WBEMConnectionFactory._data.update(self._defaultData)
         # Here we allow individual tests to override some of the data
         self._data = wbemServerClass.WBEMConnectionFactory._data
+        self._invocations = wbemServerClass.WBEMConnectionFactory._invocations
         return dict(
             WBEMServerFactory=wbemServerClass,
             _probeHost=lambda x,host,port,x509: "server cert",
@@ -354,6 +365,8 @@ install group-top2=/conary.rpath.com@rpl:2/2-2-2
             [
             ])
         taskData = lastTask.task_data.thaw()
+        self.assertEquals(taskData.object.argument,
+                methodArguments)
         self.assertXMLEquals(taskData.object.response, """
 <surveys>
   <survey>
@@ -361,4 +374,54 @@ install group-top2=/conary.rpath.com@rpl:2/2-2-2
   </survey>
 </surveys>
 """)
+        self.assertEquals([ x.methodName for x in self._invocations ],
+                ['Scan', 'GetInstance'])
+        self.assertEquals(self._invocations[0].params,
+            dict(DesiredPackages=methodArguments.get('desiredTopLevelItems'),
+                    SystemModel=methodArguments.get('systemModel')))
+
+    def testScanWithSystemModel(self):
+        params = self._cimParams()
+        methodArguments = dict(
+            systemModel='\n'.join("install %s" % x for x in
+                ['group-a=h@ns:1/1-2-3', 'group-b=h@ns:2/1-2-3']))
+        self.client.survey_scan_cim(params, **methodArguments)
+        lastTask = self.results.scan[-1]
+        self.failIf(lastTask.status.detail, lastTask.status.detail)
+        self.failUnlessEqual(
+            [ (x.status.code, x.status.text) for x in self.results.update ],
+            [
+            ])
+        taskData = lastTask.task_data.thaw()
+        self.assertEquals(taskData.object.argument,
+                methodArguments)
+        self.assertXMLEquals(taskData.object.response, """
+<surveys>
+  <survey>
+    <uuid>aa-bb-cc-dd</uuid>
+  </survey>
+</surveys>
+""")
+        self.assertEquals([ x.methodName for x in self._invocations ],
+                ['Scan', 'GetInstance'])
+        self.assertEquals(self._invocations[0].params,
+            dict(DesiredPackages=methodArguments.get('desiredTopLevelItems'),
+                    SystemModel=methodArguments.get('systemModel')))
+
+class MethodInvocation(object):
+    __slots__ = [ 'methodName', 'params', 'response', ]
+    def __init__(self, methodName, params, response):
+        self.methodName = methodName
+        self.params = params
+        self.response = response
+
+class IntrinsicMethodInvocation(MethodInvocation):
+    __slots__ = []
+
+class ExtrinsicMethodInvocation(MethodInvocation):
+    __slots__ = [ 'objectPath', ]
+    def __init__(self, methodName, objectPath, params, response):
+        super(ExtrinsicMethodInvocation, self).__init__(methodName, params, response)
+        self.objectPath = objectPath
+
 testsuite.main()

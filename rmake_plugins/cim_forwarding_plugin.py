@@ -88,11 +88,7 @@ class CimHandler(bfp.BaseHandler):
     def _getArgs(cls, taskType, params, methodArguments, zoneAddresses):
         if taskType in [ NS.CIM_TASK_REGISTER, NS.CIM_TASK_SHUTDOWN, NS.CIM_TASK_POLLING ]:
             return CimData(params, zoneAddresses)
-        if taskType in [ NS.CIM_TASK_SURVEY_SCAN ]:
-            arguments = dict(desiredTopLevelItems=methodArguments.get(
-                'desiredTopLevelItems', None))
-            return bfp.GenericData(params, zoneAddresses, arguments)
-        if taskType in [ NS.CIM_TASK_UPDATE ]:
+        if taskType in [ NS.CIM_TASK_SURVEY_SCAN, NS.CIM_TASK_UPDATE ]:
             return bfp.GenericData(params, zoneAddresses, methodArguments)
         if taskType in [ NS.CIM_TASK_CONFIGURATION ]:
             configuration = methodArguments['configuration']
@@ -368,9 +364,10 @@ class SurveyScanTask(CIMTaskHandler):
 
         server = self.getWbemConnection(data)
 
-        desiredTopLevelItems = data.argument['desiredTopLevelItems']
+        desiredTopLevelItems = data.argument.get('desiredTopLevelItems')
+        systemModel = data.argument.get('systemModel')
         scanner = surveyscanner.CIMSurveyScanner(server)
-        job = scanner.scan(desiredTopLevelItems)
+        job = scanner.scan(desiredTopLevelItems, systemModel)
 
         succeeded = False
         if job.properties['JobResults'].value:
