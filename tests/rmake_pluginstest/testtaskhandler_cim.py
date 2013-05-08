@@ -376,9 +376,14 @@ install group-top2=/conary.rpath.com@rpl:2/2-2-2
 """)
         self.assertEquals([ x.methodName for x in self._invocations ],
                 ['Scan', 'GetInstance'])
-        self.assertEquals(self._invocations[0].params,
-            dict(DesiredPackages=methodArguments.get('desiredTopLevelItems'),
-                    SystemModel=methodArguments.get('systemModel')))
+        desired = dict()
+        arg = methodArguments.get('desiredTopLevelItems')
+        if arg is not None:
+            desired.update(DesiredPackages=arg)
+        arg = methodArguments.get('systemModel')
+        if arg is not None:
+            desired.update(SystemModel=arg)
+        self.assertEquals(self._invocations[0].params, desired)
 
     def testScanWithSystemModel(self):
         params = self._cimParams()
@@ -404,9 +409,14 @@ install group-top2=/conary.rpath.com@rpl:2/2-2-2
 """)
         self.assertEquals([ x.methodName for x in self._invocations ],
                 ['Scan', 'GetInstance'])
-        self.assertEquals(self._invocations[0].params,
-            dict(DesiredPackages=methodArguments.get('desiredTopLevelItems'),
-                    SystemModel=methodArguments.get('systemModel')))
+        desired = dict()
+        arg = methodArguments.get('desiredTopLevelItems')
+        if arg is not None:
+            desired.update(DesiredPackages=arg)
+        arg = methodArguments.get('systemModel')
+        if arg is not None:
+            desired.update(SystemModel=arg)
+        self.assertEquals(self._invocations[0].params, desired)
 
 class MethodInvocation(object):
     __slots__ = [ 'methodName', 'params', 'response', ]
