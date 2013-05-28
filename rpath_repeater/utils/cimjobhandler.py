@@ -21,6 +21,7 @@ import time
 import wbemlib
 
 WBEMException = wbemlib.WBEMException
+createObjectPath = wbemlib.createObjectPath
 
 class CIMJobHandler(object):
     '''
@@ -132,6 +133,13 @@ class CIMJobHandler(object):
                 result[0], 4096L)
 
         return result[1]['job']
+
+    def callExtrinsicMethod(self, objectPath, methodName, methodKwargs=None):
+        if methodKwargs is None:
+            methodKwargs = {}
+        conn = self.server.conn
+        result = conn.InvokeMethod(methodName, objectPath, **methodKwargs)
+        return result
 
     def handleJob(self, job, timeout=None):
         job = self.pollJobForCompletion(job, timeout = timeout)

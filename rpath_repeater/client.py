@@ -246,13 +246,13 @@ class RepeaterClient(object):
         method = 'shutdown'
         raise NotImplementedError(method)
 
-    def update_cim(self, cimParams, sources=None, **kwargs):
+    def update_cim(self, cimParams, **kwargs):
         method = 'update'
-        return self._cimCallDispatcher(method, cimParams, sources=sources, **kwargs)
+        return self._cimCallDispatcher(method, cimParams, **kwargs)
 
-    def update_wmi(self, wmiParams, sources=None, **kwargs):
+    def update_wmi(self, wmiParams, **kwargs):
         method = 'update'
-        return self._wmiCallDispatcher(method, wmiParams, sources=sources, **kwargs)
+        return self._wmiCallDispatcher(method, wmiParams, **kwargs)
 
     def configuration_cim(self, cimParams, configuration=None, **kwargs):
         method = 'configuration'

@@ -21,6 +21,7 @@ import logging
 from conary.lib import cfg as cny_cfg
 from conary.lib import cfgtypes
 from rmake3.lib import chutney
+from rmake3.lib import logger
 from rmake3.lib.jabberlink import message
 from rmake3.lib.jabberlink.handlers import link
 
@@ -140,9 +141,13 @@ class RepeaterMessageHandler(message.MessageHandler):
 
         @fact.deferred.addErrback
         def processError(error):
-            # There was an error talking upstream. Return a 502 Bad Gateway
-            # XXX Ideally we want to explain what the original error was
-            reply = { 'status' : 502, 'body' : '' }
+            logger.logFailure(error, "Error in proxied REST request:")
+            reply = dict(
+                    status=500,
+                    message='Internal Server Error',
+                    headers={},
+                    body='',
+                    )
             neighbor.send(message.Message(self.namespace, chutney.dumps(reply),
                                            in_reply_to=msg))
 
@@ -179,6 +184,8 @@ class EndPoint(resource.Resource):
 
     def sendMsg(self, request, method):
         request.content.seek(0, 0)
+        request.requestHeaders.setRawHeaders('x-forwarded-for',
+                [request.getClientIP()])
         body = request.content.read()
 
         content = {
@@ -197,8 +204,11 @@ class EndPoint(resource.Resource):
         def on_reply(replies):
             for reply in replies:
                 dict = chutney.loads(reply.payload)
-
                 request.setResponseCode(dict['status'])
+                for key, values in dict.get('headers', {}).items():
+                    if key.lower() in ('connection', 'transfer-encoding'):
+                        continue
+                    request.responseHeaders.setRawHeaders(key, values)
 
                 responseBody = dict['body']
                 if responseBody:
@@ -210,7 +220,16 @@ class EndPoint(resource.Resource):
         return d
 
 
+class HTTPPageGetter(client.HTTPPageGetter):
+
+    def handleStatusDefault(self):
+        # Pass through all HTTP responses regardless of status
+        pass
+
+
 class HTTPClientFactory(client.HTTPClientFactory):
+    protocol = HTTPPageGetter
+
     def __init__(self, url, *args, **kwargs):
         client.HTTPClientFactory.__init__(self, url, *args, **kwargs)
         self.status = None

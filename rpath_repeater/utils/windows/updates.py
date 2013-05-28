@@ -36,7 +36,7 @@ from conary.conaryclient import modelupdate
 from conary.errors import ParseError
 from conary.errors import TroveSpecsNotFound
 
-from rpath_tools.client.utils.update_job_formatter import Formatter
+from rpath_tools.lib.formatter import Formatter
 
 from rpath_repeater.utils.windows.rtis import Servicing
 from rpath_repeater.utils.windows.callbacks import BaseCallback
