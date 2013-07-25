@@ -20,6 +20,8 @@ import logging
 
 from conary.lib import cfg as cny_cfg
 from conary.lib import cfgtypes
+from conary.lib.http.request import URL
+
 from rmake3.lib import chutney
 from rmake3.lib import logger
 from rmake3.lib.jabberlink import message
@@ -83,7 +85,7 @@ class RepeaterMessageHandler(message.MessageHandler):
     XRepeaterHeader = 'X-rPath-Repeater'
 
     def __init__(self, host, workers):
-        self.host = host
+        self.targetUrl = URL(host)
         self.workers = workers
 
     def getManagementZone(self, neighbor):
@@ -151,7 +153,11 @@ class RepeaterMessageHandler(message.MessageHandler):
             neighbor.send(message.Message(self.namespace, chutney.dumps(reply),
                                            in_reply_to=msg))
 
-        reactor.connectTCP(self.host, 80, fact)
+        host, port = self.targetUrl.hostport
+        if self.targetUrl.scheme == 'https':
+            reactor.connectSSL(str(host), port, fact)
+        else:
+            reactor.connectTCP(str(host), port, fact)
 
 
 class EndPoint(resource.Resource):
@@ -186,6 +192,8 @@ class EndPoint(resource.Resource):
         request.content.seek(0, 0)
         request.requestHeaders.setRawHeaders('x-forwarded-for',
                 [request.getClientIP()])
+        request.requestHeaders.setRawHeaders('x-forwarded-proto',
+                ['https' if request.isSecure() else 'http'])
         body = request.content.read()
 
         content = {
