@@ -51,7 +51,7 @@ class ConaryScanner(_ConaryScanner):
         self._client = client
 
     def _getDb(self):
-        return DbShim(self.client.repos, self.pkglist)
+        return DbShim(self._client.repos, self.pkglist)
 
 
 class WindowsPackage(object):
