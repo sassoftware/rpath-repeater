@@ -64,10 +64,6 @@ class TargetCommand(BaseCommand):
         return self._invoke(codes.NS.TARGET_INSTANCES_LIST,
             instanceIds=instanceIds, **kwargs)
 
-    def captureSystem(self, instanceId, params, **kwargs):
-        return self._invoke(codes.NS.TARGET_SYSTEM_CAPTURE,
-            instanceId=instanceId, params=params, **kwargs)
-
     def imageDeploymentDescriptor(self, **kwargs):
         return self._invoke(codes.NS.TARGET_IMAGE_DEPLOY_DESCRIPTOR,
                 jobUrl=None, **kwargs)
@@ -431,20 +427,6 @@ def main():
     elif 0:
         cli.targets.configure(zone, targetConfiguration, userCredentials)
         uuid, job = cli.targets.listImages(imageIds=None)
-    elif 1:
-        cli.targets.configure(zone, targetConfiguration, userCredentials)
-        instanceId = ""
-        params = dict(
-            outputToken='afe25c82-94e9-44c3-ae47-b352f06ee3aa',
-            imageUploadUrl="http://dhcp155.eng.rpath.com/uploadBuild/5",
-            imageFilesCommitUrl="http://dhcp155.eng.rpath.com/api/products/celery/images/5/files",
-            imageTitle='Image Title',
-            imageName="cobbler-clone.ova",
-            image_id="http://dhcp155.eng.rpath.com/api/v1/images/5",
-        )
-        params.update({'metadata.owner': 'Owner', 'metadata.admin' : 'Admin'})
-        instanceId = '42345ce9-8a1e-7239-ceb9-3cfbcc8c6667'
-        uuid, job = cli.targets.captureSystem(instanceId, params)
     elif 0:
         uuid, job = cli.register_cim(cimParams)
     elif 0:

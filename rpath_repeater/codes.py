@@ -53,7 +53,6 @@ class NS(object):
     TARGET_TEST_CREDENTIALS = "%s.test.credentials" % TARGET
     TARGET_IMAGES_LIST = "%s.images.list" % TARGET
     TARGET_INSTANCES_LIST = "%s.instances.list" % TARGET
-    TARGET_SYSTEM_CAPTURE = "%s.instances.capture" % TARGET
     TARGET_IMAGE_DEPLOY = "%s.images.deploy" % TARGET
     TARGET_IMAGE_DEPLOY_DESCRIPTOR = "%s.images.deploy.descriptor" % TARGET
     TARGET_SYSTEM_LAUNCH = "%s.instances.launch" % TARGET
