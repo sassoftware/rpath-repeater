@@ -21,6 +21,7 @@ from twisted.internet import error as internet_error
 from twisted.internet import reactor
 from rmake3.core import plug_dispatcher
 from rmake3.lib import netlink
+from rmake3.lib.twisted_extras import tools
 from rpath_repeater.utils import base_forwarding_plugin as bfp
 from rpath_repeater.utils import http
 
@@ -28,7 +29,11 @@ log = logging.getLogger(__name__)
 
 class NodeReportingPlugin(plug_dispatcher.DispatcherPlugin):
     HEARTBEAT = 600
+    TIMEOUT = 60
+
+
     def dispatcher_post_setup(self, dispatcher):
+        self.serializer = tools.Serializer()
         self.setUpHeartbeat(dispatcher)
         self.getLocalAddressses(dispatcher)
 
@@ -58,7 +63,7 @@ class NodeReportingPlugin(plug_dispatcher.DispatcherPlugin):
         node = bfp.XML.Element('management_nodes', *children)
         data = self.toXml(node)
         log.debug("Updating inventory with %d management nodes", len(children))
-        self.postResults(data)
+        return self.serializer.call(self.postResults, (data,), collapsible=True)
 
     @classmethod
     def toXml(self, elt):
@@ -111,7 +116,7 @@ class NodeReportingPlugin(plug_dispatcher.DispatcherPlugin):
             'Content-Type' : 'application/xml; charset="utf-8"',
             'Host' : host, }
         fact = http.HTTPClientFactory(path, method='PUT', postdata=data,
-            headers = headers)
+            headers=headers, timeout=self.TIMEOUT)
         @fact.deferred.addCallback
         def processResult(result):
             log.debug("Management node list updated")
@@ -126,3 +131,4 @@ class NodeReportingPlugin(plug_dispatcher.DispatcherPlugin):
                     error.getErrorMessage())
 
         reactor.connectTCP(host, port, fact)
+        return fact.deferred
