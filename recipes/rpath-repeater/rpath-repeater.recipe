@@ -25,7 +25,6 @@ class rPathRepeater(PackageRecipe):
         'pyOpenSSL',
         'python-devel',
         'python-lxml',
-        'pywbem:python',
         'rmake3:python',
         'rpath-tools:python',
         'smartform:python',

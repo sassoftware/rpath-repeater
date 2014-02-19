@@ -26,7 +26,6 @@ class rPathRepeaterTest(TestPackageRecipe):
         'conary-test:python',
         'make',
         'python-devel',
-        'pywbem:python',
         'rmake3:python',
         'rpath-repeater:lib',
         'rpath-repeater:python',
