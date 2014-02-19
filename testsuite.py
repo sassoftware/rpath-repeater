@@ -27,7 +27,6 @@ class Suite(suite.TestSuite):
 
     execPathVarNames = [
         'CONARY_PATH',
-        'RPATH_TOOLS_PATH',
         'SMARTFORM_PATH',
         'XOBJ_PATH',
         'WMICLIENT_PATH',
