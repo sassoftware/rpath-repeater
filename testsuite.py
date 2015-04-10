@@ -29,7 +29,6 @@ class Suite(suite.TestSuite):
         'CONARY_PATH',
         'SMARTFORM_PATH',
         'XOBJ_PATH',
-        'WMICLIENT_PATH',
     ]
 
 _s = Suite()
