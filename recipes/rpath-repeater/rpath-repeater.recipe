@@ -27,7 +27,6 @@ class rPathRepeater(PackageRecipe):
         'python-lxml',
         'rmake3:python',
         'smartform:python',
-        'wmiclient:python',
         'xobj:python',
     ]
 
