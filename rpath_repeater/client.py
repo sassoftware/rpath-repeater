@@ -192,38 +192,6 @@ class RepeaterClient(object):
 
         return (uuid, job.thaw())
 
-    def _cimCallDispatcher(self, method, cimParams, resultsLocation=None,
-            zone=None, uuid=None, jobToken=None, **kwargs):
-        if uuid is None:
-            uuid = RmakeUuid.uuid4()
-        params = self._callParams(method, resultsLocation, zone, jobToken,
-                **kwargs)
-        assert isinstance(cimParams, self.CimParams)
-        if cimParams.port is None:
-            cimParams.port = 5989
-        params['cimParams'] = cimParams.toDict()
-        return self._launchRmakeJob(self.__CIM_PLUGIN_NS, params, uuid=uuid)
-
-    def _wmiCallDispatcher(self, method, wmiParams, resultsLocation=None,
-            zone=None, uuid=None, jobToken=None, **kwargs):
-        if uuid is None:
-            uuid = RmakeUuid.uuid4()
-        params = self._callParams(method, resultsLocation, zone, jobToken,
-                **kwargs)
-        assert isinstance(wmiParams, self.WmiParams)
-        if wmiParams.port is None:
-            wmiParams.port = 135
-        params['wmiParams'] = wmiParams.toDict()
-        return self._launchRmakeJob(self.__WMI_PLUGIN_NS, params, uuid=uuid)
-
-    def register_cim(self, cimParams, **kwargs):
-        method = 'register'
-        return self._cimCallDispatcher(method, cimParams, **kwargs)
-
-    def register_wmi(self, wmiParams, **kwargs):
-        method = 'register'
-        return self._wmiCallDispatcher(method, wmiParams, **kwargs)
-
     def bootstrap(self, assimilatorParams, resultsLocation=None, zone=None,
             uuid=None, jobToken=None, **kwargs):
         '''this will only be valid for Linux, and adopts an unmanaged system'''
@@ -234,56 +202,8 @@ class RepeaterClient(object):
         params['assimilatorParams'] = assimilatorParams.toDict()
         return self._launchRmakeJob(self.__ASSIMILATOR_PLUGIN_NS, params, uuid=uuid)
 
-    def shutdown_cim(self, cimParams, **kwargs):
-        method = 'shutdown'
-        return self._cimCallDispatcher(method, cimParams, **kwargs)
-
-    def shutdown_wmi(self, cimParams, **kwargs):
-        method = 'shutdown'
-        raise NotImplementedError(method)
-
-    def update_cim(self, cimParams, **kwargs):
-        method = 'update'
-        return self._cimCallDispatcher(method, cimParams, **kwargs)
-
-    def update_wmi(self, wmiParams, **kwargs):
-        method = 'update'
-        return self._wmiCallDispatcher(method, wmiParams, **kwargs)
-
-    def configuration_cim(self, cimParams, configuration=None, **kwargs):
-        method = 'configuration'
-        return self._cimCallDispatcher(method, cimParams,
-            configuration=configuration, **kwargs)
-
-    def configuration_wmi(self, wmiParams, configuration=None, **kwargs):
-        method = 'configuration'
-        return self._wmiCallDispatcher(method, wmiParams,
-            configuration=configuration, **kwargs)
-
-    def survey_scan_cim(self, cimParams, **kwargs):
-        method = 'survey_scan'
-        return self._cimCallDispatcher(method, cimParams, **kwargs)
-
-    def survey_scan_wmi(self, wmiParams, **kwargs):
-        method = 'survey_scan'
-        return self._wmiCallDispatcher(method, wmiParams, **kwargs)
-
-    def retireNode(self, node, zone, port = None):
-        """ This is a temporary large hammer for handling the retirement
-            of a management node.
-        """
-        return self.shutdown(node, zone, port)
-
     def getNodes(self):
         return self.client.getWorkerList()
-
-    def poll_cim(self, cimParams, **kwargs):
-        method = 'poll'
-        return self._cimCallDispatcher(method, cimParams, **kwargs)
-
-    def poll_wmi(self, wmiParams, **kwargs):
-        method = 'poll'
-        return self._wmiCallDispatcher(method, wmiParams, **kwargs)
 
     def launchWaitForNetwork(self, cimParams, resultsLocation=None, zone=None,
             uuid=None, jobToken=None, **kwargs):
@@ -304,26 +224,6 @@ class RepeaterClient(object):
 
         return (uuid, job)
 
-    def detectMgmtInterface(self, mgmtParams, resultsLocation=None,
-            zone=None, uuid=None, jobToken=None, **kwargs):
-        """
-        ifaceParamList is a list of ManagementInterfaceParams to be probed
-        """
-        params = dict(
-                zone=zone or self.zone,
-                authToken=jobToken,
-                params=mgmtParams.toDict(),
-                )
-
-        if resultsLocation is not None:
-            assert isinstance(resultsLocation, self.ResultsLocation)
-            params['resultsLocation'] = resultsLocation.toDict()
-
-        uuid, job = self._launchRmakeJob(self.__MGMT_IFACE_PLUGIN_NS,
-            params, uuid=uuid)
-
-        return (uuid, job)
-
     def getJob(self, uuid):
         return self.client.getJob(uuid).thaw()
 
@@ -332,30 +232,14 @@ def main():
     if len(sys.argv) < 2:
         print "Usage: %s system" % sys.argv[0]
         return 1
-    system = sys.argv[1]
     zone = 'Local rBuilder'
     cli = RepeaterClient(jobUrlTemplate="http://localhost:1234/api/v1/jobs/%(job_uuid)s")
-    eventUuid = "0xDeadBeef"
-    resultsLocation = cli.ResultsLocation(path="/adfadf", port=1234)
-    cimParams = cli.CimParams(host=system,
-        eventUuid=eventUuid,
-        #requiredNetwork="1.1.1.1",
-        #clientCert=file("/tmp/reinhold.crt").read(),
-        #clientKey=file("/tmp/reinhold.key").read(),
-    )
-    wmiParams = cli.WmiParams(host=system, port=135,
-        eventUuid = eventUuid,
-        username="Administrator",
-        password="password",
-        domain=system)
     targetConfiguration = cli.targets.TargetConfiguration(
         'vmware', 'vsphere.eng.rpath.com', 'vsphere', config={})
     userCredentials = cli.targets.TargetUserCredentials(credentials=dict(
         username="eng", password="password"),
         rbUser="dontcare", rbUserId=1, isAdmin=False, opaqueCredentialsId=1)
     if 1:
-        uuid, job = cli.survey_scan_cim(cimParams, zone=zone)
-    elif 0:
         cli.targets.configure(zone, targetConfiguration)
         uuid, job = cli.targets.checkCreate()
     elif 0:
@@ -427,73 +311,6 @@ def main():
     elif 0:
         cli.targets.configure(zone, targetConfiguration, userCredentials)
         uuid, job = cli.targets.listImages(imageIds=None)
-    elif 0:
-        uuid, job = cli.register_cim(cimParams)
-    elif 0:
-        uuid, job = cli.poll_cim(cimParams, resultsLocation=resultsLocation,
-            zone=zone)
-    elif 0:
-        params = cli.ManagementInterfaceParams(host=system,
-            eventUuid = eventUuid,
-            interfacesList = [
-                dict(interfaceHref='/api/inventory/management_interfaces/2',
-                     port=1234),
-                dict(interfaceHref='/api/inventory/management_interfaces/1',
-                     port=5989),
-            ])
-        uuid, job = cli.detectMgmtInterface(params,
-            resultsLocation = resultsLocation,
-            zone = zone)
-    elif 0:
-        uuid, job = cli.register_wmi(wmiParams,
-            resultsLocation = resultsLocation,
-            zone=zone)
-    elif 0:
-        uuid, job = cli.poll_wmi(wmiParams,
-            resultsLocation = resultsLocation,
-            zone = zone)
-    elif 0:
-        uuid, job = cli.update_wmi(wmiParams,
-            resultsLocation = resultsLocation,
-            zone = zone,
-            sources = [
-                'group-windemo-appliance=/windemo.eng.rpath.com@rpath:windemo-1-devel/1-2-1[]',
-            ],
-            )
-    else:
-       
-        keyData = file("/root/.ssh/id_rsa.pub").read() 
-        assimilatorParams = cli.AssimilatorParams(host=system, port=22,
-            eventUuid='eventUuid',
-            # normally filled in by rBuilder
-            caCert=file("/srv/rbuilder/pki/hg_ca.crt").read(),
-            # normally filled in by plugin
-            platformLabels={
-                'centos-5' : [ 'jules.eng.rpath.com@rpath:centos-5-stable',
-                               'centos.rpath.com@rpath:centos-5-common' ],
-                'sles-11'  : [ 'jules.eng.rpath.com@rpath:sles-11-stable', 
-                               'sles.rpath.com@rpath:sles-11-common' ]
-            },
-            sshAuth = [
-                           { 
-                               'sshUser'     : 'root', 
-                               'sshKey'      : keyData,
-                               'sshPassword' : 'letmein',
-                           },
-                           { 
-                               'sshUser'     : 'root', 
-                               'sshPassword' : 'wrong1' 
-                           },
-                           { 
-                               'sshUser'     : 'root', 
-                               'sshPassword' : 'password' 
-                           },
-            ]
-        )
-
-        uuid, job = cli.bootstrap(assimilatorParams,
-            resultsLocation = resultsLocation,
-            zone = zone)
     while 1:
         job = cli.getJob(uuid)
         if job.status.final:
