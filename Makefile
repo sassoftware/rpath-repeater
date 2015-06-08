@@ -14,7 +14,6 @@
 # limitations under the License.
 #
 
-
 all: all-subdirs default-all
 
 all-subdirs:
